@@ -65,18 +65,24 @@ repo-root/
 │       ├── main.go         # Main executable
 │       └── jobs/           # Job implementations (if applicable)
 │           └── job.go
-├── pkg/                    # Application libraries and packages
-│   ├── api/                # API client libraries
-│   ├── config/             # Configuration structures
+├── pkg/                    # Shared libraries (reusable across HyperFleet services)
+│   ├── logger/             # Structured logging
+│   ├── errors/             # Error handling utilities
+│   └── utils/              # Common utility functions
+├── internal/               # Private application code (service-specific)
+│   ├── api/                # API client implementations
+│   ├── config/             # Configuration loading
 │   ├── handlers/           # HTTP handlers
 │   ├── services/           # Business logic
-│   ├── models/             # Data models
-│   └── utils/              # Utility functions
+│   └── models/             # Data models
+├── configs/                # Configuration file templates (if applicable)
+│   ├── config.yaml.example # Example configuration
+│   └── defaults/           # Default configurations
 ├── openapi/                # OpenAPI/Swagger specifications (if applicable)
 │   ├── api.yaml            # OpenAPI 3.0 specification
 │   └── v1/                 # Versioned API specs
 │       └── swagger.json
-├── k8s/                    # Kubernetes manifests
+├── kustomize/              # Kustomize manifests (if applicable)
 │   ├── base/               # Base Kustomize configuration
 │   ├── overlays/           # Environment-specific overlays
 │   │   ├── dev/
@@ -118,7 +124,8 @@ repo-root/
 |-----------|---------|----------|-------|
 | `bin/` | Compiled binaries | Yes | Must be in `.gitignore` |
 | `cmd/` | Main application entry points | Yes | One subdirectory per executable |
-| `pkg/` | Application libraries and packages | Yes | All reusable code and business logic |
+| `pkg/` | Shared libraries | Yes | Code designed for reuse across HyperFleet services (logger, errors, utils) |
+| `internal/` | Private application code | Yes | Service-specific implementation (handlers, services, models, config). Go compiler prevents external imports. |
 | `Makefile` | Build automation | Yes | See [makefile-conventions.md](makefile-conventions.md) |
 | `README.md` | Project documentation | Yes | Clear overview and setup instructions |
 
@@ -127,9 +134,10 @@ repo-root/
 | Directory | Purpose | When to Use | Notes |
 |-----------|---------|-------------|-------|
 | `build/` | Temporary build artifacts | If build generates temporary files | Must be in `.gitignore` |
+| `configs/` | Configuration file templates | If repo requires default configs or examples | Example configs, defaults. Committed to Git |
 | `openapi/` | OpenAPI/Swagger specifications | If repo defines APIs via OpenAPI specs | YAML/JSON files, committed to Git |
-| `k8s/` | Kubernetes manifests | If repo deploys to Kubernetes | Use Kustomize structure |
-| `helm/` | Helm charts | If repo provides Helm charts | One chart per directory |
+| `kustomize/` | Kustomize manifests | If repo uses Kustomize for deployment | Base + overlays structure |
+| `helm/` | Helm charts | If repo uses Helm for deployment | One chart per directory |
 | `docs/` | Additional documentation | If README.md is not sufficient | Markdown files |
 | `scripts/` | Helper scripts | If repo has automation scripts | Shell, Python, etc. |
 | `test/` | Integration/E2E tests | If unit tests are in `*_test.go` files | Separate from unit tests |
