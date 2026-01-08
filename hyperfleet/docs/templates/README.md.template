@@ -1,0 +1,122 @@
+# [Repository Name]
+
+[2-3 sentence description of what this component does and its role in HyperFleet. Replace this placeholder with specific information about your repository's purpose and scope.]
+
+## Quick Start
+
+[Essential setup steps that get someone running the project/service. Include the absolute minimum steps needed to get the component working. Example:]
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/openshift-hyperfleet/[repository-name].git
+cd [repository-name]
+
+# 2. Install dependencies
+make install
+
+# 3. Run
+make run
+```
+
+## Prerequisites
+
+[Required tools, versions, access, etc. Be specific about versions. Example:]
+
+- **[Language/Runtime]** [version]+
+- **[Build Tool]** [version]+
+- **[Database/Service]** [version]+
+- **[Authentication/Access]** [requirements]
+
+See [PREREQUISITES.md](PREREQUISITES.md) for installation instructions (if you have a separate prerequisites file).
+
+## Installation
+
+[Detailed setup instructions with commands. Include all steps from initial setup to first successful run. Example:]
+
+```bash
+# 1. Install dependencies
+[dependency-install-commands]
+
+# 2. Build
+make build
+
+# 3. Setup database/services (if applicable)
+make db/setup
+
+# 4. Run migrations (if applicable)
+./bin/[binary-name] migrate
+
+# 6. Start service
+make run
+```
+
+## [Usage|API Resources|Core Features]
+
+[Choose the most appropriate heading based on your repository type:]
+
+[How to use the component, main endpoints, key functionality. Include practical examples.]
+
+<!-- For API services, you may use this structure: -->
+### [Resource Name]
+[Description of what this resource represents]
+
+**Main endpoints:**
+- `GET/POST /api/[version]/[resource]`
+- `GET /api/[version]/[resource]/{id}`
+
+**Example usage:**
+```bash
+# Example API calls
+curl http://localhost:8000/api/v1/[resource] | jq
+```
+
+<!-- For CLI tools, you may use this structure: -->
+### Commands
+```bash
+# List available commands
+[tool-name] help
+
+# Example usage
+[tool-name] [command] [options]
+```
+
+<!-- For libraries, you may use this structure: -->
+### Usage Example
+```[language]
+// Code example showing basic usage
+```
+
+## [Documentation]
+
+[Only include this section if you have a docs/ directory with substantial documentation]
+
+### Core Documentation
+- **[API Reference](docs/api/README.md)** - Complete API documentation
+- **[Examples](docs/examples/README.md)** - Usage examples and tutorials
+- **[Architecture](docs/architecture/README.md)** - Component design and decisions
+
+### Additional Resources
+[List any additional guides specific to your component]
+- **[Deployment Guide](docs/deployment.md)** - Production deployment
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+
+## [Repository-Specific Sections]
+
+[Add sections specific to your repository type. Common examples below - use only what applies:]
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contribution guidelines.
+
+---
+
+<!-- Template Notes (remove this section when using the template):
+1. Replace all [placeholders] with actual values
+2. Choose appropriate section headings based on your repository type
+3. Remove sections that don't apply to your component
+4. Add repository-specific sections as needed
+5. Keep examples current and test them regularly
+6. Link to detailed documentation in docs/ directory if it exists
+-->

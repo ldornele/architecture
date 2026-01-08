@@ -1,0 +1,165 @@
+# Contributing to [Repository Name]
+
+## Development Setup
+
+[Complete local environment setup including prerequisites, installation, and first run.]
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/openshift-hyperfleet/[repository-name].git
+cd [repository-name]
+
+# 2. Install prerequisites
+[List prerequisite installation steps or refer to README.md]
+
+# 3. Install dependencies
+[dependency-install-commands]
+
+# 4. Build the project
+make build
+
+# 5. Setup local environment
+[environment-setup-steps]
+
+# 6. Verify setup works
+make test
+```
+
+**First-time setup notes:**
+- [Any important notes for first-time contributors]
+- [Common gotchas or troubleshooting tips]
+- [Links to additional setup resources if needed]
+
+## Repository Structure
+
+[Overview of key directories and files - what's where and why. Help developers understand the codebase organization.]
+
+```
+[repository-name]/
+├── [main-directory]/           # [Description of what goes here]
+│   ├── [subdirectory]/         # [Description]
+│   └── [key-files]             # [Description]
+├── [other-directory]/          # [Description]
+├── [config-directory]/         # [Description]
+├── [test-directory]/           # [Description]
+├── Makefile                    # [Brief description of main targets]
+├── README.md                   # [Getting started guide]
+└── CONTRIBUTING.md             # [This file]
+```
+
+## Testing
+
+[How to run unit tests, integration tests, linting, and validation. Include all quality gates that PRs must pass.]
+
+### Unit Tests
+```bash
+# Run all unit tests
+make test
+
+# Run tests for specific package/module
+[specific-test-command]
+
+# Run tests with coverage
+make test-coverage
+```
+
+### Integration Tests
+```bash
+# Run integration tests (may require additional setup)
+make test-integration
+
+# Setup test environment
+[integration-test-setup-steps]
+```
+
+### Linting and Quality Checks
+```bash
+# Run all quality checks
+make lint
+
+# Run specific checks
+[specific-lint-commands]
+
+# Auto-fix issues (if available)
+make lint-fix
+```
+
+## Common Development Tasks
+
+[Build commands, running locally, generating code, etc. Include the day-to-day commands developers will use.]
+
+### Building
+```bash
+# Clean build
+make clean && make build
+
+# Build for different targets (if applicable)
+make build-[target]
+
+# Build container image
+make image
+```
+
+### Running Locally
+```bash
+# Run with default configuration
+make run
+
+# Run with custom configuration
+[custom-run-command]
+
+# Run in development mode (with auto-reload, etc.)
+make dev
+```
+
+### Code Generation (if applicable)
+```bash
+# Generate code from specifications
+make generate
+
+# Regenerate all generated files
+make generate-all
+
+# Update dependencies
+make deps-update
+```
+
+### Database Operations (if applicable)
+```bash
+# Setup local database
+make db/setup
+
+# Run migrations
+make db/migrate
+
+# Reset database to clean state
+make db/reset
+```
+
+## Release Process
+
+[How releases are created and published, or note if not applicable]
+
+### Automated Releases (if applicable)
+- Releases are automated via [describe process]
+- Version bumps happen when [describe trigger]
+- [Release artifacts/packages] are published to [location]
+
+### Manual Release Process (if applicable)
+1. [Step-by-step release process]
+2. [Version updating procedures]
+3. [Testing requirements before release]
+4. [Publication steps]
+
+**Note:** [If this component doesn't have releases, note how it's deployed/used]
+
+---
+
+<!-- Template Notes (remove this section when using the template):
+1. Replace all [placeholders] with actual values specific to your repository
+2. Remove sections that don't apply (e.g., database operations for a simple CLI tool)
+3. Add repository-specific development tasks as needed
+4. Keep commands current and test them regularly
+5. Update the repository structure diagram when directories change
+6. Consider linking to more detailed development guides in docs/ if they exist
+-->
