@@ -180,7 +180,7 @@ To help tooling identify repository types, repositories **SHOULD** include a `.h
 # .hyperfleet.yaml - Repository metadata for HyperFleet tooling
 version: v1
 repository:
-  type: helm-chart  # Repository build artifact type (see Repository Types table above)
+  types: [helm-chart]  # List of repository types (see Repository Types table above)
   name: adapter-landing-zone
   description: Helm charts for adapter deployment landing zone
 ```
@@ -198,7 +198,7 @@ repository:
 
 The standards-audit tool recognizes repository type variations:
 
-1. **With `.hyperfleet.yaml`**: The tool reads the repository type and validates against the appropriate target set
+1. **With `.hyperfleet.yaml`**: The tool reads the repository types and validates against the appropriate target sets
 2. **Without `.hyperfleet.yaml`**: The tool defaults to `service` type and expects standard targets
 3. **Auto-detection fallback**: If no `.hyperfleet.yaml` exists, the tool may infer type from:
    - Presence of `charts/` directory → `helm-chart`
@@ -206,11 +206,40 @@ The standards-audit tool recognizes repository type variations:
    - Presence of `terraform/` directory → `infrastructure`
    - Only `.md` files → `documentation`
 
+> **Note:** Targets are additive. The repository types define the **minimum required targets**. A repository with multiple types must include the required targets for each type.
+
+**Example: Service repository with Helm charts**
+
+A repository that builds binaries and also contains Helm charts would declare both types:
+
+```yaml
+# .hyperfleet.yaml
+version: v1
+repository:
+  types: [service, helm-chart]  # Must satisfy required targets for both types
+  name: my-adapter
+  description: Adapter service with deployment charts
+```
+
+```makefile
+# Required targets from 'service' type
+help:           ## Show this help
+build:          ## Build the binary
+test:           ## Run tests
+lint:           ## Run linters
+clean:          ## Clean build artifacts
+
+# Required targets from 'helm-chart' type
+helm-lint:      ## Lint Helm charts
+helm-template:  ## Render Helm templates
+helm-test:      ## Run Helm tests
+```
+
 **Example audit output for Helm-chart repository:**
 
 ```plaintext
 Repository: adapter-landing-zone
-Type: helm-chart (from .hyperfleet.yaml)
+Types: [helm-chart] (from .hyperfleet.yaml)
 
 Required Targets:
   ✓ help
