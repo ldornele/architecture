@@ -62,7 +62,7 @@ All HyperFleet repositories **MUST** implement these targets:
 | `lint` | Run linters | Execute configured linters (golangci-lint, yamllint, etc.) | Linting violations or success |
 | `clean` | Remove build artifacts | Delete all generated files (binaries, coverage, build cache) | Empty `bin/`, `build/` directories |
 
-### Example invocation
+### Example: Required targets
 
 ```bash
 make help           # See all available targets
@@ -89,7 +89,7 @@ Repositories **MAY** implement these targets if applicable:
 | `deploy` | Deploy to environment | If repo has deployment logic | Deploy to dev/staging |
 | `run` | Run the application locally | For services that can run standalone | Start local server |
 
-### Example invocation
+### Example: Optional targets
 
 ```bash
 make generate                   # Generate code from specs
