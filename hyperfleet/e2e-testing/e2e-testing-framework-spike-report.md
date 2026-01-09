@@ -1,24 +1,27 @@
-# Spike Report: E2E Testing Framework for Cluster Lifecyle Manager (CLM) System
+# Spike Report: E2E Testing Framework for Hyperfleet Core Data Flow
 
 ---
 
 **JIRA Story:** HYPERFLEET-403  
-**Date:** Jan 6, 2026  
-**Target System:** API Service + Sentinel + Multi-Cloud Adapter Tasks (GCP, AWS, Azure)
+**Date:** Jan 9, 2026  
+**Target System:** Hyperfleet API → Sentinel → Message Broker → Adapters (Core Framework)
 
 ---
 
 ## Executive Summary
 
-This spike report evaluates E2E testing frameworks for the CLM system—a distributed microservice architecture consisting of an OpenAPI-based API Service, a Sentinel orchestrator, and multiple cloud adapter tasks deployed across provider-specific Kubernetes clusters (GCP, AWS, Azure, etc.).
+This spike report evaluates E2E testing frameworks for **Hyperfleet's core data flow**—testing the end-to-end pipeline: Hyperfleet API → Sentinel → Message Broker → Adapters → back to API.
 
-After evaluating Ginkgo, Godog, and Testify, the report presents **two viable options for team vote**: 
-- **Option A (Ginkgo + Markdown)** offers a pure Go testing approach with separate documentation—prioritizing simpler stack, superior debugging, and faster development velocity. 
-- **Option B (Hybrid Ginkgo + Godog)** uses executable Gherkin scenarios to guarantee documentation-code alignment—eliminating drift risk and enabling stakeholder collaboration. Both are production-ready; the choice depends on team priorities around development velocity vs. guaranteed documentation synchronization.
+**Decision: Ginkgo v2 + Markdown Documentation**
 
-The proposed framework emphasizes a **user-centric testing philosophy**: E2E tests validate the system exclusively through the API from the user's perspective, not internal component version combinations. This drives a **branch-based version strategy** where repository branches map to CLM release versions (e.g., release-1.2.x), eliminating version tracking in test code. Backward compatibility is validated by running older branch tests against newer CLM deployments.
+After evaluating Ginkgo v2, Godog, and Testify across seven dimensions, we select **Ginkgo v2** because it excels in:
+- **Reliability & Flakiness Prevention**: Built-in async testing (`Eventually`/`Consistently`) prevents flaky tests in distributed systems
+- **AI-Assisted Development**: Pure Go optimizes LLM-driven test generation, maintenance, and debugging
+- **Maturity & Ecosystem**: Large community, widely adopted, strong long-term support
 
-The architecture abstracts **multi-provider deployment differences** through a provider interface pattern. Each cloud provider operates a dedicated K8s cluster with consistent core services (API Service, Sentinel) but provider-specific adapter sets. The framework dynamically discovers adapters and handles provider-specific timeouts, dependencies, and resource provisioning.
+We mitigate Ginkgo's documentation drift risk through AI-powered validation and CI checks (detailed in Section 2.3).
+
+**Scope**: This framework tests our core data flow architecture. Provider-specific adapter implementations (validation, DNS, etc.) are **out of scope** and should have dedicated stories. 
 
 ---
 
@@ -26,384 +29,306 @@ The architecture abstracts **multi-provider deployment differences** through a p
 
 ### 1.1 System Architecture
 
-The target system comprises Cluster Lifecyle Manager (CLM) components deployed on Kubernetes clusters:
+The target system comprises the **core Hyperfleet data flow framework**:
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                    User / API Consumer                       │
-└───────────────────────┬──────────────────────────────────────┘
-                        │
-                        ▼
-┌──────────────────────────────────────────────────────────────┐
-│              Kubernetes Cluster (CLM Deployment)             │
-│                                                              │
-│  ┌─────────────────┐                                         │
-│  │   API Service   │ (OpenAPI, User-facing, Golang)          │
-│  └────────┬────────┘                                         │
-│           │                                                  │
-│           ▼                                                  │
-│  ┌─────────────────┐                                         │
-│  │    Sentinel     │ (Orchestrator/Controller, Golang)       │
-│  └────────┬────────┘                                         │
-│           │                                                  │
-│           │                                                  │
-│           │ Step 1: Foundation Adapter                       │
-│           ▼                                                  │
-│     ┌──────────────────┐                                     │
-│     │  Landing Zone    │ ◄── Base Adapter (Required First)   │
-│     │    Adapter       │     Create required resources       │
-│     └────────┬─────────┘     (e.g., k8s namespace)           │
-│              │                                               │
-│              │ Step 2: Dependent Adapters (parallel)         │
-│              ├───────────┬─────────────┬─────────────┐       │
-│              ▼           ▼             ▼             ▼       │
-│         ┌──────────┐ ┌──────────┐ ┌──────────┐               │
-│         │Validation│ │   DNS    │ │  Pull    │               │
-│         │ Adapter  │ │Placement │ │ Secret   │     ...       │
-│         │          │ │ Adapter  │ │ Adapter  │               │
-│         └────┬─────┘ └────┬─────┘ └────┬─────┘               │
-│              │            │            │                     │
-│              └────────────┴────────────┴────────────┘        │
-│                           │                                  │
-│                           │ Step 3: Orchestration Adapter    │
-│                           ▼                                  │
-│                    ┌──────────────┐                          │
-│                    │  Hypershift  │                          │
-│                    │   Adapter    │                          │
-│                    └──────┬───────┘                          │
-│                           │                                  │
-└───────────────────────────┴──────────────────────────────────┘
-                            │
-                            ▼
-                   ┌────────────────┐
-                   │ Cloud Provider │
-                   │  (GCP/AWS/     │
-                   │   Azure/...)   │
-                   └────────────────┘
-```
+![Hyperfleet E2E Data Flow Architecture](./hyperfleet-e2e.png)
 
+*Diagram provided by Ciaran*
 
-**Note:**
-- Each K8s cluster is dedicated to a single cloud provider, ensuring strong isolation and independent lifecycle management
-- **Consistent Components:** API Service and Sentinel are deployed identically across all provider clusters
-- **Provider-Specific Components:** Adapters may differ between provider clusters based on provider requirements
+**Core Data Flow (In Scope):**
+1. **User → API**: User creates/queries objects through Hyperfleet API
+2. **API → Sentinel**: Sentinel polls API for objects requiring orchestration
+3. **Sentinel → Broker**: Sentinel creates topics and publishes to message broker
+4. **Broker → Adapter**: Topics are broadcast to adapter(s) for consumption
+5. **Adapter → API**: Adapters orchestrate task lifecycle and report state back to API
+
+**Out of Scope:**
+- Provider-specific adapter implementations (validation, DNS, pull-secret adapters, etc.)
+- Provider-specific infrastructure provisioning
+- Multi-provider deployment architecture
 
 ### 1.2 Testing Challenges
 
-1. **User-Centric Scenarios:** Tests must validate end-to-end flows from the user's perspective (e.g., "Create Cluster → Poll Status → Validate Adapters → Verify Cluster Ready")
-2. **Multi-Service Orchestration:** Each scenario involves coordinating behavior across multiple adapters (Landing Zone, Validation, DNS Placement, Pull Secret, and potentially other provider-specific adapters, plus Hypershift) deployed in Kubernetes
-3. **Multi-Cluster Testing:** E2E framework must connect to different K8s clusters to validate CLM works across providers (one cluster per provider)
-4. **Adapter Composition:** Multiple adapters per provider (Landing Zone, Validation, DNS Placement, Pull Secret, ..., Hypershift) require coordinated validation, with adapter sets potentially varying per provider
-5. **Cloud Provider Variance:** Adapters exhibit provider-specific timing, quotas, and failure modes
-6. **Version Skew:** Rolling deployments require compatibility validation across service version combinations
-7. **Kubernetes-Native Operations:** Tests must interact with K8s APIs for service discovery, health checks, and log collection
-8. **Asynchronous Operations:** Cluster provisioning involves eventual consistency, requiring intelligent polling
-
-### 1.3 Key Design Principles
-
-**User-Centric Testing Philosophy:**
-
-E2E tests must validate the system from the **user's perspective**. Users interact exclusively through the **API** and have no visibility into internal component versions or architecture.
-
-**Critical Implications:**
-
-1. ✅ **Test API Behavior, Not Component Combinations**
-    - Focus on **CLM release versions** (e.g., v1.2.0), not individual service versions
-    - Internal component compatibility (Sentinel, Adapters) is a deployment concern
-    - E2E tests validate end-to-end user workflows through the API
-
-2. ✅ **Branch-Based Testing Strategy**
-    - Use repository branches to test different CLM releases
-    - Test code aligns with the API version it validates
-
-3. ✅ **Adapter Awareness Without Version Tracking**
-    - Dynamically discover deployed adapters (varies by provider)
-    - Validate adapter functionality through API operations
-    - Don't track individual adapter versions separately
+1. **Multi-Component Data Flow:** Validating data flow across API → Sentinel → Broker → Adapter → API
+2. **Asynchronous Operations:** Eventual consistency requires intelligent polling and timeout handling
+3. **Version Skew:** Rolling deployments require compatibility validation across service versions
+4. **Framework Regression:** Changes in one component must not break downstream components
 
 ---
 
-## 2. Framework Evaluation
+## 2. Framework Selection and Evaluation
 
-### 2.1 Framework Comparison
+### 2.1 Evaluation Criteria
 
-#### 2.1.1 **Ginkgo v2** (Go BDD Testing Framework)
+Three candidate frameworks were evaluated—**Ginkgo v2**, **Godog**, and **Testify**—across seven critical dimensions:
 
-**Strengths:**
-- **Mature Go-Native BDD:** First-class BDD syntax (`Describe`, `Context`, `It`) with excellent Go integration
-- **Parallel Execution:** Built-in support for parallel specs at multiple levels (suite, describe, it)
-- **Flexible Organization:** Nested contexts, shared behaviors, and spec filtering
-- **Rich Assertions:** Integrates with Gomega for expressive, failure-message-rich assertions
-- **Polling & Async:** `Eventually()` and `Consistently()` for eventual consistency testing
-- **CLI Tooling:** Robust CLI for running, filtering, and debugging tests
+1. **Integration & Setup**: Ease of integrating testing scenarios, CI pipelines, and tooling requirements
+2. **Test Organization & Execution**: Test structure, filtering capabilities, and execution control
+3. **Documentation & Communication**: How tests serve as documentation and communicate intent to stakeholders
+4. **Reliability & Flakiness Prevention**: Built-in support for eventual consistency, retry logic, and anti-flakiness patterns
+5. **AI-Assisted Development**: Suitability for LLM-driven test generation, maintenance, and debugging
+6. **Maturity & Ecosystem**: Community size, stability, long-term support, and available resources
+7. **Long-term Maintainability**: Ease of debugging, refactoring, and evolving tests over time
 
-**Weaknesses:**
-- **Not Plain English:** While BDD-style, still code-first (not Gherkin)
-- **Learning Curve:** Developers unfamiliar with BDD may need onboarding
+### 2.2 Framework Comparison
 
-**Use Case Fit:** ★★★★★  
-Excellent for Go-native teams requiring robust parallel execution and async handling.
+| Criteria | Ginkgo v2 | Godog | Testify |
+|----------|-----------|-------|---------|
+| **Integration & Setup** | ⭐⭐⭐⭐⭐ Standard Go, zero dependencies | ⭐⭐⭐☆☆ Requires Godog runner + feature files | ⭐⭐⭐⭐⭐ Standard Go test |
+| **Test Organization & Execution** | ⭐⭐⭐⭐⭐ Labels, hierarchical, parallel | ⭐⭐⭐⭐☆ Tags, scenarios, serial by default | ⭐⭐☆☆☆ Flat, name-based |
+| **Documentation & Communication** | ⭐⭐⭐☆☆ Requires separate Markdown docs | ⭐⭐⭐⭐⭐ Executable specs, zero drift | ⭐⭐☆☆☆ Code-only |
+| **Reliability & Flakiness Prevention** | ⭐⭐⭐⭐⭐ Eventually/Consistently, automatic retry | ⭐⭐☆☆☆ Manual polling with custom logic | ⭐⭐☆☆☆ Manual implementation |
+| **AI-Assisted Development** | ⭐⭐⭐⭐⭐ Single language, direct debugging | ⭐⭐⭐☆☆ Two languages, higher token cost | ⭐⭐⭐⭐☆ Simple but limited |
+| **Maturity & Ecosystem** | ⭐⭐⭐⭐⭐ Large community, widely adopted | ⭐⭐⭐☆☆ Smaller community, growing | ⭐⭐⭐⭐☆ Mature, simpler scope |
+| **Long-term Maintainability** | ⭐⭐⭐⭐☆ Doc drift risk, strong tooling | ⭐⭐⭐⭐☆ Two files to maintain, clear intent | ⭐⭐⭐☆☆ Limited structure |
 
-#### 2.1.2 **Godog** (Cucumber/Gherkin for Go)
+**Key Trade-offs:**
 
-**Strengths:**
-- **Gherkin Syntax:** Enables plain-English scenario definitions (Given/When/Then)
-- **Documentation-as-Code:** Feature files serve as both documentation and test definitions
-- **Business Alignment:** Non-technical stakeholders can read and validate scenarios
-- **Step Reusability:** Step definitions promote DRY principles
+| Framework | Strengths | Weaknesses |
+|-----------|-----------|------------|
+| **Ginkgo v2** | • Built-in async testing (`Eventually`/`Consistently`)<br>• Pure Go (AI-friendly, single language)<br>• Rich organization (labels, parallel, ordered) | • Separate docs (drift risk)<br>• Less accessible to non-developers |
+| **Godog** | • Executable specs (zero drift by design)<br>• Readable by non-developers<br>• Industry-standard Gherkin | • Manual async patterns<br>• Two-file system overhead<br>• Less AI-optimal (context switching) |
 
-**Weaknesses:**
-- **Less Mature:** Smaller community compared to Ginkgo
-- **Limited Parallel Support:** Parallel execution less sophisticated than Ginkgo
-- **Verbosity:** Gherkin can become unwieldy for complex technical scenarios
-- **Debugging:** Stack traces less intuitive than pure Go tests
+**Decision: Ginkgo v2**
 
-**Use Case Fit:** ★★★★☆  
-Ideal when documentation-code alignment is paramount, especially for compliance-driven environments.
+For Hyperfleet E2E testing, we prioritize **reliability** (robust async testing) and **development velocity** (AI-assisted workflows) over executable documentation. Meanwhile, we mitigate doc drift through AI-powered validation (Section 2.3).
 
-#### 2.1.3 **Testify** (Assertion & Mocking Library)
+*See Appendix A for detailed framework evaluations.*
 
-**Strengths:**
-- **Lightweight:** Minimal abstraction, feels like idiomatic Go
-- **Suite Support:** `suite` package provides setup/teardown hooks
-- **Familiar Syntax:** Assertions resemble JUnit/xUnit patterns
+### 2.3 Implementation: Ginkgo v2 + Markdown Documentation
 
-**Weaknesses:**
-- **No BDD Structure:** Lacks hierarchical organization (no nested contexts)
-- **No Parallel Primitives:** Must implement parallelization manually
-- **Limited Async Support:** No built-in polling/eventual consistency helpers
+The Hyperfleet E2E testing framework uses **Ginkgo v2** with **Markdown documentation**. This section details implementation patterns and how we address documentation drift.
 
-**Use Case Fit:** ★★★☆☆  
-Suitable for unit/integration tests but lacks E2E orchestration features.
+#### 2.3.1 Reliability & Flakiness Prevention
 
-### 2.2 Recommendation Options (For Team Vote)
-
-Both approaches are viable for CLM E2E testing. The choice depends on team priorities and organizational context. **Please review both options and vote on your preference.**
-
----
-
-#### **Option A: Ginkgo + Markdown Documentation**
-
-**Approach:**  
-Use **Ginkgo v2** for all test implementation with **separate Markdown documents** for scenario documentation. Tests reference doc sections via comments/tags.
-
-**Key Benefits:**
-1. ✅ **Simpler Stack:** Pure Go testing, no additional DSL (Gherkin) - single language for entire team
-2. ✅ **Superior Debugging:** Stack traces map directly to Go code, no step mapping indirection
-3. ✅ **Full Go Power:** No Gherkin constraints on test structure - use full language features
-4. ✅ **Flexible Documentation:** Markdown supports diagrams, code blocks, tables, links, images
-5. ✅ **Lower Learning Curve:** Most developers already know Markdown and Go
-6. ✅ **Faster Development:** Write tests directly without defining step definitions
-7. ✅ **Easier Maintenance:** Single codebase, no step definition sync overhead
-8. ✅ **Native Performance:** No interpretation layer between tests and implementation
-9. ✅ **Team Familiarity:** Go developers can be productive immediately
-
-**Trade-offs:**
-- ⚠️ Drift Risk: Docs and code can diverge without automated validation (mitigated by process and code review)
-- ⚠️ Manual Sync: Requires discipline to keep docs updated (can be enforced via PR templates and checklists)
-
-**Best For:**
-- Engineering-focused teams comfortable with Go
-- Projects prioritizing development velocity and debugging efficiency
-- Teams wanting maximum flexibility in test implementation
-- Organizations with strong code review practices
-- Technical audiences who value code readability over natural language
-
-**Implementation Example:**  
-```markdown
-<!-- scenarios/cluster_lifecycle.md -->
-## Scenario: Create Cluster with All Adapters
-**Test ID:** E2E-CLM-001  
-**Priority:** Critical
-
-### Prerequisites
-- CLM cluster (gcp-prod) is accessible via kubeconfig
-- All adapters deployed and healthy
-
-### Steps
-1. Connect to GCP CLM cluster via K8s API
-2. Verify all 5 adapters are in Running state
-3. Submit CREATE_CLUSTER request via API service
-4. Poll cluster status every 30 seconds
-5. Validate cluster reaches READY within 15 minutes
-6. Verify all adapters report SUCCESS status
-
-### Expected Results
-- API returns 202 Accepted
-- Cluster ID is valid UUID
-- All adapters complete successfully
-- Cluster state is READY
-```
+Distributed E2E testing requires robust async handling. Ginkgo's built-in patterns eliminate entire classes of flaky tests:
 
 ```go
-// tests/cluster_lifecycle_test.go
-// Implements: scenarios/cluster_lifecycle.md
-var _ = Describe("Cluster Lifecycle", Label("E2E-CLM-001", "multi-provider", "critical"), func() {
-    // Multi-provider test using DescribeTable
-    DescribeTable("Create cluster successfully",
-        func(providerName string, providerConfig map[string]string) {
-            var (
-                ctx       context.Context
-                provider  providers.CloudProvider
-                k8sClient *clients.K8sClient
-                apiClient *clients.APIClient
-                clusterID string
-            )
+// Eventual consistency - polls until condition met or timeout
+Eventually(func() string {
+    return apiClient.GetObjectStatus(ctx, objectID).State
+}, 10*time.Minute, 15*time.Second).Should(Equal("COMPLETED"))
 
-            ctx = context.Background()
-            // Build complete config with common and provider-specific settings
-            config := map[string]string{
-                "kubeconfig":   fmt.Sprintf("/path/to/%s-kubeconfig", providerName),
-                "cluster_name": fmt.Sprintf("%s-prod", providerName),
-                "namespace":    "clm-system",
-            }
-            // Merge provider-specific config
-            for k, v := range providerConfig {
-                config[k] = v
-            }
+// Stable state verification - ensures condition remains true
+Consistently(func() bool {
+    return brokerClient.IsHealthy(ctx)
+}, 2*time.Minute, 5*time.Second).Should(BeTrue())
+```
 
-            var err error
-            provider, err = providers.NewProvider(providerName, config)
-            Expect(err).NotTo(HaveOccurred())
+**Anti-Flakiness Patterns:**
+- **No fixed sleeps**: `Eventually` polls dynamically, adapts to actual system timing
+- **Automatic retry**: Transparent handling of transient failures
+- **Configurable timeouts**: Environment-specific timing without code changes
+- **Idempotent cleanup**: Resources freed even on test failures
 
-            // Submit cluster creation request
-            By(fmt.Sprintf("Creating %s cluster via API", providerName))
-            clusterSpec := &clients.ClusterSpec{
-                Name:      fmt.Sprintf("test-%s-%d", providerName, time.Now().Unix()),
-                Provider:  providerName,
-                Region:    provider.Region(),
-                NodeCount: 3,
-            }
-
-            cluster, err := apiClient.CreateCluster(ctx, clusterSpec)
-            Expect(err).NotTo(HaveOccurred())
-            Expect(cluster).NotTo(BeNil())
-
-            // Verify all adapters completed successfully (with provider-specific timeouts)
-            By("Verifying all adapters complete successfully")
-            for _, adapterName := range requiredAdapters {
-                timeout := provider.GetAdapterTimeout(adapterName)
-                Eventually(func() string {
-                    status, err := apiClient.GetAdapterStatus(ctx, clusterID, adapterName)
-                    if err != nil {
-                        GinkgoWriter.Printf("Error getting adapter status: %v\n", err)
-                        return "ERROR"
-                    }
-                    return status.State
-                }, timeout, 30*time.Second).Should(Equal("SUCCESS"),
-                    fmt.Sprintf("Adapter %s should reach SUCCESS state", adapterName))
-            }
-
-            // Verify cluster is ready
-            By("Polling for cluster READY state")
-            clusterTimeout := provider.GetClusterTimeout(providerName)
-            Eventually(func() string {
-                status, err := apiClient.GetClusterStatus(ctx, clusterID)
-                if err != nil {
-                    GinkgoWriter.Printf("Error getting cluster status: %v\n", err)
-                    return "ERROR"
-                }
-                GinkgoWriter.Printf("Cluster state: %s\n", status.State)
-                return status.State
-            }, clusterTimeout, 30*time.Second).Should(Equal("READY"),
-                "Cluster should reach READY state within 15 minutes")
-
-            // Cleanup
-            _ = helpers.DeleteCluster(ctx, apiClient, clusterID, 5*time.Minute)
-        },
-
-        // Test entries with provider-specific configuration and labels
-        Entry("on GCP", "gcp", map[string]string{
-            "region":     "us-central1",
-            "project_id": "test-project",
-        }, Label("gcp", "provider:gcp")),
-
-        Entry("on AWS", "aws", map[string]string{
-            "region":     "us-east-1",
-            "account_id": "123456789012",
-        }, Label("aws", "provider:aws")),
-    )
+```go
+AfterEach(func() {
+    defer GinkgoRecover() // Don't let cleanup failures crash suite
+    if testObject != nil {
+        _ = apiClient.DeleteObject(testObject.ID) // Ignore errors
+        Eventually(func() bool {
+            _, err := apiClient.GetObject(testObject.ID)
+            return err != nil && IsNotFoundError(err)
+        }, 5*time.Minute).Should(BeTrue())
+    }
 })
 ```
 
-**For new feature:**
-- **Create Documentation:** Add or update the Markdown document describing the scenario with prerequisites, steps, and expected results
-- **Implement Tests:** Write corresponding Go test using Ginkgo via documentation comments/labels (e.g., `// Implements: docs/scenarios/feature.md`)
-- **Code Review:** Ensure documentation and test implementation are reviewed together to maintain alignment
+
+#### 2.3.2 AI-Assisted Development
+
+- **Single language**: LLMs parse pure Go without Gherkin/Go context switching
+- **Direct debugging**: Stack traces map to exact code locations
+- **High generation accuracy**: LLMs produce correct Ginkgo patterns with minimal context
+
+#### 2.3.3 Test Organization
+
+**Label-based filtering:**
+```bash
+ginkgo --label-filter="smoke && gcp"      # Smoke tests for Kafka
+ginkgo --label-filter="critical && !day2"    # Critical excluding SQS
+```
+
+**Ordered execution with shared setup:**
+```go
+Describe("Nodepool", Ordered, func() {
+    BeforeAll(func() { clusterID = createCluster() })
+    It("creates nodepool", func() { ... })
+    It("scales nodepool", func() { ... })
+    AfterAll(func() { deleteCluster(clusterID) })
+})
+```
+
+#### 2.3.4 Documentation Sync Strategy
+
+**Challenge:** Separate Markdown documentation can drift from test code.
+
+**Solution:** AI-assisted sync validation:
+
+**Approach:**
+
+1. **Metadata anchors** link docs to tests:
+   ```markdown
+   **AI-Sync-ID:** E2E-FLOW-001
+   ```
+   ```go
+   // @AI-Sync-ID: E2E-FLOW-001
+   var _ = Describe("Data Flow", Label("E2E-FLOW-001"), ...)
+   ```
+
+2. **AI-powered validation**: LLMs verify sync by scanning AI-Sync-IDs, detect drift
+
+3. **CI enforcement**: Automated checks catch missing implementations or orphaned docs
+
+4. **Markdown advantages**: Supports diagrams, links, embedded content beyond Gherkin's limitations
+
+#### 2.3.5 Test Case Structure
+**Example:**
+```markdown
+<!-- scenarios/data_flow.md -->
+## Scenario: End-to-End Object Creation Data Flow
+**AI-Sync-ID:** E2E-FLOW-001  
+**Priority:** Critical
+...
+```
+*Refer to the [Test Case Markdown Template](https://github.com/openshift-hyperfleet/hyperfleet-e2e/blob/main/testcases/template.md) for detailed structure.*
+
+```go
+// tests/data_flow_test.go
+// @AI-Sync-ID: E2E-FLOW-001
+var _ = Describe("End-to-End Data Flow", Label("E2E-FLOW-001", "critical"), func() {
+    // Test implementation
+})
+```
 
 ---
 
-#### **Option B: Hybrid Ginkgo + Godog Architecture** 
+## 3. Compatibility Testing Strategy
 
-**Approach:**  
-Use **Ginkgo v2** as the test runner and orchestration layer, with **Godog (Gherkin)** for scenario definition in critical user flows.
+### 3.1 Branch-Based Testing Model
 
-**Key Benefits:**
-1. ✅ **Executable Documentation:** Gherkin `.feature` files auto-validate against implementation
-2. ✅ **Zero Drift Risk:** Scenarios cannot diverge from code (tests fail if out of sync)
-3. ✅ **Stakeholder Collaboration:** Product, QA, Compliance can read and validate scenarios
-4. ✅ **Living Documentation:** Scenarios serve as both specs and tests
-5. ✅ **Industry Standard:** Gherkin is widely adopted (Cucumber, SpecFlow, Behave)
+**Principle:** Repository branch = CLM Framework version (no version tracking in test code).
 
-**Trade-offs:**
-- ⚠️ Learning Curve: Team needs to learn Gherkin syntax and step definitions
-- ⚠️ Debugging Complexity: Requires mapping from Gherkin steps to Go code
-- ⚠️ Constraints: Test logic must fit Given/When/Then structure
-- ⚠️ Additional Abstraction Layer: Step definitions add indirection
-- ⚠️ Slower Development: Must define steps before writing tests
-- ⚠️ Maintenance Overhead: Keep step definitions in sync with test code
+**Structure:**
+```
+e2e-tests/
+├── release-1.0.x/        # Tests for Hyperfleet v1.0.x
+├── release-1.1.x/        # Tests for Hyperfleet v1.1.x
+├── release-1.2.x/        # Tests for Hyperfleet v1.2.x (current)
+└── main/                 # Tests for next release (development)
+```
 
-**Best For:**
+Each branch contains tests for that specific framework release. Branch name implicitly defines which API contract tests expect.
+
+### 3.2 Backward Compatibility Testing
+
+Run old tests on new framework to validate backward compatibility:
+
+```bash
+# Test current release
+git checkout release-1.2
+./e2e-runner --env=staging.yaml  # v1.2.0 passes
+
+# Test backward compatibility  
+git checkout release-1.1          # Old tests
+./e2e-runner --env=staging.yaml   # Same v1.2.0 environment passes
+```
+
+**Validates:**
+- API contract stability across versions
+- Topic format compatibility
+- Framework component interoperability
+
+---
+
+## Appendix A: Detailed Framework Evaluations
+
+This appendix provides detailed assessments of each framework for reference.
+
+### A.1 Hybrid Ginkgo + Godog Pattern
+
+**Overview:**
+An alternative approach using Ginkgo v2 as the test runner with Godog (Gherkin) for scenario definition in critical user flows.
+
+**Key Characteristics:**
+- Executable Gherkin `.feature` files serve as both documentation and test specifications
+- Step definitions map Gherkin steps to Go implementation
+- Zero drift between documentation and code (tests fail if out of sync)
+- Industry-standard Gherkin syntax for cross-tool compatibility
+
+**When This Approach Makes Sense:**
 - Organizations with strong compliance/audit requirements requiring traceable documentation
-- Cross-functional teams with significant non-developer involvement (Product, QA, Legal)
-- Projects where business stakeholders need to validate test scenarios
-- Teams with existing Gherkin/Cucumber experience
+- Cross-functional teams with significant non-developer involvement (Product, QA, Legal, Compliance)
+- Projects where business stakeholders must validate test scenarios
+- Environments where executable specifications are mandated by policy
+- Teams with existing Gherkin/Cucumber expertise and tooling
 
-**Implementation Example:**  
+**Trade-offs vs. Recommended Approach:**
+- **Learning Curve:** Requires team to learn Gherkin syntax and step definition patterns
+- **Development Velocity:** Slower test creation with AI assistance compared to pure Go
+- **Debugging Complexity:** Stack traces require mapping from Gherkin steps to Go code
+- **AI Integration:** Lower first-pass accuracy compared to pure Go approach
+- **Context Overhead:** Higher LLM token consumption compared to single-file approach
+- **Maintenance:** Additional step definition layer to maintain and keep in sync
+
+**Example Implementation:**
+
 ```gherkin
-# scenarios/cluster_lifecycle.feature
-@cluster-lifecycle @multi-provider
-Feature: Cluster Lifecycle Management
-  As a platform user
-  I want to create, monitor, and delete clusters via the API
-  So that I can manage infrastructure programmatically across multiple cloud providers
+# scenarios/data_flow.feature
+@data-flow @framework
+Feature: End-to-End Data Flow Validation
+  As a framework developer
+  I want to validate the complete data flow from API to adapter
+  So that I can ensure framework components work together correctly
 
-  @critical @E2E-CLM-001 @multi-provider
-  Scenario Outline: Create cluster successfully on multiple providers
-    Given I am testing provider "<provider>"
+  @critical @E2E-FLOW-001
+  Scenario: Complete data flow for object creation
+    Given the Hyperfleet API is available
+    And Sentinel is running and polling
+    And the message broker is healthy
+    And at least one adapter is deployed
 
-    When I submit a "CREATE_CLUSTER" request with:
-      | field      | value        |
-      | name       | test-cluster |
-      | provider   | <provider>   |
+    When I create an object via the API:
+      | field | value          |
+      | name  | test-object-1  |
+      | type  | ClusterRequest |
     Then I should receive a "202" response
-    And the response should contain a valid cluster ID
+    And the response should contain a valid object ID
 
-    # Verify adapters complete (uses provider-specific timeouts)
-    When I check the adapter statuses for the cluster
-    Then all required adapters should reach "SUCCESS" state
+    # Verify Sentinel detects object
+    When I wait for Sentinel to detect the object
+    Then Sentinel should have detected the object within "2 minutes"
 
-    # Verify cluster ready
-    When I poll the cluster status every "30 seconds"
-    Then the cluster should reach "READY" state within "15 minutes"
+    # Verify topic created
+    When I check the message broker
+    Then a topic should exist for the object within "1 minute"
+
+    # Verify adapter consumption
+    When I check adapter state
+    Then the adapter should have consumed the topic within "2 minutes"
+    And the adapter should report status back to API
+
+    # Verify complete flow
+    When I poll the object status every "10 seconds"
+    Then the object should reach "COMPLETED" state within "10 minutes"
 ```
 
 ```go
-// Firstly, it should define each step
-func (s *ClusterSteps) theClusterShouldReachStateWithin(expectedState, timeoutStr string) error {
+// Firstly, define each step
+func (s *DataFlowSteps) theObjectShouldReachStateWithin(expectedState, timeoutStr string) error {
     ctx := context.Background()
     apiClient := s.commonSteps.GetAPIClient()
 
     timeout := parseDuration(timeoutStr)
-    pollInterval := 30 * time.Second
+    pollInterval := 10 * time.Second
 
-    fmt.Printf("Waiting for cluster to reach %s state (timeout: %v)...\n", expectedState, timeout)
+    fmt.Printf("Waiting for object to reach %s state (timeout: %v)...\n", expectedState, timeout)
 
     startTime := time.Now()
     for {
-        status, err := apiClient.GetClusterStatus(ctx, s.CreatedClusterID)
+        status, err := apiClient.GetObjectStatus(ctx, s.CreatedObjectID)
         if err == nil && status.State == expectedState {
-            fmt.Printf("✓ Cluster reached %s state\n", expectedState)
+            fmt.Printf("✓ Object reached %s state\n", expectedState)
             return nil
         }
 
@@ -412,7 +337,7 @@ func (s *ClusterSteps) theClusterShouldReachStateWithin(expectedState, timeoutSt
             if status != nil {
                 currentState = status.State
             }
-            return fmt.Errorf("cluster did not reach %s state within %v (current: %s)",
+            return fmt.Errorf("object did not reach %s state within %v (current: %s)",
                 expectedState, timeout, currentState)
         }
 
@@ -420,21 +345,28 @@ func (s *ClusterSteps) theClusterShouldReachStateWithin(expectedState, timeoutSt
     }
 }
 
-// Secondly, register the step, which mapping the content to the step
-func (s *ClusterSteps) RegisterSteps(sc *godog.ScenarioContext) {
+// Secondly, register the steps, which map the content to the step functions
+func (s *DataFlowSteps) RegisterSteps(sc *godog.ScenarioContext) {
     // Also register common steps
     s.commonSteps.RegisterSteps(sc)
     
-    // Cluster creation steps
-    // Adapter status steps
-    // Cluster status steps
-    sc.Step(`^I poll the cluster status every "([^"]*)"$`, s.iPollTheClusterStatusEvery)
-    sc.Step(`^the cluster should reach "([^"]*)" state within "([^"]*)"$`, s.theClusterShouldReachStateWithin)
+    // Object creation steps
+    sc.Step(`^I create an object via the API:$`, s.iCreateAnObjectViaTheAPI)
     
-    // Cleanup steps
-    sc.Step(`^a cluster exists with ID "([^"]*)"$`, s.aClusterExistsWithID)
-    sc.Step(`^I delete the cluster$`, s.iDeleteTheCluster)
-    sc.Step(`^the cluster should be deleted within "([^"]*)"$`, s.theClusterShouldBeDeletedWithin)
+    // Sentinel verification steps
+    sc.Step(`^I wait for Sentinel to detect the object$`, s.iWaitForSentinelToDetectTheObject)
+    sc.Step(`^Sentinel should have detected the object within "([^"]*)"$`, s.sentinelShouldHaveDetectedTheObjectWithin)
+    
+    // Broker verification steps
+    sc.Step(`^I check the message broker$`, s.iCheckTheMessageBroker)
+    sc.Step(`^a topic should exist for the object within "([^"]*)"$`, s.aTopicShouldExistForTheObjectWithin)
+    
+    // Adapter verification steps
+    sc.Step(`^the adapter should have consumed the topic within "([^"]*)"$`, s.theAdapterShouldHaveConsumedTheTopicWithin)
+    
+    // Object status steps
+    sc.Step(`^I poll the object status every "([^"]*)"$`, s.iPollTheObjectStatusEvery)
+    sc.Step(`^the object should reach "([^"]*)" state within "([^"]*)"$`, s.theObjectShouldReachStateWithin)
 }
 
 // Thirdly, load all the scenarios, and dynamically creates Describe blocks for each feature
@@ -458,17 +390,15 @@ func registerFeatureTests() {
         // Create Describe block with dynamic labels
         Describe(f.Name, Label(ginkgoLabels...), func() {
             var (
-                ctx          context.Context
-                clusterSteps *steps.ClusterSteps
-                adapterSteps *steps.AdapterSteps
-                commonSteps  *steps.CommonSteps
+                ctx           context.Context
+                dataFlowSteps *steps.DataFlowSteps
+                commonSteps   *steps.CommonSteps
             )
 
             BeforeEach(func() {
                 ctx = context.Background()
                 // Initialize step definition handlers
-                clusterSteps = steps.NewClusterSteps()
-                adapterSteps = steps.NewAdapterSteps()
+                dataFlowSteps = steps.NewDataFlowSteps()
                 commonSteps = steps.NewCommonSteps()
             })
 
@@ -480,8 +410,7 @@ func registerFeatureTests() {
                 suite := godog.TestSuite{
                     ScenarioInitializer: func(sc *godog.ScenarioContext) {
                         // Register all step definitions
-                        clusterSteps.RegisterSteps(sc)
-                        adapterSteps.RegisterSteps(sc)
+                        dataFlowSteps.RegisterSteps(sc)
                         commonSteps.RegisterSteps(sc)
 
                         // Scenario hooks
@@ -492,9 +421,9 @@ func registerFeatureTests() {
 
                         sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
                             // Cleanup after each scenario
-                            if clusterSteps.CreatedClusterID != "" {
-                                GinkgoWriter.Printf("Cleaning up cluster: %s\n", clusterSteps.CreatedClusterID)
-                                _ = clusterSteps.Cleanup(ctx)
+                            if dataFlowSteps.CreatedObjectID != "" {
+                                GinkgoWriter.Printf("Cleaning up object: %s\n", dataFlowSteps.CreatedObjectID)
+                                _ = dataFlowSteps.Cleanup(ctx)
                             }
                             return ctx, nil
                         })
@@ -517,191 +446,32 @@ func registerFeatureTests() {
 }
 ```
 
-**For new feature:**
-- **Create Gherkin Scenarios:** Add new test cases in a `.feature` file using Given/When/Then syntax
-- **Define Step Functions:** Implement Go functions for any new steps and register them in the scenario context
-- **Validation:** Run tests to ensure Gherkin steps map correctly to step definitions (tests will fail if steps are undefined)
-- **Maintenance:** When updating scenarios, verify step mappings remain valid and update step definitions as needed
+**Verdict:** While technically sound, Godog prioritizes auditability over development velocity. The Ginkgo + Markdown approach achieves similar traceability with better AI integration and developer experience.
 
 ---
 
-## 3. Cloud Provider Abstraction Design
+### A.2 Other Frameworks Considered
 
-### 3.1 Cloud Provider Interface Pattern
+**Testify:**
+- Lightweight assertion library excellent for unit/integration tests
+- Standard Go test integration with zero setup overhead
+- **Not suitable for E2E**: Lacks hierarchical organization, parallel execution primitives, and built-in async polling (`Eventually`/`Consistently`)
+- No support for eventual consistency testing in distributed systems
+- Better suited for unit tests than distributed E2E orchestration
 
-Following the **Common Adapter Framework** blueprint, the E2E framework uses a provider interface to abstract cloud-specific operations while maintaining awareness of the Kubernetes deployment model.
+**Cucumber:**
+- Industry standard for BDD but requires maintaining Ruby/JavaScript alongside Go
+- Adds language complexity and deployment overhead without leveraging team's Go expertise
 
-#### 3.1.1 Core Architecture Principles
+**Bruno:**
+- Open-source API client for manual/semi-automated API testing
+- Better suited for ad-hoc API exploration than systematic regression testing
 
-1. **One K8s Cluster Per Provider**: Each provider (GCP, AWS, Azure) has its own dedicated K8s cluster
-2. **Consistent Core Services**: API Service and Sentinel are deployed identically across all provider clusters
-3. **Provider-Specific Adapters**: Each cluster contains provider-specific adapter instances (no sharing between providers)
-4. **Dynamic Discovery**: Test framework discovers services and adapters from K8s at runtime
-
-#### 3.1.2 Provider Interface Design
-
-```go
-// CloudProvider abstracts cloud-specific operations for E2E testing
-type CloudProvider interface {
-    // Metadata
-    Name() string                        // "gcp", "aws", "azure"
-    Region() string                      // Default region for this provider
-
-    // Kubernetes Environment
-    GetClusterName() string              // K8s cluster name (e.g., "gcp-prod-cluster")
-    GetKubeconfig() string               // Path to kubeconfig
-    GetNamespace() string                // CLM deployment namespace
-
-    // Adapter Management
-    RequiredAdapters() []string          // All adapters for this provider
-    GetAdapterTimeout(adapterType string) time.Duration
-    ValidateAdapterDependencies(adapterName string) error
-
-    // Service Discovery (from K8s)
-    DiscoverAPIEndpoint(ctx context.Context, k8sClient *kubernetes.Clientset) (string, error)
-    DiscoverAdapters(ctx context.Context, k8sClient *kubernetes.Clientset) (map[string]*AdapterInfo, error)
-
-    // Test Resource Management
-    ProvisionTestResources(ctx context.Context, opts ProvisionOpts) (*TestResources, error)
-    CleanupTestResources(ctx context.Context, resources *TestResources) error
-}
-```
-
-#### 3.1.3 Provider Implementation Example
-
-```go
-// GCP Provider
-func (p *GCPProvider) RequiredAdapters() []string {
-    return []string{
-        "landing-zone",    // Foundation adapter (runs first)
-        "validation",      // Validation checks
-        "dns-placement",   // DNS configuration
-        "pull-secret",     // Image pull secrets
-        "hypershift",      // Orchestration adapter
-    }
-}
-
-func (p *GCPProvider) GetAdapterTimeout(adapterType string) time.Duration {
-    timeouts := map[string]time.Duration{
-        "landing-zone":   8 * time.Minute,
-        "validation":     5 * time.Minute,
-        "dns-placement":  6 * time.Minute,
-        "pull-secret":    3 * time.Minute,
-        "hypershift":     15 * time.Minute,
-    }
-    return timeouts[adapterType]
-}
-```
-
----
-
-## 4. Compatibility Testing Strategy
-
-### 4.1 User-Centric Testing Philosophy
-
-**Key Principle:** E2E tests validate end-to-end flows from the **user's perspective**. Users interact exclusively through the **API** and have no visibility into internal component versions (Sentinel, Adapters, etc.).
-
-**Implication:** E2E testing should focus on **API version compatibility**, not internal component version combinations. Internal component compatibility is a **deployment concern**, not an E2E testing concern.
-
-### 4.2 CLM Release-Based Testing Approach
-
-#### 4.2.1 **Branch-Based Testing Model**
-
-**Simple Principle:** Repository branch = CLM version. No version tracking in test code needed.
-
-**Repository Branch Structure:**
-
-```
-e2e-tests/
-├── release-1.0.x/        # Tests for CLM v1.0.x
-├── release-1.1.x/        # Tests for CLM v1.1.x
-├── release-1.2.x/        # Tests for CLM v1.2.x (current)
-└── main/                 # Tests for next release (development)
-```
-
-**Testing Approach:**
-- Each branch contains tests written for that specific CLM release
-- No version information needed in test code
-- Branch name implicitly defines which API version tests expect
-- Tests are always compatible with the branch they're on
-
-#### 4.2.2 **Backward Compatibility Testing**
-
-**Key Insight:** Latest CLM components can run tests from previous version branches.
-
-**Testing Workflow:**
-
-```bash
-# Test current release with its own tests
-git checkout release-1.2
-./e2e-runner --env=config/environments/gcp-staging.yaml
-# Result: All release-1.2 tests pass on CLM v1.2.0
-
-# Test backward compatibility: old tests on new CLM
-git checkout release-1.1  # Previous version tests
-./e2e-runner --env=config/environments/gcp-staging.yaml  # Same v1.2.0 environment
-# Result: release-1.1 tests still pass, proving backward compatibility
-```
-
----
-
-## 5. Reliability & Resilience Patterns
-
-### 5.1 The Flakiness Problem
-
-E2E tests are inherently flaky due to:
-- Network latency variance
-- Asynchronous operations
-- Resource contention
-- External service dependencies
-
-### 5.2 Anti-Flakiness Patterns
-
-#### 5.2.1 **Poll-and-Wait Pattern**
-
-Never use fixed `time.Sleep()`. Always poll with intelligent backoff:
-
-```go
-// Good: Polling with timeout
-Eventually(func() string {
-    status, err := apiClient.GetClusterStatus(clusterID)
-    Expect(err).NotTo(HaveOccurred())
-    return status.State
-}, 10*time.Minute, 30*time.Second).Should(Equal("READY"))
-```
-
-**Gomega's `Eventually`:**
-- Polls until condition is met or timeout
-- Configurable polling interval
-- Automatic retry on transient errors
-
-#### 5.2.2 **Idempotent Cleanup**
-
-Cleanup must be idempotent and never fail:
-
-```go
-AfterEach(func() {
-    defer GinkgoRecover() // Don't let cleanup failures crash suite
-    
-    // Idempotent cleanup
-    if testCluster != nil {
-        _ = apiClient.DeleteCluster(testCluster.ID) // Ignore errors
-        
-        // Wait for deletion to complete (but don't block forever)
-        Eventually(func() bool {
-            _, err := apiClient.GetCluster(testCluster.ID)
-            return err != nil && IsNotFoundError(err)
-        }, 5*time.Minute, 10*time.Second).Should(BeTrue())
-    }
-    
-    // Force cleanup if graceful deletion fails
-    if testEnv != nil {
-        ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-        defer cancel()
-        _ = testEnv.ForceCleanup(ctx)
-    }
-})
-```
+**Markdown Style Test (ty pattern):**
+- Python project using markdown files with embedded test assertions
+- Designed for unit tests, not distributed E2E scenarios
+- Lacks orchestration primitives for multi-service coordination
+- Inspired our metadata anchor approach but not directly applicable to distributed systems complexity
 
 ---
 
@@ -714,5 +484,6 @@ AfterEach(func() {
 - [API testing tools](https://testguild.com/api-testing-tools/)
 - [Bruno](https://github.com/usebruno/bruno/tree/main)
 - [Markdown style test suite example of ty](https://github.com/astral-sh/ruff/blob/main/crates/ty_python_semantic/resources/mdtest/typed_dict.md)
+- [OpenShift E2E Testing Repository](https://github.com/openshift/origin/)
 
 ---
