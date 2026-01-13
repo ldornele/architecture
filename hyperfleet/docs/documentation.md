@@ -198,7 +198,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Vulnerability fixes
 
-## [1.0.0] - YYYY-MM-DD
+## [1.0.0](https://github.com/openshift-hyperfleet/architecture/compare/v0.0.0...v1.0.0) - YYYY-MM-DD
 ### Added
 - Initial release
 ```

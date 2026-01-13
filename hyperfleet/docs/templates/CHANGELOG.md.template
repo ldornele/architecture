@@ -25,7 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Vulnerability fixes
 
-## [1.0.0] - YYYY-MM-DD
+## [1.0.1](https://github.com/openshift-hyperfleet/architecture/compare/v0.0.0...v1.0.1) - YYYY-MM-DD
+### Fixed
+- Improved documentation
+
+## [1.0.0](https://github.com/openshift-hyperfleet/architecture/compare/v0.0.0...v1.0.0) - YYYY-MM-DD
 ### Added
 - Initial release
 
@@ -42,7 +46,7 @@ Follow these guidelines when updating the changelog:
    - Deprecations and removals
 
 2. **What NOT to include:**
-   - Internal refactoring that doesn't affect users
+   - Internal refactoring that doesn't affect users, i.e. editorial/layout fixes only; component boundary or interface changes MUST be logged as they impact E2E testing
    - Development tooling changes
    - Documentation typo fixes
    - Code formatting changes
