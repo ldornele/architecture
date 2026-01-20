@@ -78,13 +78,15 @@ For the MVP:
 
 #### CRDs
 
-Applying a CRD or manifest (like namespace manifest) should be an idempotent operation
+Applying a CRD or manifest (like namespace manifest) should be manage by the same lifecycle management as for jobs.
 
-The adapter should detect if the work to be done by the adapter task is still in progress for the CRD. For example some k8s objects use `generation` and `status.observedGeneration` to differentiate.
+The adapter should detect if the work to be done by the adapter task is still in progress for the CRD.
+
+For example some k8s objects use `generation` and `status.observedGeneration` to differentiate.
 
 #### API calls
 
-If using an arbitrary API call in the adapter resource phase, the calling service must be also idempotent, and provide a way to determine work in progress, similar to the CRDs case.
+If using an arbitrary API call in the adapter resource phase, the calling service must provide a way to determine work in progress, similar to the CRDs case.
 
 ### Use cases solved by the new proposal
 
