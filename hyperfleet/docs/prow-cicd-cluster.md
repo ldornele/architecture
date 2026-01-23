@@ -1,0 +1,226 @@
+# Prow CI/CD Cluster Documentation
+
+## Overview
+
+This is the long-running reserved GKE cluster for Prow CI/CD job execution. This document shows you how to access it, get information about it, update it, and remove it if needed.
+
+- **Cluster Name**: `hyperfleet-dev-prow`  
+- **GCP Project**: `hcm-hyperfleet`  
+- **Connect Command**: `gcloud container clusters get-credentials hyperfleet-dev-prow --zone us-central1-a --project hcm-hyperfleet`
+
+---
+
+## Prerequisites for Viewing Cluster
+
+```bash
+# Install required tools
+gcloud components install kubectl gke-gcloud-auth-plugin
+```
+
+## Prerequisites for Terraform Operations
+
+**Only needed if you want to view Terraform state, update, or remove the cluster.**
+
+```bash
+# Install Terraform
+brew install terraform  # Terraform >= 1.5
+
+# Git clone the infrastructure repository hyperfleet-infra
+# Then
+cd hyperfleet-infra
+```
+
+---
+
+## How to Access the Cluster
+
+### 1. Authenticate with GCP
+
+```bash
+gcloud auth login
+gcloud config set project hcm-hyperfleet
+```
+
+### 2. Get Cluster Credentials
+
+```bash
+gcloud container clusters get-credentials hyperfleet-dev-prow \
+  --zone us-central1-a \
+  --project hcm-hyperfleet
+```
+
+### 3. Verify Access
+
+```bash
+kubectl get namespaces
+kubectl get pods -n prow-hyperfleet
+```
+
+---
+
+## How to Get Cluster Information
+
+### View Cluster Details
+
+```bash
+# Cluster status and configuration
+gcloud container clusters describe hyperfleet-dev-prow \
+  --zone us-central1-a \
+  --project hcm-hyperfleet
+
+# Node information
+kubectl get nodes -o wide
+
+# Running workloads
+kubectl get all -n prow-hyperfleet
+```
+
+### View Terraform State and Output of Pub/Sub Resource Information
+
+**First, clone the repo if you haven't already** (see [Prerequisites for Terraform Operations](#prerequisites-for-terraform-operations)).
+
+```bash
+cd hyperfleet-infra/terraform
+
+# Initialize with Prow backend
+terraform init -backend-config=envs/gke/dev-prow.tfbackend
+
+# View all managed resources
+terraform state list
+
+# View outputs (includes Pub/Sub config, etc.)
+terraform output
+
+# View Pub/Sub resources
+terraform output pubsub_config
+terraform output pubsub_resources
+```
+
+---
+
+## How to Update the Cluster
+
+**First, clone the repo if you haven't already** (see [Prerequisites for Terraform Operations](#prerequisites-for-terraform-operations)).
+
+### 1. Navigate to Terraform Directory
+
+```bash
+cd hyperfleet-infra/terraform
+```
+
+### 2. Initialize Terraform with Prow Backend
+
+```bash
+terraform init -backend-config=envs/gke/dev-prow.tfbackend
+```
+
+### 3. Edit Configuration
+
+Edit `envs/gke/dev-prow.tfvars` with your changes:
+
+```hcl
+# Common changes:
+node_count                 = 2              # Scale up/down
+machine_type               = "e2-standard-8" # Change VM size
+use_spot_vms               = false          # Switch to regular VMs
+```
+
+### 4. Preview and Apply Changes
+
+```bash
+# Review what will change
+terraform plan -var-file=envs/gke/dev-prow.tfvars
+
+# Coordinate with team before applying
+# Then apply changes
+terraform apply -var-file=envs/gke/dev-prow.tfvars
+```
+
+### 5. Verify Changes
+
+```bash
+kubectl get nodes
+kubectl get pods -n prow-hyperfleet
+```
+
+---
+
+## How to Remove the Cluster
+
+**⚠️ WARNING**: This destroys the entire Prow cluster. Coordinate with the team first!
+
+**First, clone the repo if you haven't already** (see [Prerequisites for Terraform Operations](#prerequisites-for-terraform-operations)).
+
+### 1. Disable Deletion Protection
+
+Edit `envs/gke/dev-prow.tfvars`:
+
+```hcl
+enable_deletion_protection = false
+```
+
+Apply the change:
+
+```bash
+cd hyperfleet-infra/terraform
+terraform init -backend-config=envs/gke/dev-prow.tfbackend
+terraform apply -var-file=envs/gke/dev-prow.tfvars
+```
+
+### 2. Destroy the Cluster
+
+```bash
+terraform destroy -var-file=envs/gke/dev-prow.tfvars
+```
+
+### 3. Recreate (if needed)
+
+```bash
+# Re-enable deletion protection in dev-prow.tfvars
+enable_deletion_protection = true
+
+# Create cluster
+terraform apply -var-file=envs/gke/dev-prow.tfvars
+```
+
+---
+
+## Key Configuration Files in hyperfleet-infra Repo
+
+| File | Purpose |
+|------|---------|
+| `terraform/envs/gke/dev-prow.tfvars` | Cluster configuration (nodes, machine type, etc.) |
+| `terraform/envs/gke/dev-prow.tfbackend` | Remote state configuration |
+| `terraform/main.tf` | Main Terraform module |
+
+---
+
+## Troubleshooting
+
+### Can't Connect to Cluster
+
+```bash
+# Re-authenticate
+gcloud auth login
+gcloud container clusters get-credentials hyperfleet-dev-prow \
+  --zone us-central1-a \
+  --project hcm-hyperfleet
+```
+
+### Terraform State Lock
+
+```bash
+# If locked and no one is using it
+terraform force-unlock <LOCK_ID>
+```
+
+---
+
+## Additional Documentation
+
+- **Detailed infrastructure docs**: `terraform/README.md` (in the cloned repo)
+- **Shared VPC setup**: `terraform/shared/README.md` (in the cloned repo)
+
+---
+
+**Last Updated**: 2026-01-23
