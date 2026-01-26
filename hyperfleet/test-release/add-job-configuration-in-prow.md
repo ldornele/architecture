@@ -311,9 +311,26 @@ zz_generated_metadata:
  - For a complete example of adding CI configuration, see this [PR](https://github.com/openshift/release/pull/72905)
  - For an example with Podman, see this [PR](https://github.com/openshift/release/pull/72331)
 
+
+## Test Step Registry
+
+To prevent naming collisions between all the registry components, the step registry has a very strict naming scheme and directory layout. First, all components have a prefix determined by the directory structure, similar to how the ci-operator configs do. The prefix is the relative directory path with all / characters changed to -. For example, a file under the ipi/install/conf directory would have as prefix of ipi-install-conf. If there is a workflow, chain, or step in that directory, the as field for that component would need to be the same as the prefix. Further, only one of step, chain, or workflow can be in a subdirectory (otherwise there would be a name conflict).
+
+After the prefix, we apply a suffix based on what the file is defining. These are the suffixes for the four file types that exist in the registry:
+
+- Step: -ref.yaml
+- Step command script: -commands.sh
+- Chain: -chain.yaml
+- Workflow: -workflow.yaml
+
+Continuing the example above, a step in the [chart-deployment](https://github.com/openshift/release/tree/master/ci-operator/step-registry/openshift-hyperfleet/chart-deployment) subdirectory would have a filename of openshift-hyperfleet-chart-deployment-ref.yaml and the command would be openshift-hyperfleet-chart-deployment-commands.sh.
+
+Other files that are allowed in the step registry but are not used for testing are OWNERS files and files that end in .md.
+
+More detailed configurations can refer to official doc [Step-Registry](https://docs.ci.openshift.org/docs/architecture/step-registry/)
+
 ## Prow References
 For more detailed information, refer to the official OpenShift CI documentation:
 - [CI Operator Architecture](https://docs.ci.openshift.org/docs/architecture/ci-operator/)
 - [Contributing to openshift/release](https://docs.ci.openshift.org/docs/how-tos/contributing-openshift-release/)
-
 
