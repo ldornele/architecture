@@ -71,8 +71,6 @@ linters:
     - exhaustive
 
     # Code Style
-    - gofmt
-    - goimports
     - misspell
     - lll
     - revive
@@ -105,7 +103,6 @@ issues:
   new: false
 
 output:
-  formats:
-    - format: colored-line-number
+  format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
