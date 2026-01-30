@@ -111,6 +111,95 @@ Communication Flow:
 
 ---
 
+## Maestro Event Flow and Processing Patterns
+
+### CloudEvents Data Flow Architecture
+
+```
+Maestro Server ←→ gRPC CloudEvents Stream ←→ Client (Watch API)
+```
+
+**Key Finding**: In **gRPC mode**, Maestro uses an **integrated gRPC broker** - no external message broker required. See [Deployment Modes](#deployment-modes) section for broker-specific details.
+
+### Watch Processing Patterns
+
+#### **Watch Implementation Architecture**
+```
+workClient.ManifestWorks(consumerName).Watch(ctx, metav1.ListOptions{})
+```
+
+**Key Finding**: Watch uses **hybrid approach** - HTTP REST API for initial state + CloudEvents for live updates!
+
+**Watch Processing Flow:**
+1. **Initial List**: HTTP REST API call to `/api/maestro/v1/resource-bundles`
+2. **CloudEvents Subscription**: Subscribe for real-time ManifestWork changes
+3. **Event Handler**: Process incoming CloudEvents and forward to watch channel
+
+**Connection & Protocol Details:**
+- **Protocol**: gRPC CloudEvents streaming (not HTTP polling)
+- **Authentication**: TLS/mTLS or token-based
+- **Filtering**: By consumerName (target cluster) and sourceID (client identifier)
+- **Performance**: Synchronous initial load + asynchronous live updates
+
+#### **Direct CloudEvents Subscription (Alternative)**
+```
+Client → CloudEventsClient.Subscribe() → CloudEvents Stream (Skip Watch API)
+```
+
+**Characteristics:**
+- **Transport**: Direct CloudEvents subscription (bypass Watch wrapper)
+- **Data Source**: Live CloudEvent stream only (no initial REST API call)
+- **Performance**: Highest throughput, but loses initial state synchronization
+- **Use Case**: Event-driven processing where current state not required
+
+### Event Processing Volume Analysis
+
+#### **High-Volume Event Scenarios**
+Based on our analysis of thousands of events every 10 seconds:
+
+**Processing Approaches:**
+
+1. **Sequential Processing** (Standard)
+   - Process each Watch event individually
+   - **Capacity**: 50-100 events per 10-second window
+   - **Bottleneck**: Sequential event handling blocks subsequent events
+
+2. **Parallel Processing** (High-Volume)
+   - Single Watch goroutine + multiple worker goroutines
+   - **Capacity**: 1,000+ events per 10-second window
+   - **Architecture**: One connection feeding multiple processors
+
+3. **Event-Driven Processing** (Enterprise Scale)
+   - Pure event subscription without Watch API
+   - **Capacity**: 10,000+ events per second
+   - **Architecture**: Direct broker subscription with event transformation
+
+### Connection Management
+
+#### **gRPC Mode (Recommended)**
+- **One gRPC connection per client** to Maestro server
+- **SourceID-based filtering**: Each client gets events filtered by its sourceID
+- **No message competition**: Each client receives independent event stream
+- **Authentication**: TLS/mTLS or token-based
+
+#### **MQTT/Pub-Sub Mode**
+- See [Deployment Modes](#deployment-modes) section for broker-specific details
+- **Key difference**: Potential message competition depending on topic design
+
+### Event Deduplication and Filtering
+
+#### **Event Characteristics**
+- **Status Updates**: Frequent condition changes generate multiple events
+- **Generation Tracking**: API generation correlation for conflict resolution
+- **Event Ordering**: CloudEvents provide sequencing and delivery guarantees
+
+#### **Filtering Strategies**
+- **Label-based**: Filter by cluster ID, resource type, adapter name
+- **Generation-based**: Process only newer generation events
+- **SourceID-based**: Events filtered by client's sourceID parameter
+
+---
+
 ## Communication Protocols
 
 ### HTTP REST API
@@ -231,8 +320,7 @@ This becomes a Maestro `resource` with:
 
 2. **gRPC Authentication**
    - TLS/mTLS for transport security
-   - Token-based authentication
-   - Certificate-based client auth
+   - Certificate-based client authentication (mTLS)
 
 3. **Agent Authentication**
    - mTLS between server and agents
