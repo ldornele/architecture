@@ -22,25 +22,38 @@ repository-name/
 ├── CONTRIBUTING.md              # Development and contribution guidelines (REQUIRED)
 ├── CHANGELOG.md                 # Release history in Keep a Changelog format (REQUIRED)
 ├── docs/                        # Detailed documentation directory (OPTIONAL)
-│   ├── api/                     # API documentation and specifications
-│   ├── architecture/            # Architecture documents and decisions
+│   ├── configs/                 # Configuration guides and references
+│   ├── development/             # Development setup and workflows
+│   ├── deployment/              # Deployment guides and procedures
+│   ├── troubleshooting/         # Debugging and troubleshooting guides
 │   └── examples/                # Usage examples and tutorials
 └── templates/                   # Template files (if applicable to the project)
 ```
 
 ### Directory Descriptions
 
-#### `/docs/api/` (for API services)
-- OpenAPI 3.0 specifications for REST APIs
-- API documentation and reference guides
-- Schema definitions and validation rules
-- API integration guides
+#### `/docs/configs/`
+- Configuration file references and examples
+- Environment-specific configuration guides
+- Configuration validation and troubleshooting
 
-#### `/docs/architecture/` (for complex components)
-- Component design documents
-- Integration patterns
-- Performance and scaling considerations
-- Architecture Decision Records (ADRs) - if used by the team
+#### `/docs/development/`
+- Local development setup instructions
+- Development workflows and best practices
+- Coding standards and contribution guidelines
+- Build and test procedures
+
+#### `/docs/deployment/`
+- Production deployment procedures
+- Environment setup and configuration
+- Infrastructure requirements
+- Monitoring and operational guides
+
+#### `/docs/troubleshooting/`
+- Common issues and solutions
+- Debugging guides and techniques
+- Performance troubleshooting
+- Log analysis and error resolution
 
 #### `/docs/examples/`
 - Usage examples and tutorials
@@ -97,13 +110,20 @@ Every repository README.md MUST include these sections in order:
 [How to use the component, main endpoints, key functionality]
 ```
 
-### 6. Documentation (if docs/ directory exists)
+### 6. Architecture Repository Link
 ```markdown
 ## Documentation
 
-- [API Reference](docs/api/README.md) - Complete API documentation
+- [Architecture](https://github.com/openshift-hyperfleet/architecture) - System architecture and API documentation
+```
+
+### 7. Additional Documentation (if docs/ directory exists)
+```markdown
+- [Configuration](docs/configs/README.md) - Configuration guides and reference
+- [Development](docs/development/README.md) - Development setup and workflows
+- [Deployment](docs/deployment/README.md) - Deployment guides and procedures
 - [Examples](docs/examples/README.md) - Usage examples and tutorials
-- [Architecture](docs/architecture/README.md) - Component design and decisions
+- [Troubleshooting](docs/troubleshooting/README.md) - Debugging and troubleshooting guides
 ```
 
 ### Repository-Specific Sections
@@ -219,9 +239,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MUST** document public functions, types, and methods
 
 ### API Documentation Location
-- OpenAPI specs: `docs/api/openapi.yaml` or embedded in code
-- API guides: `docs/api/README.md` or main README.md if simple
-- Integration examples: `docs/examples/` or main README.md if simple
+- API and architecture documentation are captured in the [architecture repository](https://github.com/openshift-hyperfleet/architecture)
+- Service-specific examples: `docs/examples/` or main README.md if simple
 
 ---
 
@@ -230,7 +249,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ADRs are **optional** but recommended for complex components that require architectural decisions to be documented.
 
 ### ADR Location (if used)
-- **Location**: `docs/architecture/adr/` directory
+- **Location**: [architecture repository](https://github.com/openshift-hyperfleet/architecture) `docs/architecture/adr/` directory
 - **Naming**: `NNNN-title-of-decision.md` (e.g., `0001-use-openapi-for-api-specs.md`)
 - **Format**: Follow standard ADR template with Status, Context, Decision, Consequences
 
