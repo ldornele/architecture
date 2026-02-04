@@ -15,7 +15,7 @@ Images published in this manner are produced when the source repository branch i
 
 ## Initial Setup
 
-When adding CI configuration for new repositories, use the **make new-repo** target instead of manually creating configuration files. This interactive tool walks you through the necessary steps and generates the proper configuration structure:
+When adding CI configuration for new repositories, use the **make new-repo** target instead of manually creating configuration files under [release repo](https://github.com/openshift/release). This interactive tool walks you through the necessary steps and generates the proper configuration structure:
 
 <details>
 <summary> Cmd "make new-repo" interactive mode step by step</summary>
