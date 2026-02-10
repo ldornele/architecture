@@ -2,7 +2,7 @@
 
 **Document Status:** Draft
 **Date:** 2026-01-29
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-02-10
 
 ---
 
@@ -134,14 +134,14 @@ release-X.Y (branch maintained post-release)
 
 **Feature Freeze:**
 ```bash
-# Release Owner creates release branch from main
+# Release Owner creates release branch from main (per component repo)
 git checkout main
 git pull origin main
 git checkout -b release-1.5
 git push origin release-1.5
 
-# Create first release candidate
-git tag -a v1.5.0-rc.1 -m "Release Candidate 1 for v1.5.0"
+# Create first release candidate (per component version)
+git tag -a v1.5.0-rc.1 -m "API Service RC1 for v1.5.0"
 git push origin v1.5.0-rc.1
 ```
 
@@ -227,9 +227,9 @@ HyperFleet Release 1.5 (validated combination):
 
 **Why?** Components evolve at their own pace, and version numbers should accurately reflect actual changes.
 
-**Component-Specific Patch Releases:**
+**Component-Specific Releases:**
 
-Between HyperFleet releases, individual components can issue patch releases independently:
+Between HyperFleet releases, individual components can issue releases independently:
 
 ```bash
 # Example: Critical bug found in Sentinel after HyperFleet Release 1.5 GA
@@ -243,12 +243,18 @@ git tag -a v1.4.3 -m "Sentinel v1.4.3 - Hotfix for metrics bug"
 git push origin v1.4.3
 
 # Result: Users can upgrade just Sentinel v1.4.2 → v1.4.3 without full release
-# No new HyperFleet Release number needed for single-component patch
+# No new HyperFleet Release number needed for single-component release
 ```
 
-**When to Create New HyperFleet Release vs Component Patch:**
-- **Component Patch Only (v1.4.2 → v1.4.3):** Single component bug fix, no compatibility impact
-- **New HyperFleet Release (1.5 → 1.6):** Multiple components changed, new features, breaking changes, or significant updates requiring full validation
+**When to Create Component Release vs HyperFleet Release:**
+
+**Component Release:**
+
+Create a component release only for isolated, fully backward-compatible fixes within a single component that do not impact APIs, schemas, cross-component behavior, or coordinated platform upgrades.
+
+**HyperFleet Release:**
+
+Create a HyperFleet release whenever a change affects supported platform users, introduces cross-component compatibility or contract implications, delivers security or critical stability fixes, or requires coordinated, platform-wide, validated upgrades.
 
 #### 2.5.2 Practical Example: HyperFleet Release 1.5
 
@@ -477,19 +483,20 @@ All PRs to release branch after code freeze require:
 For bugs discovered after GA release:
 
 ```bash
-# Create hotfix branch from release tag
-git checkout -b hotfix-1.5.1 v1.5.0
+# Example assumes Sentinel component (v1.4.x)
+# Create hotfix branch from component release tag
+git checkout -b hotfix-1.4.3 v1.4.2
 
 # Make fix, test, commit
 git commit -m "Fix critical bug in Sentinel component"
 
 # Merge to release branch
-git checkout release-1.5
-git merge --no-ff hotfix-1.5.1
+git checkout release-1.4
+git merge --no-ff hotfix-1.4.3
 
-# Tag patch release
-git tag -a v1.5.1 -m "Patch release v1.5.1"
-git push origin release-1.5 --tags
+# Tag component patch release
+git tag -a v1.4.3 -m "Patch release v1.4.3"
+git push origin release-1.4 --tags
 
 # Cherry-pick to main if applicable
 git checkout main
