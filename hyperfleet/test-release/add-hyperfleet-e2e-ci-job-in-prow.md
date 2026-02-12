@@ -22,27 +22,53 @@ For detailed instructions on initializing job configuration in Prow, please refe
 
 According to the description in the [Test Step Registry](add-job-configuration-in-prow.md#test-step-registry) section, it needs to add the following files.
 
-For the Hyperfleet E2E test, create a new folder **e2e** under [openshift-hyperfleet](https://github.com/openshift/release/tree/master/ci-operator/step-registry/openshift-hyperfleet). The step files should be:
+For the Hyperfleet E2E test, create a folder like **e2e** under [openshift-hyperfleet](https://github.com/openshift/release/tree/master/ci-operator/step-registry/openshift-hyperfleet). Add step/chain/workflow file follow via your requirements.
+
+For Hyperfleet E2E CI test, we added these [step and workflow](https://github.com/openshift/release/tree/main/ci-operator/step-registry/openshift-hyperfleet/e2e) like this:
+
 ```text
- - openshift-hyperfleet-e2e-commands.sh
- - openshift-hyperfleet-e2e-ref.yaml
- - openshift-hyperfleet-e2e-ref.metadata.json
- - OWNERS
+ci-operator/step-registry/openshift-hyperfleet/e2e/
+├── openshift-hyperfleet-e2e-workflow.yaml           # Main E2E test workflow definition
+├── openshift-hyperfleet-e2e-workflow.metadata.json  
+│
+├── setup/                                            # Hyperfleet platform deployment setup step
+│   ├── openshift-hyperfleet-e2e-setup-ref.yaml
+│   ├── openshift-hyperfleet-e2e-setup-ref.metadata.json
+│   └── openshift-hyperfleet-e2e-setup-commands.sh
+│
+├── test/                                             # Hyperfleet E2E CI test execution step
+│   ├── openshift-hyperfleet-e2e-test-ref.yaml
+│   ├── openshift-hyperfleet-e2e-test-ref.metadata.json
+│   └── openshift-hyperfleet-e2e-test-commands.sh
+│
+└── cleanup/                                          # Hyperfleet E2E cleanup steps
+    ├── cluster-resources/                            # Clean up shared cluster resources
+    │   ├── openshift-hyperfleet-e2e-cleanup-cluster-resources-ref.yaml
+    │   ├── openshift-hyperfleet-e2e-cleanup-cluster-resources-ref.metadata.json
+    │   └── openshift-hyperfleet-e2e-cleanup-cluster-resources-commands.sh
+    │
+    └── cloud-provider/                               # Clean up cloud provider resources
+        ├── openshift-hyperfleet-e2e-cleanup-cloud-provider-ref.yaml
+        ├── openshift-hyperfleet-e2e-cleanup-cloud-provider-ref.metadata.json
+        └── openshift-hyperfleet-e2e-cleanup-cloud-provider-commands.sh
+
 ```
 
 #### Step Parameters Configuration
 
-**openshift-hyperfleet-e2e-ref.yaml**
+**openshift-hyperfleet-e2e-`<folder-name>`-ref.yaml**
+
 - Declaring step parameters: More detailed usage can refer to the [official doc](https://docs.ci.openshift.org/docs/architecture/step-registry/#declaring-step-parameters)
+  - If you create folder for step/chain/workflow, you should replace the folder_name.If not, just need to delete it
   - Credentials  config: The secret has been added according to the [doc](prow-vault-access-management.md). For CI job, it requires gcloud credential to get the GKE cluster credential to deploy. We prepared a SA **hyperfleet-e2e** for it and store the credential under hyperfleet-e2e folder in Vault, so please don't delete it.
   - Image: **hyperfleet-e2e** It is built from [Dockerfile](https://github.com/openshift/release/blob/b968e721d74890587b15db562aa6138709543fa2/ci-operator/config/openshift-hyperfleet/hyperfleet-e2e/openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml#L8) before every test in the job.The Dockerfile is from [hyperfleet-e2e](https://github.com/openshift-hyperfleet/hyperfleet-e2e/blob/main/Dockerfile)
 
  ```yaml
 ref:
-  as: openshift-hyperfleet-e2e
+  as: openshift-hyperfleet-e2e-<folder-name>
   from: hyperfleet-e2e
   grace_period: 10m
-  commands: openshift-hyperfleet-e2e-commands.sh
+  commands: openshift-hyperfleet-e2e-<folder-name>-commands.sh
   resources:
     requests:
       cpu: 100m
@@ -59,7 +85,7 @@ ref:
     mount_path: /var/run/hyperfleet-e2e
  ```
 
-**openshift-hyperfleet-e2e-commands.sh**
+**openshift-hyperfleet-e2e-`<folder-name>`-commands.sh**
 - Define the shell script for the job. It depends on different business logic.
   - In above step, it mounts the volume for credential. And the hcm-hyperfleet-e2e.json secret has been added in Vault, so it can get the value directly in the shell script
 
@@ -69,12 +95,12 @@ ref:
 GCP_CREDENTIALS_FILE="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"  
 ```
 
-**openshift-hyperfleet-e2e-ref.metadata.json**
+**openshift-hyperfleet-e2e-`<folder-name>`-ref.metadata.json**
 - Store the owners and path
 
 ```json
 {
-  "path": "openshift-hyperfleet/e2e/openshift-hyperfleet-e2e-ref.yaml",
+  "path": "openshift-hyperfleet/e2e/<folder-name>/openshift-hyperfleet-e2e-<folder-name>-ref.yaml",
   "owners": {
     "approvers": [
       "..."
@@ -99,7 +125,8 @@ tests:
       <key>: <value>
       ...
     test:
-    - ref: openshift-hyperfleet-e2e # The step/chain/workflow name defined in above
+    - ref: <step_name/chain_name> # Required step/chain name for the job
+    workflow: <workflow_name>  # Required workflow name for the job
 ```
 
 ### Job URLs and Monitoring
@@ -109,7 +136,7 @@ tests:
 To find and monitor running jobs on Prow:
 1. Navigate to the [Prow dashboard](https://prow.ci.openshift.org/).
 2. Use the filter bar to search for specific jobs:
-   - By job name: [`*-hyperfleet-e2e-main-e2e-hyperfleet-e2e-nightly*`](https://prow.ci.openshift.org/?repo=openshift-hyperfleet%2Fhyperfleet-e2e&job=*hyperfleet-e2e-main-e2e-hyperfleet-e2e-nightly*)
+   - By job name: [`periodic-ci-openshift-hyperfleet-hyperfleet-e2e-main-e2e-hyperfleet-e2e-test-workflow-nightly`](https://prow.ci.openshift.org/?job=periodic-ci-openshift-hyperfleet-hyperfleet-e2e-main-e2e-hyperfleet-e2e-test-workflow-nightly)
    - By status: Add `&state=pending` or `&state=success` or `&state=failure` to the URL
 3. Click on any job to view detailed logs and execution information
 
@@ -144,13 +171,14 @@ To add another job based on the existing Hyperfleet E2E CI job:
 
 1. **Copy the existing job configuration** to add it in [`openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml`](https://github.com/openshift/release/blob/b968e721d74890587b15db562aa6138709543fa2/ci-operator/config/openshift-hyperfleet/hyperfleet-e2e/openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml#L16) Update the following:
    ```yaml
-   - as: hyperfleet-e2e-nightly # Job name
+   - as: hyperfleet-e2e-<specified_name> # Job name
      cron: 30 9 * * * # Job cron time
      steps:
        env: # All required env parameters, it depends on test step/chain/workflow requirements
          <key>: <value>
        test:
-       - ref: openshift-hyperfleet-e2e # Required step/chain/workflow name for the job
+       - ref: <step_name/chain_name> # Required step/chain name for the job
+       workflow: <workflow_name>  # Required workflow name for the job
    ```
 
 2. **Modify the job name and parameters**
@@ -167,6 +195,12 @@ To add another job based on the existing Hyperfleet E2E CI job:
    ```
 
 4. **Submit a PR with the new job configuration**
+   - Prow will trigger some precheck jobs to verify the changed code
+   - It still requiure to trigger the affected job via adding comment.
+   ```text
+   /pj-rehearse {test-name}
+   ```
+   - In the past, it required adding **/pj-rehearse ack** to meet the tidy job once you get a team member approved
 
 ### Debugging
 
