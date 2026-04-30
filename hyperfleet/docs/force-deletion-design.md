@@ -1,7 +1,7 @@
 ---
 Status: Draft
 Owner: HyperFleet Team
-Last Updated: 2026-04-28
+Last Updated: 2026-04-30
 ---
 
 # Force Deletion Design
@@ -69,9 +69,12 @@ Force delete is a privileged operation exposed under the `/admin/` path prefix, 
 
 The resource must already be in `Finalizing` state (`deleted_time` set), meaning a normal `DELETE` was issued first. Force delete is an escalation for stuck deletions, not a replacement for normal delete. The API rejects force delete on resources that are not in `Finalizing`.
 
+The request body requires a `reason` field explaining why the admin is force-deleting. See [Audit Logging Approach](#audit-logging-approach).
+
 Response codes:
 
 - `204 No Content`: force delete succeeded, records removed
+- `400 Bad Request`: missing or empty `reason` in request body
 - `404 Not Found`: resource does not exist (already deleted or invalid ID)
 - `409 Conflict`: resource is not in `Finalizing` state
 - `500 Internal Server Error`: delete failed due to unexpected server error
@@ -118,6 +121,8 @@ These metrics enable Prometheus alert rules (e.g., alert when any resource has b
 ## Audit Logging Approach
 
 The API logs a structured log entry before hard-deleting records, following the [Logging Specification](../standards/logging-specification.md). The log entry includes the caller identity, resource ID, resource type, timestamp, subresources being removed, and adapter statuses at time of force delete. If the delete fails, the API logs the failure with the error.
+
+The force-delete endpoint requires a `reason` in the request body. The reason is included in the audit log entry, recording why the admin chose to force-delete.
 
 ---
 
