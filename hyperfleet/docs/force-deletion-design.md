@@ -1,7 +1,7 @@
 ---
 Status: Draft
 Owner: HyperFleet Team
-Last Updated: 2026-05-04
+Last Updated: 2026-05-06
 ---
 
 # Force Deletion Design
@@ -46,7 +46,7 @@ sequenceDiagram
     participant DB
     participant Adapter
 
-    Admin->>API: POST /admin/clusters/{id}/force-delete
+    Admin->>API: POST /api/hyperfleet/v1/clusters/{id}/force-delete
     API->>API: Validate resource in Finalizing
     API->>API: Log audit entry
     API->>DB: Hard-delete records (single transaction)
@@ -63,10 +63,10 @@ sequenceDiagram
 
 Force delete is a synchronous API action. The API immediately hard-deletes records from the database, bypassing the `Reconciled=True` gate.
 
-`POST /admin/clusters/{id}/force-delete`
-`POST /admin/clusters/{cluster_id}/nodepools/{nodepool_id}/force-delete`
+`POST /api/hyperfleet/v1/clusters/{id}/force-delete`
+`POST /api/hyperfleet/v1/clusters/{cluster_id}/nodepools/{nodepool_id}/force-delete`
 
-Force delete is a privileged operation exposed under the `/admin/` path prefix, a new pattern outside the standard `/api/hyperfleet/{version}/` convention. The `/admin/` prefix is used because force delete is an operational escape hatch, not a versioned resource API. The HyperFleet API is not directly customer-facing. It sits behind partner APIs (GCP, AWS/ROSA) that provide native authorization. Partners do not expose admin endpoints in their public API.
+Force delete follows the standard `/api/hyperfleet/{version}/` convention (see [API Versioning](../components/api-service/api-versioning.md)) as a custom action on a versioned resource.
 
 The resource must already be in `Finalizing` state (`deleted_time` set), meaning a normal `DELETE` was issued first. Force delete is an escalation for stuck deletions, not a replacement for normal delete. The API rejects force delete on resources that are not in `Finalizing`.
 
@@ -131,7 +131,6 @@ The force-delete endpoint requires a `reason` in the request body. The reason is
 ### What We Lose / What Gets Harder
 
 - K8s resources managed by adapters may be orphaned if adapters did not finish cleanup before force delete. Force delete is scoped to DB records only and does not attempt infrastructure cleanup. See [ADR 0013 — Force Delete Scope: Database-Only](../adrs/0013-force-delete-scope-db-only.md) for the full decision and extension path.
-- The `/admin/` path prefix deviates from the API versioning standard (`/api/hyperfleet/{version}/`). Force delete is an operational escape hatch, not a versioned resource API.
 - Audit trail for force-delete actions depends on log retention, which the team does not control. If logs expire before an incident investigation, the record of when and why a force-delete occurred is lost.
 
 ### Acceptable Because
@@ -162,6 +161,31 @@ The force-delete endpoint requires a `reason` in the request body. The reason is
 - Force delete already covers the "adapter is stuck" scenario. The skip flag adds a middle ground (skip one, wait for the rest) that touches API, Sentinel, and the adapter framework for a narrow case.
 - If the healthy adapters are running, they handle 404s gracefully when a force-deleted resource disappears. The practical difference between letting them finish cleanup and force-deleting while they no-op on 404 is minimal.
 - Keeping deletion binary (normal waits for all, force bypasses all) is simpler to reason about and implement.
+
+### Separate `/admin/` Endpoint Path
+
+**What**:
+- Expose force-delete under a dedicated `/admin/clusters/{id}/force-delete` path, outside the versioned `/api/hyperfleet/{version}/` convention.
+
+**Why Rejected**:
+- Introduces a second routing convention to maintain alongside the existing versioned API.
+- Force-delete is still an operation on a HyperFleet resource. Placing it outside `/api/hyperfleet/` implies it is not part of the API.
+
+### Hybrid `/api/hyperfleet/v1/admin/` Path
+
+**What**:
+- Nest an `admin` segment inside the versioned path: `/api/hyperfleet/v1/admin/clusters/{id}/force-delete`.
+
+**Why Rejected**:
+- `admin` in the path breaks the convention that path segments represent resources or collections, creating ambiguity about what `admin` refers to.
+
+### Action-Prefixed Endpoint (`admin-force-delete`)
+
+**What**:
+- Embed the access level in the action name: `/api/hyperfleet/v1/clusters/{id}/admin-force-delete`.
+
+**Why Rejected**:
+- Mixes access control with the action name. The action should describe what it does, not who can call it.
 
 ### Async Force Delete
 
