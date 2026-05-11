@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Architecture Team
-Last Updated: 2026-03-26
+Last Updated: 2026-05-11
 ---
 
 # Architecture Decision Records (ADRs)
@@ -90,3 +90,4 @@ What did we decide? State it plainly.
 | [0012](0012-hard-delete-mechanism-after-adapter-reconciliation.md) | Hard-Delete Ownership and Execution | Proposed | 2026-04-23 |
 | [0013](0013-force-delete-scope-db-only.md) | Force Delete Scope: Database-Only | Proposed | 2026-05-01 |
 | [0014](0014-konflux-build-and-release.md) | Konflux for Container Image Build and Release | Active | 2026-04-21 |
+| [0015](0015-eventual-consistency-for-read-path.md) | Eventual Consistency for the API Read Path | Active | 2026-05-08 |
