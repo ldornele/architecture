@@ -199,11 +199,11 @@ All core services use testcontainers-go for integration testing and golangci-lin
 |-------|-------|
 | **Release Process** | [hyperfleet-release-process.md](./docs/release/hyperfleet-release-process.md) |
 | **Pipeline Design** | [konflux-release-pipeline-design.md](./docs/release/konflux-release-pipeline-design.md) |
-| **ADR** | [0013 — Konflux for Container Image Build and Release](./adrs/0013-konflux-build-and-release.md) |
+| **ADR** | [0014 — Konflux for Container Image Build and Release](./adrs/0014-konflux-build-and-release.md) |
 
 ### 6.1 Konflux (Build and Release)
 
-Container images are built and released via Konflux on the `stone-prd-rh01` cluster. PaC tag-triggered pipelines build images, Tekton Chains signs provenance, and the `rh-push-to-external-registry` pipeline publishes to `quay.io/redhat-services-prod/hyperfleet/`. See [Konflux Release Pipeline Design](./docs/release/konflux-release-pipeline-design.md) for full architecture.
+Container images are built and released via Konflux on the `kflux-prd-rh02` cluster. PaC tag-triggered pipelines build images, Tekton Chains signs provenance, and the `rh-push-to-external-registry` pipeline publishes to `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/`. Helm charts will be published as OCI artifacts via the `build-helm-chart-oci-ta` task to `quay.io/redhat-services-prod/hyperfleet-tenant/` (pending a managed release pipeline for external registries from the Konflux team). See [Konflux Release Pipeline Design](./docs/release/konflux-release-pipeline-design.md) and [Helm OCI Distribution Design](./docs/release/helm-oci-distribution-design.md) for full architecture.
 
 ### 6.2 Prow CI
 
@@ -225,3 +225,4 @@ CI system for PR validation and E2E testing. Presubmit and postsubmit jobs acros
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
 | 2026-03-25 | 1.0 | Initial Bill of Artifacts | Tirth Chetan Thakkar |
+| 2026-05-11 | 1.1 | Updated Konflux section: cluster to kflux-prd-rh02, added Helm OCI distribution, fixed ADR reference | Ciaran Roche |

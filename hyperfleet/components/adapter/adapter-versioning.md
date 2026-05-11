@@ -113,8 +113,7 @@ Adapter Binary v1.2.5 uses Config Schema 1.2
 
 **Helm Chart Versioning:**
 - Each adapter config is packaged as a Helm chart
-- Helm chart version follows semantic versioning independently
-- Chart version != Binary version != Schema version
+- Chart version and app version are coupled — both track the same git tag (see [Helm Chart Conventions](../../standards/helm-chart-conventions.md) Section 3)
 
 **Example deployment manifest:**
 ```yaml
