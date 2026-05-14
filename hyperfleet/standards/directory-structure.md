@@ -145,7 +145,7 @@ repo-root/
 |-----------|---------|-------------|-------|
 | `build/` | Temporary build artifacts | If build generates temporary files | Must be in `.gitignore` |
 | `configs/` | Configuration file templates | If repo requires default configs or examples | Example configs, defaults. Committed to Git |
-| `openapi/` | OpenAPI/Swagger specifications | If repo defines APIs via OpenAPI specs | YAML/JSON files, committed to Git |
+| `openapi/` | OpenAPI spec and code-generation config | If repo defines or consumes APIs via OpenAPI | Config files (e.g., `oapi-codegen.yaml`) are committed; `openapi.yaml` is **not** committed in repos that extract it from the `hyperfleet-api-spec` Go module (`hyperfleet-api`, `hyperfleet-sentinel`) |
 | `kustomize/` | Kustomize manifests | If repo uses Kustomize for deployment | Base + overlays structure |
 | `charts/` | Helm charts | If repo uses Helm for deployment | Follows Helm community convention |
 | `docs/` | Documentation (operational, development, deployment) | If README.md is not sufficient for the repo's documentation needs | Service repos: see [documentation standard](../docs/documentation.md) for required operational files. Non-service repos: use for development guides, architecture notes, etc. |

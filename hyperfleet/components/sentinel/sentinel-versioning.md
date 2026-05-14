@@ -106,9 +106,8 @@ asyncapi-2.0.yaml → Sentinel v2.0.x (breaking change: enum for reason field)
 - No need for Sentinel to support multiple API versions simultaneously
 
 **For MVP:**
-- Sentinel imports API client code from API repository or uses generated OpenAPI client
-- Example: `import "github.com/openshift-hyperfleet/hyperfleet-api/pkg/client"`
-- Version coupling: Sentinel v1.x.x imports API v1 client, Sentinel v2.x.x imports API v2 client
+- Sentinel generates its API client from the `github.com/openshift-hyperfleet/hyperfleet-api-spec` Go module (pinned in `go.mod`) via `make generate`; the generated client lives in `pkg/api/openapi/` (not committed)
+- Version coupling: bump `hyperfleet-api-spec` in Sentinel's `go.mod` to track API changes; Sentinel v1.x.x uses API spec v1, Sentinel v2.x.x uses API spec v2
 
 **When API version changes:**
 1. New API major version released (e.g., v2 launches)

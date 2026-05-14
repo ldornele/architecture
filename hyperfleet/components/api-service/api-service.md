@@ -234,7 +234,7 @@ Why Rejected: the API gets an additional concern (publishing) and needs to guara
 /api/hyperfleet/v1/
 ```
 
-Full spec: available at `/api/hyperfleet/v1/openapi` when the service is running, or in the `openapi/` directory of the [hyperfleet-api repository](https://github.com/openshift-hyperfleet/hyperfleet-api).
+Full spec: available at `/api/hyperfleet/v1/openapi` when the service is running, or in the [`hyperfleet-api-spec` repository](https://github.com/openshift-hyperfleet/hyperfleet-api-spec) (the authoritative TypeSpec source). The `openapi/openapi.yaml` in `hyperfleet-api` is extracted from the spec module at build time and is not committed to git.
 
 ### Configuration
 
