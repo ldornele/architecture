@@ -307,9 +307,9 @@ One Application (`hyperfleet`) with three Components:
 
 | Component | Git Repo | Target Registry |
 |-----------|----------|-----------------|
-| `hyperfleet-api` | `github.com/openshift-hyperfleet/hyperfleet-api` | `quay.io/redhat-services-prod/hyperfleet/hyperfleet-api` |
-| `hyperfleet-sentinel` | `github.com/openshift-hyperfleet/hyperfleet-sentinel` | `quay.io/redhat-services-prod/hyperfleet/hyperfleet-sentinel` |
-| `hyperfleet-adapter` | `github.com/openshift-hyperfleet/hyperfleet-adapter` | `quay.io/redhat-services-prod/hyperfleet/hyperfleet-adapter` |
+| `hyperfleet-api` | `github.com/openshift-hyperfleet/hyperfleet-api` | `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-api` |
+| `hyperfleet-sentinel` | `github.com/openshift-hyperfleet/hyperfleet-sentinel` | `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-sentinel` |
+| `hyperfleet-adapter` | `github.com/openshift-hyperfleet/hyperfleet-adapter` | `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-adapter` |
 
 When any Component builds, the resulting Snapshot contains images for ALL Components (the new build plus the last known images for the other two).
 
@@ -368,7 +368,7 @@ One PR to `openshift/release` changes the nightly Prow job to pull images from p
 ```yaml
 env:
   IMAGE_REGISTRY: quay.io
-  API_IMAGE_REPO: redhat-services-prod/hyperfleet/hyperfleet-api
+  API_IMAGE_REPO: redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-api
   API_IMAGE_TAG: latest
 ```
 

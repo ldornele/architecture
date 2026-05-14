@@ -91,3 +91,4 @@ What did we decide? State it plainly.
 | [0013](0013-force-delete-scope-db-only.md) | Force Delete Scope: Database-Only | Proposed | 2026-05-01 |
 | [0014](0014-konflux-build-and-release.md) | Konflux for Container Image Build and Release | Active | 2026-04-21 |
 | [0015](0015-eventual-consistency-for-read-path.md) | Eventual Consistency for the API Read Path | Active | 2026-05-08 |
+| [0016](0016-helm-oci-distribution.md) | Helm OCI Distribution via Konflux | Active | 2026-05-11 |

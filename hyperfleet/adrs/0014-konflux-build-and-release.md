@@ -21,7 +21,7 @@ Adopt a hybrid model: **Konflux handles image build and release, Prow retains E2
 The architecture has three layers:
 
 - **PaC (Pipelines as Code)** — trigger layer. Watches GitHub webhooks and matches git events (push to main, version tags) to `.tekton/` pipeline files in each component repo.
-- **Konflux** — orchestration layer. Builds images, generates SBOM, signs provenance (Tekton Chains), runs Enterprise Contract validation, and releases to `quay.io/redhat-services-prod/hyperfleet/`.
+- **Konflux** — orchestration layer. Builds images, generates SBOM, signs provenance (Tekton Chains), runs Enterprise Contract validation, and releases to `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/`.
 - **Prow** — test layer. Runs nightly and RC E2E tests against Konflux-built images from Quay. Retains PR presubmit checks (lint, unit tests).
 
 Key design choices:

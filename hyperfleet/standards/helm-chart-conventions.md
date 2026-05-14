@@ -151,15 +151,20 @@ Charts SHOULD expose these when the component requires them:
 ## 3. Chart Versioning Strategy
 
 - Chart version (`version` in `Chart.yaml`) MUST follow [SemVer 2.0](https://semver.org/).
-- Chart version is **independent** from `appVersion` (the application binary version).
-- Bump **major** for breaking values.yaml changes (renamed keys, removed fields).
-- Bump **minor** for new features (new values keys, new templates).
-- Bump **patch** for fixes (template bugs, default value corrections).
+- Chart version and `appVersion` MUST be **coupled** — both track the same git tag. When a component is tagged `v1.5.0`, the chart publishes with `version: 1.5.0` and `appVersion: "1.5.0"`.
+- The `build-helm-chart-oci-ta` task derives the version from the git tag automatically, stripping the `v` prefix (e.g., `v1.5.0` → `1.5.0`).
+- Bump **major** for breaking changes (values.yaml API, application API).
+- Bump **minor** for new features.
+- Bump **patch** for fixes.
+
+### Why Coupled Versioning
+
+Chart and application source live in the same repo and are tagged together. Independent versioning would require separate pipeline triggers, a version matrix, and tracking which chart versions are compatible with which app versions — complexity with no practical benefit for our team size and chart simplicity. See [Helm OCI Distribution Design](../docs/release/helm-oci-distribution-design.md) Section 6.
 
 ### appVersion Convention
 
 - `appVersion` in source MUST be set to `"0.0.0-dev"` — it is a placeholder.
-- CI/release tooling stamps the real application version (e.g., `v1.2.3`) at release time.
+- CI/release tooling stamps the real application version (e.g., `1.5.0`) at release time, matching the chart `version`.
 - `appVersion` MUST NOT be used as a fallback for the container image tag. Image tags come from git SHAs (dev) or semver (release) and are always set explicitly via `image.tag`.
 - Umbrella charts (e.g., in `hyperfleet-infra`) MUST also use `appVersion: "0.0.0-dev"` since they do not build binaries.
 

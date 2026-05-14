@@ -151,7 +151,7 @@ git push origin v1.5.0-rc1
 
 - [ ] Tag RC1 for each component: `vX.Y.0-rc1`
 - [ ] **Verify Konflux builds container images for all RC1 tags** (wait for builds to complete)
-- [ ] Confirm all RC1 images pushed to `quay.io/redhat-services-prod/hyperfleet/hyperfleet-*`
+- [ ] Confirm all RC1 images pushed to `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-*`
 
 #### Stakeholder Communication
 - [ ] **Slack**: Announce Feature Freeze
@@ -309,7 +309,7 @@ git push origin v1.5.0
 - [ ] Verify Konflux builds and pushes container images to registry
 
 #### Release Artifacts (see [Release Artifacts](#7-release-artifacts-and-deliverables))
-- [ ] Container images published to `quay.io/redhat-services-prod/hyperfleet/hyperfleet-*`
+- [ ] Container images published to `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-*`
 - [ ] Helm charts packaged and tested
 - [ ] Git tags created with correct versions
 - [ ] Release notes published in `hyperfleet-release` repo
@@ -329,7 +329,7 @@ git push origin v1.5.0
   - hyperfleet-sentinel: vX.Y.Z
   - hyperfleet-adapter: vX.Y.Z
   - Release Notes: [LINK]
-  - Container Images: quay.io/redhat-services-prod/hyperfleet/hyperfleet-*
+  - Container Images: quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-*
   ```
 - [ ] **Developers**: Notify release is complete
 - [ ] **Offering Team**: Notify for GCP integration deployment
@@ -883,9 +883,9 @@ Component Version Tags:
 - hyperfleet-adapter: v2.0.0
 
 Container Images (for HyperFleet Release 1.5):
-- quay.io/redhat-services-prod/hyperfleet/hyperfleet-api:1.5.0
-- quay.io/redhat-services-prod/hyperfleet/hyperfleet-sentinel:1.4.2
-- quay.io/redhat-services-prod/hyperfleet/hyperfleet-adapter:2.0.0
+- quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-api:1.5.0
+- quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-sentinel:1.4.2
+- quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-adapter:2.0.0
 
 Compatibility:
 - hyperfleet-api v1.5.0 requires hyperfleet-adapter ≥ v2.0.0
@@ -1191,27 +1191,28 @@ A dedicated release repository serves as the single source of truth for all Hype
 
 **Container Images:**
 - Built automatically by Konflux on release tag push (PaC tag-triggered pipeline)
-- Published to `quay.io/redhat-services-prod/hyperfleet/`
+- Published to `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/`
 - Includes signed provenance (SLSA Level 3) and SBOM
 - Registered in Pyxis for Red Hat vulnerability scanning
 - **Image naming:** Each component uses its own independent semantic version
   ```text
-  quay.io/redhat-services-prod/hyperfleet/hyperfleet-{component}:{component-version}
+  quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-{component}:{component-version}
   ```
   - `hyperfleet-api` for hyperfleet-api
   - `hyperfleet-sentinel` for hyperfleet-sentinel
   - `hyperfleet-adapter` for hyperfleet-adapter
 - **Example for HyperFleet Release 1.5:**
-  - `quay.io/redhat-services-prod/hyperfleet/hyperfleet-api:1.5.0`
-  - `quay.io/redhat-services-prod/hyperfleet/hyperfleet-sentinel:1.4.2`
-  - `quay.io/redhat-services-prod/hyperfleet/hyperfleet-adapter:2.0.0`
+  - `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-api:1.5.0`
+  - `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-sentinel:1.4.2`
+  - `quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-adapter:2.0.0`
 
   (Each component has its own version reflecting its actual changes per [Versioning Strategy](#35-versioning-strategy))
 
 **Helm Charts:**
 - Each component has its own Helm chart in component repositories
   - Note: hyperfleet-adapter base chart is designed for overlay usage by business adapters, not standalone deployment
-- Note: Umbrella chart strategy (hyperfleet-chart repo) is under discussion
+- Component charts are published as OCI artifacts to Quay.io via Konflux — see [Helm OCI Distribution Design](./helm-oci-distribution-design.md)
+- `hyperfleet-infra` repo contains deployment umbrella charts for local dev and E2E testing (not published to OCI)
 
 **Git Tags:**
 - Git tags created independently in component repositories: `vX.Y.Z` (reflecting each component's version)
