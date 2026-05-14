@@ -122,11 +122,11 @@ Shared Go library providing a unified pub/sub messaging abstraction with built-i
 | Repository | [hyperfleet-api-spec](https://github.com/openshift-hyperfleet/hyperfleet-api-spec)   |
 | Language | TypeSpec                                                                             |
 | Version | 1.0.2                                                                                |
-| Generated Artifact | [openapi.yaml](https://github.com/openshift-hyperfleet/hyperfleet-api/blob/main/openapi/openapi.yaml) (committed to hyperfleet-api) |
+| Consumed by | `hyperfleet-api` and `hyperfleet-sentinel` via the `github.com/openshift-hyperfleet/hyperfleet-api-spec` Go module |
 
 TypeSpec definitions generating OpenAPI 3.0 specifications (with optional OpenAPI 2.0 conversion for legacy tooling), published as GitHub Release artifacts. Supports multi-cloud provider variants via alias-based type switching (`aliases-core.tsp`, `aliases-gcp.tsp`). Key models: Cluster, NodePool, Status, Error (RFC 9457). Interactive API docs via GitHub Pages.
 
-> **Note:** The production OpenAPI contract used by code generation lives in [hyperfleet-api/openapi/openapi.yaml](https://github.com/openshift-hyperfleet/hyperfleet-api/blob/main/openapi/openapi.yaml).
+> **Note:** Both `hyperfleet-api` and `hyperfleet-sentinel` consume the OpenAPI schema directly from the `hyperfleet-api-spec` Go module — `openapi/openapi.yaml` is extracted from the module cache at code-generation time and is not tracked in git in either repository. See [openapi/README.md](https://github.com/openshift-hyperfleet/hyperfleet-api/blob/main/openapi/README.md) in `hyperfleet-api` and [openapi/README.md](https://github.com/openshift-hyperfleet/hyperfleet-sentinel/blob/main/openapi/README.md) in `hyperfleet-sentinel` for full details.
 
 ### 3.2 CloudEvents Contract
 

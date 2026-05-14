@@ -83,18 +83,23 @@ Generated code refers to any files automatically created by tools from source sp
 
 | Repository | Generated Code Location | Source Specification | Status |
 |------------|------------------------|---------------------|--------|
-| `hyperfleet-api` | `pkg/api/openapi/`, `*_mock.go` | `openapi/openapi.yaml` (owned) | ✅ Compliant |
-| `hyperfleet-sentinel` | `pkg/api/openapi/` | `openapi/openapi.yaml` (fetched from hyperfleet-api) | ✅ Compliant |
+| `hyperfleet-api` | `pkg/api/openapi/`, `*_mock.go` | `github.com/openshift-hyperfleet/hyperfleet-api-spec` Go module (extracted to `openapi/openapi.yaml` by `make generate`; not tracked in git) | ✅ Compliant |
+| `hyperfleet-sentinel` | `pkg/api/openapi/` | `github.com/openshift-hyperfleet/hyperfleet-api-spec` Go module (extracted to `openapi/openapi.yaml` by `make generate`; not tracked in git) | ✅ Compliant |
+
+> **Details:** For the full mechanics of schema import and code generation, see [openapi/README.md](https://github.com/openshift-hyperfleet/hyperfleet-api/blob/main/openapi/README.md) in `hyperfleet-api` and [openapi/README.md](https://github.com/openshift-hyperfleet/hyperfleet-sentinel/blob/main/openapi/README.md) in `hyperfleet-sentinel`.
 
 **Note:** `hyperfleet-adapter`, `hyperfleet-broker`, and adapter repositories do not currently have generated code.
 
 ### File Patterns to Exclude
 
-Each repository should add appropriate patterns to `.gitignore`. Note the distinction between **generated code** (auto-created from specs) and **fetched sources** (downloaded but not generated).
+Each repository should add appropriate patterns to `.gitignore`. Both the extracted spec (`openapi/openapi.yaml`, copied from the Go module cache) and the generated Go client (`pkg/api/openapi/`) must be excluded.
 
 **hyperfleet-api:**
 
 ```gitignore
+# Extracted OpenAPI spec (from hyperfleet-api-spec Go module, not committed)
+/openapi/openapi.yaml
+
 # Generated OpenAPI code (from oapi-codegen)
 /pkg/api/openapi/
 /data/generated/
@@ -106,11 +111,11 @@ Each repository should add appropriate patterns to `.gitignore`. Note the distin
 **hyperfleet-sentinel:**
 
 ```gitignore
+# Extracted OpenAPI spec (from hyperfleet-api-spec Go module, not committed)
+openapi/openapi.yaml
+
 # Generated OpenAPI client (from oapi-codegen)
 pkg/api/openapi/
-
-# Fetched OpenAPI spec (downloaded from hyperfleet-api, not generated)
-openapi/openapi.yaml
 ```
 
 ---
