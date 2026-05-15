@@ -220,7 +220,7 @@ All production images **MUST** include standardized OCI labels. Place the `LABEL
 ```dockerfile
 ARG APP_VERSION="0.0.0-dev"
 LABEL name="<service-name>" \
-      vendor="Red Hat" \
+      vendor="Red Hat, Inc." \
       version="${APP_VERSION}" \
       summary="<one-line summary>" \
       description="<detailed description of what the service does>"
@@ -231,7 +231,7 @@ LABEL name="<service-name>" \
 | Label | Description | Example |
 |-------|-------------|---------|
 | `name` | Service name (matches image name) | `hyperfleet-sentinel` |
-| `vendor` | Organization | `Red Hat` |
+| `vendor` | Organization | `Red Hat, Inc.` |
 | `version` | Semantic version or git-derived version | `abc1234` |
 | `summary` | One-line description | `HyperFleet Sentinel - Resource polling and event publishing service` |
 | `description` | Detailed description of the service | `Watches HyperFleet API resources and publishes reconciliation events to message brokers` |
@@ -312,7 +312,7 @@ ENTRYPOINT ["/app/<service-name>"]
 
 ARG APP_VERSION="0.0.0-dev"
 LABEL name="<service-name>" \
-      vendor="Red Hat" \
+      vendor="Red Hat, Inc." \
       version="${APP_VERSION}" \
       summary="<one-line service summary>" \
       description="<detailed service description>"
