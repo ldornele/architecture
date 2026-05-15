@@ -54,13 +54,26 @@ When a developer runs `git commit`, the pre-commit framework intercepts the oper
   ```
 
 - Go 1.25+ (for the `commitlint` hook and LeakTK secret scanning — both built automatically by pre-commit on first run)
-- `btrfs-progs-devel` (Fedora/RHEL) for LeakTK compilation:
-
-  ```bash
-  sudo dnf install btrfs-progs-devel
-  ```
-
 - `make` targets (`lint`, `gofmt`, `go-vet`) in the consuming repo (for Go tooling hooks)
+
+**LeakTK builds with `CGO_ENABLED=0` by default** — no system dependencies required. This works on all platforms (Linux, macOS, Windows).
+
+<details>
+<summary>Optional: Building LeakTK with CGO enabled</summary>
+
+If you need CGO support, install the following system dependencies before running `make install-hooks`:
+
+```bash
+# Fedora/RHEL
+sudo dnf install btrfs-progs-devel
+
+# Ubuntu/Debian
+sudo apt install libbtrfs-dev
+```
+
+Then set `CGO_ENABLED=1` in your environment.
+
+</details>
 
 ---
 
@@ -152,11 +165,11 @@ This section covers two migration scenarios:
 
 Follow these steps to add pre-commit hooks to an existing HyperFleet repository.
 
-### Step 1: Add `.pre-commit-config.yaml`
+#### Step 1: Add `.pre-commit-config.yaml`
 
 Copy the [Standard Configuration](#standard-configuration) into a `.pre-commit-config.yaml` file in the repo root.
 
-### Step 2: Add `install-hooks` Makefile target
+#### Step 2: Add `install-hooks` Makefile target
 
 Add the target to your Makefile (see [Makefile Conventions — Optional Targets](https://github.com/openshift-hyperfleet/architecture/blob/main/hyperfleet/standards/makefile-conventions.md#optional-targets)):
 
@@ -166,7 +179,7 @@ install-hooks: ## Install pre-commit hooks
 	pre-commit install
 ```
 
-### Step 3: Add Make aliases for Go tooling hooks (Go repos only)
+#### Step 3: Add Make aliases for Go tooling hooks (Go repos only)
 
 The Go tooling hooks expect `make gofmt` and `make go-vet` targets. If your repo uses different names (e.g., `fmt` and `vet`), add aliases:
 
@@ -178,7 +191,7 @@ gofmt: fmt ## Alias for fmt
 go-vet: vet ## Alias for vet
 ```
 
-### Step 4: Update documentation
+#### Step 4: Update documentation
 
 Add `pre-commit` to the prerequisites section in your `README.md`:
 
@@ -202,7 +215,7 @@ Add the hook installation step to your getting started section or `CONTRIBUTING.
 make install-hooks
 ```
 
-### Step 5: Install and verify
+#### Step 5: Install and verify
 
 ```bash
 make install-hooks
@@ -221,7 +234,7 @@ Test with an invalid commit (should fail):
 git commit --allow-empty -m "bad commit message"
 ```
 
-### Step 6: Fix existing violations
+#### Step 6: Fix existing violations
 
 Run hooks against the entire codebase to fix any pre-existing violations (trailing whitespace, missing EOF newlines, etc.). Without this step, the first contributor who touches an unrelated file with a trailing whitespace or missing newline gets a hook failure they didn't cause.
 
@@ -236,7 +249,7 @@ git add -p
 git commit -m "HYPERFLEET-XXX - chore: fix pre-commit baseline violations"
 ```
 
-### Step 7: Commit the hook configuration
+#### Step 7: Commit the hook configuration
 
 ```bash
 git add .pre-commit-config.yaml Makefile README.md CONTRIBUTING.md
@@ -275,11 +288,20 @@ Both tools perform secret scanning using Gitleaks as the underlying engine. Here
 
 **Step 1: Ensure system requirements**
 
-Verify that all team members have Go 1.25+ and btrfs-progs-devel installed:
+Verify that all team members have Go 1.25+ installed:
 
 ```bash
 go version  # Should show 1.25.0 or later
+```
 
+**LeakTK builds with `CGO_ENABLED=0` by default** — no additional system dependencies required. This works on all platforms (Linux, macOS, Windows).
+
+<details>
+<summary>Optional: If CGO support is needed</summary>
+
+Install system dependencies before running `make install-hooks`:
+
+```bash
 # Fedora/RHEL
 sudo dnf install btrfs-progs-devel
 
@@ -287,11 +309,11 @@ sudo dnf install btrfs-progs-devel
 sudo apt install libbtrfs-dev
 ```
 
-Or via Homebrew on macOS:
+Then set `CGO_ENABLED=1` in your environment.
 
-```bash
-brew install btrfs-progs
-```
+**Note:** macOS does not require btrfs dependencies — btrfs is a Linux-only filesystem and not available via Homebrew.
+
+</details>
 
 **Step 2: Update `.pre-commit-config.yaml`**
 
@@ -316,7 +338,7 @@ repos:
 **Step 3: Notify team**
 
 Inform all developers that:
-1. System requirements must be met (Go 1.25+, btrfs-progs-devel)
+1. System requirements must be met (Go 1.25+ only — no other dependencies needed)
 2. They should reinstall hooks: `make install-hooks`
 3. The **first commit** will take 3-5 minutes (one-time compilation)
 4. Subsequent commits will run instantly (cached binary)
@@ -327,6 +349,37 @@ Inform all developers that:
 git add .pre-commit-config.yaml
 git commit -m "HYPERFLEET-XXX - chore: migrate from rh-pre-commit to LeakTK"
 ```
+
+**Step 5: Update CI/CD pipelines**
+
+If your repository enforces hooks in CI, update your pipeline configuration to use LeakTK instead of rh-pre-commit. The following steps apply regardless of CI platform (Prow, GitHub Actions, GitLab CI, etc.):
+
+1. **Ensure Go 1.25+ is available** in your CI environment
+   - Verify with `go version` or install if needed
+
+2. **Install pre-commit framework**:
+   ```bash
+   pip install pre-commit
+   ```
+
+3. **Cache the pre-commit environment** to avoid 3-5 minute LeakTK compilation on every run
+   - Cache directory: `~/.cache/pre-commit/`
+   - Cache key: tie to `.pre-commit-config.yaml` content (e.g., hash of the file)
+   - This reduces subsequent runs from minutes to seconds
+
+4. **Replace rh-pre-commit invocations** with pre-commit:
+   ```bash
+   # Before (rh-pre-commit)
+   rh-pre-commit run --all-files
+   
+   # After (pre-commit with LeakTK)
+   pre-commit run --all-files
+   ```
+
+**Notes:**
+- The **first pipeline run** after migration compiles LeakTK (3-5 minutes). Subsequent runs use the cached binary.
+- **LeakTK builds with `CGO_ENABLED=0` by default** — no btrfs-progs-devel or other system dependencies required.
+- Search for `rh-pre-commit`, `LeakTK`, `make install-hooks`, and `pre-commit` in your CI configuration to locate and update all relevant pipeline steps.
 
 #### What Changes After Migration
 
@@ -399,11 +452,27 @@ sudo dnf update golang
 
 ### LeakTK compilation fails with "btrfs/ioctl.h: No such file or directory"
 
-Install the btrfs development headers:
+This error occurs when LeakTK tries to build with CGO enabled but the btrfs development headers are missing.
+
+**Solution 1 (Recommended):** Build without CGO — no system dependencies required:
 
 ```bash
-sudo dnf install btrfs-progs-devel
+# Clear cached build and rebuild
+pre-commit clean
+CGO_ENABLED=0 pre-commit install
 ```
+
+**Solution 2:** Install btrfs development headers (Linux only):
+
+```bash
+# Fedora/RHEL
+sudo dnf install btrfs-progs-devel
+
+# Ubuntu/Debian
+sudo apt install libbtrfs-dev
+```
+
+**Note:** macOS users should use Solution 1 — btrfs is Linux-only and not available on macOS.
 
 ### First commit takes 3-5 minutes
 
