@@ -362,12 +362,18 @@ If your repository enforces hooks in CI, update your pipeline configuration to u
    pip install pre-commit
    ```
 
-3. **Cache the pre-commit environment** to avoid 3-5 minute LeakTK compilation on every run
+3. **Run the repository's hook installation target** to ensure consistent setup:
+   ```bash
+   make install-hooks
+   ```
+   This mirrors the developer workflow and ensures pre-commit hooks are registered. The first run compiles LeakTK (3-5 minutes) — cache to avoid recompilation on subsequent runs.
+
+4. **Cache the pre-commit environment** to avoid recompiling LeakTK on every run
    - Cache directory: `~/.cache/pre-commit/`
    - Cache key: tie to `.pre-commit-config.yaml` content (e.g., hash of the file)
    - This reduces subsequent runs from minutes to seconds
 
-4. **Replace rh-pre-commit invocations** with pre-commit:
+5. **Replace rh-pre-commit invocations** with pre-commit:
    ```bash
    # Before (rh-pre-commit)
    rh-pre-commit run --all-files
@@ -375,6 +381,8 @@ If your repository enforces hooks in CI, update your pipeline configuration to u
    # After (pre-commit with LeakTK)
    pre-commit run --all-files
    ```
+   
+   **Note:** If your repo uses the `make install-hooks` wrapper, you can also run hooks via `make` targets that delegate to pre-commit.
 
 **Notes:**
 - The **first pipeline run** after migration compiles LeakTK (3-5 minutes). Subsequent runs use the cached binary.
