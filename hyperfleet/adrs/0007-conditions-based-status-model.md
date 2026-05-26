@@ -33,7 +33,7 @@ Two conditions are mandatory on all resources: **`Available`** and **`Ready`**. 
 
 ## Consequences - Evolution
 
-**Mapped Conditions (Added 2026-05):** The original ADR established two condition sources: system-computed aggregated conditions (`Reconciled`, `LastKnownReconciled`) and adapter-reported conditions (stored internally in `adapter_statuses`). A third category was added via [Condition Mapping Design](../hyperfleet/components/api-service/condition-mapping-design.md): **mapped conditions** — resource conditions dynamically created from adapter conditions using CEL-based transformation rules.
+**Mapped Conditions (Added 2026-05):** The original ADR established two condition sources: system-computed aggregated conditions (`Reconciled`, `LastKnownReconciled`) and adapter-reported conditions (stored internally in `adapter_statuses`). A third category was added via [Condition Mapping Design](../components/api-service/condition-mapping-design.md): **mapped conditions** — resource conditions dynamically created from adapter conditions using CEL-based transformation rules.
 
 **Why Added:** Rich provider-specific conditions (e.g., ROSA control plane status, GCP quota availability) existed in adapter conditions but were not exposed in the public `status.conditions` array. External consumers (CLI, UI, customer integrations) could not access these provider health signals. Mapped conditions solve this by allowing operators to configure CEL rules that selectively copy/transform adapter conditions into customer-visible resource conditions.
 
