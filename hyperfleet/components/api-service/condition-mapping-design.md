@@ -201,7 +201,7 @@ Each rule executes **once per PUT /statuses request**, producing **at most one r
 
 **No Conflict Resolution Needed**: Because the map key **is** the output condition type, each rule produces exactly one unique condition. There is no need for a "last-wins" strategy or priority ordering.
 
-**Unknown Filtering**: Adapter conditions with `status="Unknown"` are **automatically filtered out** before CEL evaluation. Only conditions with `status="True"` or `status="False"` are available in the `conditions` variable, ensuring resource conditions never violate the True/False-only contract.
+**Unknown Filtering**: Adapter conditions with `status="Unknown"` are **automatically filtered out** before CEL evaluation. Only conditions with `status="True"` or `status="False"` are available in the `statuses` variable, ensuring resource conditions never violate the True/False-only contract.
 
 ### CEL Evaluation Context
 
