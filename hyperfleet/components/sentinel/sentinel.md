@@ -70,7 +70,7 @@ The Sentinel solves these problems by:
 - **Closing the reconciliation loop**: Continuously polls resources and publishes events to trigger adapter evaluation
 - **Uses adapter status updates**: Reads `status.conditions[].last_updated_time` and condition statuses (updated by adapters on every check) to determine when to create next event
 - **Fully configurable decision logic**: Named CEL params and a boolean result expression define the complete decision logic (e.g., different age thresholds for ready vs not-ready resources)
-- **Relies on API-computed Ready condition**: The API aggregates adapter statuses into a `Ready` condition — when `Ready != True` (including after spec changes that increment `generation`), the Sentinel's default rules trigger reconciliation
+- **Relies on API-computed Reconciled condition**: The API aggregates adapter statuses into a `Reconciled` condition — when `Reconciled != True` (including after spec changes that increment `generation`), the Sentinel's default rules trigger reconciliation
 - **Self-healing**: Automatically retries without manual intervention
 - **Horizontal scalability**: Resource filtering allows multiple Sentinels to handle different resource subsets
 - **Event-driven architecture**: Maintains decoupling by publishing CloudEvents to message broker
@@ -260,11 +260,11 @@ The service uses a fully configurable decision logic based on the `message_decis
 
 **Key Insight — Why No Hardcoded Generation Check**:
 
-The API already aggregates adapter statuses into the `Ready` condition. When a user changes the resource spec (incrementing `generation`), the API sets `Ready` to `False` because not all adapters have reconciled the new generation yet. This means `Ready == False` already covers the generation mismatch case — there is no need for the Sentinel to duplicate this logic with a separate generation check.
+The API already aggregates adapter statuses into the `Reconciled` condition. When a user changes the resource spec (incrementing `generation`), the API sets `Reconciled` to `False` because not all adapters have reconciled the new generation yet. This means `Reconciled == False` already covers the generation mismatch case — there is no need for the Sentinel to duplicate this logic with a separate generation check.
 
 This simplifies the Sentinel to a single unified rule engine:
-- The `Ready` condition is the canonical signal for "this resource needs reconciliation"
-- The `Available` condition is informational but not used for decision-making in the default configuration
+- The `Reconciled` condition is the canonical signal for "this resource needs reconciliation"
+- The `LastKnownReconciled` condition is informational but not used for decision-making in the default configuration
 - Operators can write custom rules using any condition type if their use case requires it
 
 ### Message Decision
@@ -282,13 +282,14 @@ The Sentinel uses a `message_decision` configuration with named **params** and a
 
 | Param Name | Type | Expression | Purpose |
 |------------|------|------------|---------|
-| `ref_time` | CEL → string | `condition("Ready").last_updated_time` | Reference timestamp for age calculation |
-| `is_ready` | CEL → bool | `condition("Ready").status == "True"` | Whether resource is ready |
-| `is_new_resource` | CEL → bool | `!is_ready && resource.generation == 1` | Brand-new resource that needs immediate reconciliation |
-| `ready_and_stale` | CEL → bool | `is_ready && now - timestamp(ref_time) > duration("30m")` | Ready resource whose last check is stale |
-| `not_ready_and_debounced` | CEL → bool | `!is_ready && now - timestamp(ref_time) > duration("10s")` | Not-ready resource, debounce period elapsed |
+| `ref_time` | CEL → string | `condition("Reconciled").last_updated_time` | Reference timestamp for age calculation |
+| `is_reconciled` | CEL → bool | `condition("Reconciled").status == "True"` | Whether resource is reconciled |
+| `is_new_resource` | CEL → bool | `!is_reconciled && resource.generation == 1` | Brand-new resource that needs immediate reconciliation |
+| `generation_mismatch` | CEL → bool | `resource.generation > condition("Reconciled").observed_generation` | Resource spec changed since last reconciliation |
+| `reconciled_and_stale` | CEL → bool | `is_reconciled && now - timestamp(ref_time) > duration("30m")` | Reconciled resource whose last check is stale |
+| `not_reconciled_and_debounced` | CEL → bool | `!is_reconciled && now - timestamp(ref_time) > duration("10s")` | Not-reconciled resource, debounce period elapsed |
 
-**Result**: `is_new_resource || ready_and_stale || not_ready_and_debounced`
+**Result**: `is_new_resource || generation_mismatch || reconciled_and_stale || not_reconciled_and_debounced`
 
 **Why debounce?**
 
