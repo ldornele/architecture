@@ -251,7 +251,7 @@ The service uses a fully configurable decision logic based on the `message_decis
 
 **Publish Event IF**:
 - Evaluate all `message_decision.params` in dependency order (each param is a CEL expression or duration literal)
-- Params can reference other params (e.g., `is_ready` can be used in `ready_and_stale`)
+- Params can reference other params (e.g., `is_reconciled` can be used in `reconciled_and_stale`)
 - Evaluate `message_decision.result` boolean expression (standard CEL logical operators)
 - If result is `true` → publish event
 
@@ -306,7 +306,7 @@ By introducing a debounce interval (10s default), the Sentinel limits the messag
 - The `now` variable (current timestamp) is available in all expressions
 - The `result` is the **sole decision maker** — all time-based checks, condition evaluations, and reconciliation triggers are encoded in params (no hardcoded checks)
 - The `result` expression uses standard CEL logical operators (`&&`, `||`). No aliases or custom operator syntax — pure CEL.
-- A single custom helper function `condition(name)` provides access to resource status data (see reference below). Fields are accessed directly (e.g., `condition("Ready").status`), keeping the API surface minimal.
+- A single custom helper function `condition(name)` provides access to resource status data (see reference below). Fields are accessed directly (e.g., `condition("Reconciled").status`), keeping the API surface minimal.
 - This aligns with the adapter framework's preconditions pattern (CEL-based evaluation)
 
 #### Custom CEL Function Reference
@@ -325,14 +325,14 @@ Returns the full condition object matching the given `type` name, with fields:
 
 **Examples**:
 ```cel
-condition("Ready").status == "True"              # check if resource is ready
-condition("Ready").last_updated_time             # get timestamp for age calculation
+condition("Reconciled").status == "True"              # check if resource is ready
+condition("Reconciled").last_updated_time             # get timestamp for age calculation
 condition("Available").observed_generation       # get last reconciled generation
 ```
 
 **Notes**:
 - Searches `resource.status.conditions[]` by the `type` field
-- Works with **any** condition type present on the resource (e.g., `"Ready"`, `"Available"`, `"Applied"`, `"Health"`, or custom conditions)
+- Works with **any** condition type present on the resource (e.g., `"Reconciled"`, `"LastKnownReconciled"`, `"Applied"`, `"Health"`, or custom conditions)
 - When accessing `.last_updated_time` on a missing condition, the zero time value will cause `timestamp()` conversion to produce a very old timestamp, which naturally triggers age-exceeded checks — acting as a fail-safe that ensures new or unknown resources get reconciled (see Test 7)
 
 **Configuration** (via YAML files):
@@ -348,12 +348,12 @@ poll_interval: 5s
 # Message decision - configurable decision logic
 message_decision:
   params:
-    ref_time: 'condition("Ready").last_updated_time'
-    is_ready: 'condition("Ready").status == "True"'
-    is_new_resource: '!is_ready && resource.generation == 1'
-    ready_and_stale: 'is_ready && now - timestamp(ref_time) > duration("30m")'
-    not_ready_and_debounced: '!is_ready && now - timestamp(ref_time) > duration("10s")'
-  result: 'is_new_resource || ready_and_stale || not_ready_and_debounced'
+    ref_time: 'condition("Reconciled").last_updated_time'
+    is_reconciled: 'condition("Reconciled").status == "True"'
+    is_new_resource: '!is_reconciled && resource.generation == 1'
+    reconciled_and_stale: 'is_reconciled && now - timestamp(ref_time) > duration("30m")'
+    not_reconciled_and_debounced: '!is_reconciled && now - timestamp(ref_time) > duration("10s")'
+  result: 'is_new_resource || reconciled_and_stale || not_reconciled_and_debounced'
 
 # Resource selector - only process resources matching these labels
 resource_selector:
@@ -470,7 +470,7 @@ Integration tests MUST verify that:
 
 **Status Tracking**:
 
-The Sentinel reads the resource's status conditions to evaluate the message decision rules. The default configuration relies on the `Ready` condition, but custom rules can reference any condition:
+The Sentinel reads the resource's status conditions to evaluate the message decision rules. The default configuration relies on the `Reconciled` condition, but custom rules can reference any condition:
 
 ```json
 {
@@ -486,7 +486,7 @@ The Sentinel reads the resource's status conditions to evaluate the message deci
         "last_transition_time": "2025-10-21T10:00:00Z"
       },
       {
-        "type": "Ready",
+        "type": "Reconciled",
         "status": "False",
         "observed_generation": 1,
         "last_updated_time": "2025-10-21T12:00:00Z",
@@ -501,22 +501,22 @@ The Sentinel reads the resource's status conditions to evaluate the message deci
 
 - **`generation`**: User's desired state version. Increments when the resource spec changes (e.g., user scales nodes from 3 to 5). This is the "what the user wants" field.
 
-- **`condition.observed_generation`**: Which generation was last reconciled by a given adapter. The API uses this to compute the aggregated `Ready` condition — when any adapter's `observed_generation` is behind `resource.generation`, the API sets `Ready` to `False`.
+- **`condition.observed_generation`**: Which generation was last reconciled by a given adapter. The API uses this to compute the aggregated `Reconciled` condition — when any adapter's `observed_generation` is behind `resource.generation`, the API sets `Reconciled` to `False`.
 
-- **`condition.last_transition_time`**: Updates ONLY when the condition status changes (e.g., Ready False → True)
+- **`condition.last_transition_time`**: Updates ONLY when the condition status changes (e.g., Reconciled False → True)
 
 - **`condition.last_updated_time`**: Updates EVERY time an adapter checks the resource, regardless of whether status changed
 
 **How generation changes flow through the system:**
 
-When a user changes the cluster spec (e.g., scales nodes), `generation` increments (1 → 2). The API detects that not all adapters have reconciled this generation and sets `Ready` to `False`. The Sentinel's default rules see `Ready != True` and trigger reconciliation — no separate generation check is needed in the Sentinel.
+When a user changes the cluster spec (e.g., scales nodes), `generation` increments (1 → 2). The API detects that not all adapters have reconciled this generation and sets `Reconciled` to `False`. The Sentinel's default rules see `Reconciled != True` and trigger reconciliation — no separate generation check is needed in the Sentinel.
 
 **Why this matters for age calculation in message decision:**
 
 If a cluster stays in "Provisioning" state for 2 hours, `last_transition_time` would remain at the time it entered "Provisioning" (e.g., 10:00), even though adapters check it at 11:00, 11:30, 12:00. Using `last_transition_time` for age calculation would incorrectly trigger events too frequently. Using `last_updated_time` ensures age is calculated from the last adapter check, not the last status change.
 
 **For complete details on generation and observed_generation semantics, see:**
-- [HyperFleet Status Guide](../../docs/status-guide.md) - Complete documentation of the status contract, including how adapters report `observed_generation` and how the API aggregates it into the `Ready` condition
+- [HyperFleet Status Guide](../../docs/status-guide.md) - Complete documentation of the status contract, including how adapters report `observed_generation` and how the API aggregates it into the `Reconciled` condition
 
 ### Resource Filtering Architecture
 
@@ -551,12 +551,12 @@ resource_type: clusters
 poll_interval: 5s
 message_decision:
   params:
-    ref_time: 'condition("Ready").last_updated_time'
-    is_ready: 'condition("Ready").status == "True"'
-    is_new_resource: '!is_ready && resource.generation == 1'
-    ready_and_stale: 'is_ready && now - timestamp(ref_time) > duration("30m")'
-    not_ready_and_debounced: '!is_ready && now - timestamp(ref_time) > duration("10s")'
-  result: 'is_new_resource || ready_and_stale || not_ready_and_debounced'
+    ref_time: 'condition("Reconciled").last_updated_time'
+    is_reconciled: 'condition("Reconciled").status == "True"'
+    is_new_resource: '!is_reconciled && resource.generation == 1'
+    reconciled_and_stale: 'is_reconciled && now - timestamp(ref_time) > duration("30m")'
+    not_reconciled_and_debounced: '!is_reconciled && now - timestamp(ref_time) > duration("10s")'
+  result: 'is_new_resource || reconciled_and_stale || not_reconciled_and_debounced'
 resource_selector:
   - label: region
     value: us-east
@@ -577,12 +577,12 @@ resource_type: clusters
 poll_interval: 5s
 message_decision:
   params:
-    ref_time: 'condition("Ready").last_updated_time'
-    is_ready: 'condition("Ready").status == "True"'
-    is_new_resource: '!is_ready && resource.generation == 1'
-    ready_and_stale: 'is_ready && now - timestamp(ref_time) > duration("1h")'      # Different!
-    not_ready_and_debounced: '!is_ready && now - timestamp(ref_time) > duration("15s")' # Different!
-  result: 'is_new_resource || ready_and_stale || not_ready_and_debounced'
+    ref_time: 'condition("Reconciled").last_updated_time'
+    is_reconciled: 'condition("Reconciled").status == "True"'
+    is_new_resource: '!is_reconciled && resource.generation == 1'
+    reconciled_and_stale: 'is_reconciled && now - timestamp(ref_time) > duration("1h")'      # Different!
+    not_reconciled_and_debounced: '!is_reconciled && now - timestamp(ref_time) > duration("15s")' # Different!
+  result: 'is_new_resource || reconciled_and_stale || not_reconciled_and_debounced'
 resource_selector:
   - label: region
     value: us-west
@@ -603,12 +603,12 @@ resource_type: nodepools
 poll_interval: 5s
 message_decision:
   params:
-    ref_time: 'condition("Ready").last_updated_time'
-    is_ready: 'condition("Ready").status == "True"'
-    is_new_resource: '!is_ready && resource.generation == 1'
-    ready_and_stale: 'is_ready && now - timestamp(ref_time) > duration("10m")'
-    not_ready_and_debounced: '!is_ready && now - timestamp(ref_time) > duration("5s")'
-  result: 'is_new_resource || ready_and_stale || not_ready_and_debounced'
+    ref_time: 'condition("Reconciled").last_updated_time'
+    is_reconciled: 'condition("Reconciled").status == "True"'
+    is_new_resource: '!is_reconciled && resource.generation == 1'
+    reconciled_and_stale: 'is_reconciled && now - timestamp(ref_time) > duration("10m")'
+    not_reconciled_and_debounced: '!is_reconciled && now - timestamp(ref_time) > duration("5s")'
+  result: 'is_new_resource || reconciled_and_stale || not_reconciled_and_debounced'
 
 hyperfleet_api:
   endpoint: http://hyperfleet-api.hyperfleet-system.svc.cluster.local:8080
@@ -868,114 +868,114 @@ The following test scenarios ensure the Decision Engine correctly implements the
 
 ### Message Decision Tests
 
-**Test 1: Ready resource with recent check → skip**
+**Test 1: Reconciled resource with recent check → skip**
 ```
 Given:
-  - Resource Ready condition status: True
+  - Resource Reconciled condition status: True
   - resource.generation = 2
-  - condition("Ready").last_updated_time = now() - 5m (age < 30m)
+  - condition("Reconciled").last_updated_time = now() - 5m (age < 30m)
 Then:
   - Decision: SKIP
   - Reason: "message decision not matched"
-  - Params evaluated: ref_time, is_ready=true, is_new_resource=false,
-    ready_and_stale=false, not_ready_and_debounced=false
+  - Params evaluated: ref_time, is_reconciled=true, is_new_resource=false,
+    reconciled_and_stale=false, not_reconciled_and_debounced=false
   - Result: false || false || false = false
 ```
 
-**Test 2: Not-Ready resource with debounce elapsed → publish**
+**Test 2: Not-reconciled resource with debounce elapsed → publish**
 ```
 Given:
-  - Resource Ready condition status: False
+  - Resource Reconciled condition status: False
   - resource.generation = 2
-  - condition("Ready").last_updated_time = now() - 15s (age > 10s)
+  - condition("Reconciled").last_updated_time = now() - 15s (age > 10s)
 Then:
   - Decision: PUBLISH
   - Reason: "message decision matched"
-  - Params evaluated: ref_time, is_ready=false, is_new_resource=false,
-    ready_and_stale=false, not_ready_and_debounced=true
+  - Params evaluated: ref_time, is_reconciled=false, is_new_resource=false,
+    reconciled_and_stale=false, not_reconciled_and_debounced=true
   - Result: false || false || true = true
 ```
 
-**Test 3: Not-Ready resource within debounce period → skip**
+**Test 3: Not-reconciled resource within debounce period → skip**
 ```
 Given:
-  - Resource Ready condition status: False
+  - Resource Reconciled condition status: False
   - resource.generation = 2
-  - condition("Ready").last_updated_time = now() - 5s (age < 10s)
+  - condition("Reconciled").last_updated_time = now() - 5s (age < 10s)
 Then:
   - Decision: SKIP
   - Reason: "message decision not matched"
-  - Params evaluated: ref_time, is_ready=false, is_new_resource=false,
-    ready_and_stale=false, not_ready_and_debounced=false
+  - Params evaluated: ref_time, is_reconciled=false, is_new_resource=false,
+    reconciled_and_stale=false, not_reconciled_and_debounced=false
   - Result: false || false || false = false
 ```
 
-**Test 4: Ready resource with stale check → publish (periodic health check)**
+**Test 4: Reconciled resource with stale check → publish (periodic health check)**
 ```
 Given:
-  - Resource Ready condition status: True
+  - Resource Reconciled condition status: True
   - resource.generation = 2
-  - condition("Ready").last_updated_time = now() - 31m (age > 30m)
+  - condition("Reconciled").last_updated_time = now() - 31m (age > 30m)
 Then:
   - Decision: PUBLISH
   - Reason: "message decision matched"
-  - Params evaluated: ref_time, is_ready=true, is_new_resource=false,
-    ready_and_stale=true, not_ready_and_debounced=false
+  - Params evaluated: ref_time, is_reconciled=true, is_new_resource=false,
+    reconciled_and_stale=true, not_reconciled_and_debounced=false
   - Result: false || true || false = true
 ```
 
 **Test 5: Brand-new resource (generation 1, not ready) → publish immediately**
 ```
 Given:
-  - Resource Ready condition status: False
+  - Resource Reconciled condition status: False
   - resource.generation = 1
-  - condition("Ready").last_updated_time = now() - 2s (within debounce period)
+  - condition("Reconciled").last_updated_time = now() - 2s (within debounce period)
 Then:
   - Decision: PUBLISH
   - Reason: "message decision matched"
-  - Params evaluated: ref_time, is_ready=false, is_new_resource=true,
-    ready_and_stale=false, not_ready_and_debounced=false
+  - Params evaluated: ref_time, is_reconciled=false, is_new_resource=true,
+    reconciled_and_stale=false, not_reconciled_and_debounced=false
   - Result: true || false || false = true
 Note:
   - Brand-new resources bypass the debounce because no adapter has
     processed them yet — there is no "previous work" to wait for.
 ```
 
-**Test 6: Not-Ready resource due to generation mismatch → publish via debounce**
+**Test 6: Not-reconciled resource due to generation mismatch → publish via debounce**
 ```
 Given:
   - resource.generation = 2 (user changed spec)
-  - API has set Ready condition status: False (because adapters haven't reconciled generation 2)
-  - condition("Ready").last_updated_time = now() - 15s (debounce elapsed)
+  - API has set Reconciled condition status: False (because adapters haven't reconciled generation 2)
+  - condition("Reconciled").last_updated_time = now() - 15s (debounce elapsed)
 Then:
   - Decision: PUBLISH
   - Reason: "message decision matched"
-  - Params evaluated: ref_time, is_ready=false, is_new_resource=false,
-    ready_and_stale=false, not_ready_and_debounced=true
+  - Params evaluated: ref_time, is_reconciled=false, is_new_resource=false,
+    reconciled_and_stale=false, not_reconciled_and_debounced=true
   - Result: false || false || true = true
 Note:
-  - The generation mismatch is handled implicitly: the API sets Ready=False when
+  - The generation mismatch is handled implicitly: the API sets Reconciled=False when
     any adapter's observed_generation is behind resource.generation.
-    The Sentinel's default rules pick this up via the not_ready_and_debounced path.
+    The Sentinel's default rules pick this up via the not_reconciled_and_debounced path.
 ```
 
 ### Edge Cases
 
-**Test 7: Missing Ready condition on resource (zero-value fail-safe)**
+**Test 7: Missing Reconciled condition on resource (zero-value fail-safe)**
 ```
 Given:
-  - Resource has no Ready condition
+  - Resource has no Reconciled condition
   - resource.generation = 1
 Then:
-  - condition("Ready") returns zero-value Condition
-  - is_ready = false (zero-value .status == "" != "True")
-  - is_new_resource = true (generation == 1 && !is_ready)
+  - condition("Reconciled") returns zero-value Condition
+  - is_reconciled = false (zero-value .status == "" != "True")
+  - is_new_resource = true (generation == 1 && !is_reconciled)
   - Decision: PUBLISH
   - Reason: "message decision matched"
 Note:
   - Brand-new resources with no conditions are caught by is_new_resource.
     Even without is_new_resource, the zero-value ref_time would produce
-    a very old timestamp, making not_ready_and_debounced true as well.
+    a very old timestamp, making not_reconciled_and_debounced true as well.
 ```
 
 **Test 8: CEL expression compilation failure at startup**
@@ -996,22 +996,22 @@ Then:
   - Clear error message indicating the circular dependency
 ```
 
-**Test 10: Brand-new resource with no Ready condition and generation > 1**
+**Test 10: Brand-new resource with no Reconciled condition and generation > 1**
 ```
 Given:
-  - Resource has no Ready condition (no adapter has reported yet)
+  - Resource has no Reconciled condition (no adapter has reported yet)
   - resource.generation = 2 (created with a spec update before any adapter ran)
 Then:
-  - condition("Ready") returns zero-value Condition
-  - is_ready = false (.status == "" != "True")
+  - condition("Reconciled") returns zero-value Condition
+  - is_reconciled = false (.status == "" != "True")
   - is_new_resource = false (generation != 1)
   - ref_time = zero time → age is effectively infinite
-  - not_ready_and_debounced = true
+  - not_reconciled_and_debounced = true
   - Decision: PUBLISH
   - Reason: "message decision matched"
 Note:
   - Even without is_new_resource, the zero-value ref_time produces a very old
-    timestamp, so not_ready_and_debounced catches it as a fail-safe.
+    timestamp, so not_reconciled_and_debounced catches it as a fail-safe.
 ```
 
 **Test 11: message_decision omitted from configuration**
@@ -1027,7 +1027,7 @@ Note:
     decision logic rather than relying on hidden defaults.
 ```
 
-**Test 12: Params reference non-Ready condition types**
+**Test 12: Params reference non-Reconciled condition types**
 ```
 Given:
   - Configuration uses custom condition types:
@@ -1043,7 +1043,7 @@ Then:
   - Params evaluated: ref_time=Applied.last_updated_time, is_applied=true, age_exceeded=true
 Note:
   - The condition() function works with ANY condition type present in
-    resource.status.conditions[], not just "Ready".
+    resource.status.conditions[], not just "Reconciled".
   - If the referenced condition type does not exist on the resource,
     condition() returns a zero-value Condition, which naturally triggers
     age-exceeded checks (zero timestamp = very old age).
@@ -1069,11 +1069,11 @@ Integration tests should verify the complete Sentinel workflow:
 
 1. **Event Publishing**: Sentinel successfully publishes CloudEvents to the message broker when message decision result is true
 
-2. **Not-Ready triggers reconciliation**: When a resource's Ready condition is False (including after spec changes that increment generation), Sentinel publishes an event based on message decision rules
+2. **Not-reconciled triggers reconciliation**: When a resource's Reconciled condition is False (including after spec changes that increment generation), Sentinel publishes an event based on message decision rules
 
 3. **Message decision evaluation**: Sentinel evaluates message_decision params and result to determine whether to publish
 
-4. **Adapter feedback loop**: Adapters receive events, process resources, and update conditions correctly, which the API aggregates into the `Ready` condition for Sentinel to read in subsequent polls
+4. **Adapter feedback loop**: Adapters receive events, process resources, and update conditions correctly, which the API aggregates into the `Reconciled` condition for Sentinel to read in subsequent polls
 
 ---
 
