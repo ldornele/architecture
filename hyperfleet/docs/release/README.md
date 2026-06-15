@@ -20,3 +20,8 @@ Last Updated: 2026-05-11
 ## Prow Test and Release
 
 The `test-release/` subdirectory contains Prow-specific docs for CI job setup and E2E testing infrastructure.
+
+| Document | Purpose |
+|----------|---------|
+| [Add Hyperfleet E2E CI Job in Prow](./test-release/add-hyperfleet-e2e-ci-job-in-prow.md) | Configure E2E CI jobs in Prow and trigger periodic jobs via Gangway |
+| [Trigger HyperFleet E2E Jobs via Gangway API](./test-release/trigger-e2e-jobs-via-gangway.md) | Run the nightly and RC E2E jobs on demand via the Gangway API, with image-tag overrides |
