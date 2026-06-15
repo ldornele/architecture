@@ -192,18 +192,9 @@ After this configuration is merged, members of these teams will be able to rerun
 
 #### Manual Trigger via command
 
-**Obtaining an Authentication Token**
-Each SSO user is entitled to obtain a personal authentication token. Tokens can be retrieved through the UI of the app.ci cluster at [OpenShift Console](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/). 
-
-**Triggering a Periodic Job**
-
-```text
-curl -v -X POST -H "Authorization: Bearer $(oc whoami -t)" -d '{"job_name": "<JOB_NAME>", "job_execution_type": "1"}' https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions
-
-Example:
-curl -v -X POST -H "Authorization: Bearer $(oc whoami -t)" -d '{"job_name": "periodic-ci-openshift-hyperfleet-hyperfleet-e2e-main-e2e-hyperfleet-e2e-nightly", "job_execution_type": "1"}' https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions
-```
-More other steps can refer to official [prow doc](https://docs.ci.openshift.org/docs/how-tos/triggering-prowjobs-via-rest/#triggering-a-periodic-job)
+To trigger the nightly or RC E2E jobs on demand via the Gangway REST API — including how to
+obtain a token and how to override component image tags — see
+[Trigger HyperFleet E2E Jobs via Gangway API](trigger-e2e-jobs-via-gangway.md).
 
 #### Manual Trigger in a PR via GitHub Comment
 
