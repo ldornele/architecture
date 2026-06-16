@@ -30,6 +30,8 @@ This is the long-running reserved GKE cluster for Prow CI/CD job execution. This
   1. Get **explicit approval** from team leaders
   2. Send a **team-wide broadcast via Slack** before taking action to ensure everyone is aware of potential impacts
 
+> **Note:** This cluster is excluded from the [GCP Developer Cluster Lifecycle Policy](gcp-developer-cluster-lifecycle.md) (TTL, nightly shutdown, and automated enforcement do not apply).
+
 ---
 
 ## Prerequisites for Viewing Cluster
@@ -253,4 +255,3 @@ terraform force-unlock <LOCK_ID>
 - **Shared VPC setup**: `terraform/shared/README.md` (in the cloned repo)
 
 ---
-
