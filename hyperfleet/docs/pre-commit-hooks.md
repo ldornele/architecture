@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Platform Team
-Last Updated: 2026-05-14
+Last Updated: 2026-06-18
 ---
 
 # Pre-Commit Hooks Setup Guide
@@ -128,7 +128,7 @@ repos:
 
   # HyperFleet code quality hooks
   - repo: https://github.com/openshift-hyperfleet/hyperfleet-hooks
-    rev: v0.1.1  # pin to a specific tag
+    rev: 7f5119208e5cdee3f0c688881b6a4b803095f203 # v0.2.1
     hooks:
       - id: hyperfleet-commitlint
         stages: [commit-msg]
