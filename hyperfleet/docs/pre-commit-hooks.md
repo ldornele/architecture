@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Platform Team
-Last Updated: 2026-05-14
+Last Updated: 2026-06-16
 ---
 
 # Pre-Commit Hooks Setup Guide
@@ -122,13 +122,13 @@ default_install_hook_types: [pre-commit, commit-msg]
 repos:
   # Secret scanning
   - repo: https://github.com/leaktk/leaktk
-    rev: v0.3.2  # Check https://github.com/leaktk/leaktk/releases for latest
+    rev: e62a495260dc1e396fa586e51bbe1355f6fc7d9d # v0.3.3
     hooks:
       - id: leaktk.git.pre-commit
 
   # HyperFleet code quality hooks
   - repo: https://github.com/openshift-hyperfleet/hyperfleet-hooks
-    rev: v0.1.1  # pin to a specific tag
+    rev: 7d5cd98ed6a1a98c39c04b9f4ab9b0ffb0d49155 # v0.1.1
     hooks:
       - id: hyperfleet-commitlint
         stages: [commit-msg]
@@ -138,7 +138,7 @@ repos:
 
   # File hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -146,6 +146,12 @@ repos:
 ```
 
 The file hygiene hooks (`trailing-whitespace`, `end-of-file-fixer`, `check-added-large-files`) catch common issues — trailing whitespace, missing final newlines, and accidentally committed large binaries — before they reach PR review.
+
+> **Important:** All `rev` values **MUST** use full commit SHAs, not tags. Tags are mutable references that can be modified after publication (see [CVE-2025-30066](https://www.cve.org/CVERecord?id=CVE-2025-30066) for a real-world pre-commit hook supply chain attack). Add the tag as a trailing comment for readability (e.g., `# v0.3.3`). When updating versions, resolve the new tag to its SHA with:
+>
+> ```bash
+> git ls-remote --tags https://github.com/leaktk/leaktk.git v0.3.3
+> ```
 
 > **Note:** `default_install_hook_types: [pre-commit, commit-msg]` means a single `pre-commit install` command installs hooks for **both** the `pre-commit` and `commit-msg` stages. Without this setting, you would need to run `pre-commit install --hook-type commit-msg` separately to enable commit message validation.
 
@@ -327,10 +333,10 @@ repos:
     hooks:
       - id: rh-pre-commit
 
-# After (LeakTK)
+# After (LeakTK) — resolve tag to SHA: git ls-remote --tags https://github.com/leaktk/leaktk.git v0.3.3
 repos:
   - repo: https://github.com/leaktk/leaktk
-    rev: v0.3.2  # Check https://github.com/leaktk/leaktk/releases for latest
+    rev: e62a495260dc1e396fa586e51bbe1355f6fc7d9d # v0.3.3
     hooks:
       - id: leaktk.git.pre-commit
 ```
@@ -507,13 +513,17 @@ Use this sparingly — CI will still validate the commit message on the PR.
 
 ### Updating hook versions
 
-To pull the latest hook definitions:
+To update hook versions, resolve the new tag to its commit SHA and update the `rev` field manually:
 
 ```bash
-pre-commit autoupdate
+# Find the SHA for a new tag
+git ls-remote --tags https://github.com/leaktk/leaktk.git v0.4.0
+
+# Update .pre-commit-config.yaml with the new SHA
+# rev: <new-sha> # v0.4.0
 ```
 
-This updates the `rev` field in `.pre-commit-config.yaml` to the latest tag.
+> **Note:** Do not use `pre-commit autoupdate` — it replaces SHAs with tags, which weakens supply chain security. Always pin to commit SHAs.
 
 ---
 
