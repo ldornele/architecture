@@ -2,6 +2,12 @@
 
 Documentation-only repository. Single source of truth for all HyperFleet architectural documentation. No application code.
 
+## Setup
+
+```bash
+make install-hooks    # Install pre-commit hooks (secret scanning, commit message validation)
+```
+
 ## Validation
 
 | Script | Checks |
