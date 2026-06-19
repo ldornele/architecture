@@ -211,6 +211,59 @@ terraform apply -var-file=envs/gke/dev-prow.tfvars
 
 ---
 
+## Manual Installation Steps
+
+After provisioning the cluster via Terraform, two components must be installed manually from the [hyperfleet-infra](https://github.com/openshift-hyperfleet/hyperfleet-infra) repository.
+
+**First, clone the repo if you haven't already** (see [Prerequisites for Terraform Operations](#prerequisites-for-terraform-operations)).
+
+### Install Maestro
+
+Maestro is the resource management service that HyperFleet adapters depend on. Install it via the `hyperfleet-infra` Makefile:
+
+```bash
+cd hyperfleet-infra
+make install-maestro
+```
+
+### Install the Namespace Cleaner
+
+The namespace cleaner is a CronJob that automatically removes stale E2E test resources every hour. It performs a two-phase cleanup:
+
+1. Deletes Maestro resource bundles older than **3 hours** via the Maestro REST API — this prevents Maestro from recreating the associated namespaces on its next reconciliation cycle
+2. Deletes Kubernetes namespaces carrying the `hyperfleet.io/cluster-id` label older than **3 hours** — this label is present on all resources created by E2E adapters
+
+
+The cleaner is defined in the `helm/namespace-cleaner/` Helm chart in `hyperfleet-infra` ([PR #55](https://github.com/openshift-hyperfleet/hyperfleet-infra/pull/55)).
+
+```bash
+cd hyperfleet-infra
+make install-cleaner
+```
+
+**Configurable variables** (override on the `make` command line):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLEANER_SCHEDULE` | `0 * * * *` | Cron schedule (every hour) |
+| `CLEANER_LABEL_SELECTOR` | `hyperfleet.io/cluster-id` | Label key used to identify E2E namespaces |
+| `CLEANER_AGE_MINUTES` | `180` | Minimum age in minutes before a resource is deleted |
+| `CLEANER_MAESTRO_URL` | `http://maestro.maestro.svc.cluster.local:8000` | Maestro REST API endpoint |
+
+To trigger a run immediately without waiting for the next scheduled tick:
+
+```bash
+kubectl create job --from=cronjob/namespace-cleaner namespace-cleaner-manual -n prow-hyperfleet
+```
+
+To uninstall:
+
+```bash
+make uninstall-cleaner
+```
+
+---
+
 ## Key Configuration Files in hyperfleet-infra Repo
 
 | File | Purpose |
