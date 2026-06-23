@@ -27,7 +27,7 @@ Lightweight performance baselines for core HyperFleet operations, captured for t
 
 | Parameter | Value |
 |---|---|
-| Cluster | GKE dev |
+| Cluster | GKE dev (e2-standard-4 nodes, 4 vCPU / 16GB RAM) |
 | Execution | In-cluster pod via `kubectl run` (ClusterIP, no external network) |
 | Database | PostgreSQL with ~1k seeded clusters |
 | Sentinel poll interval | 5s |
