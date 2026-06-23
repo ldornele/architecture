@@ -319,35 +319,20 @@ If trade-off becomes unacceptable (e.g., maestro serves production traffic), poo
 
 ## 9. Recommendation
 
-### Adopt — blocked on upstream chart work
+### Reject — dedicated node pool makes resilience worse, not better
 
 **Rationale:**
 
-1. **Cost-neutral.** ~$12/month incremental, or saves ~$86/month if cluster stays at 2 nodes. Not a factor.
+1. **Dedicated node worsens node-failure resilience.** On the current 2-node shared pool, if one node dies maestro reschedules immediately to the surviving node. On a 1-node tainted pool, maestro has nowhere to go — taint blocks every other node, pod stays `Pending` until GKE auto-repair provisions a replacement (~2-5 min). Dedicated pool trades immediate reschedule for guaranteed downtime on node failure (see [Section 7a](#7a-single-node-trade-off-accepted-risk)).
 
-2. **Workload isolation.** Maestro and E2E share nothing — no scheduling interaction. Resource contention was measured during a tier0 E2E run (2026-06-18) and **not observed** — nodes peaked at 15% CPU / 25% memory. Under parallel E2E execution, load would be higher.
+2. **Two-node dedicated pool = unjustified overhead.** Scaling the dedicated pool to 2 nodes would solve the SPOF, but running two nodes for a workload using 20m CPU / 94Mi memory is disproportionate. The shared pool already provides multi-node resilience at no extra cost.
 
-3. **Simplifies capacity planning.** Maestro resource needs explicitly budgeted (one `e2-small`), separate from E2E test scaling. No more reasoning about shared pool sizing.
+3. **Maestro is being replaced.** Maestro will not be part of HyperFleet's future architecture. Upstream chart work, Terraform changes, and ongoing pool maintenance are not justified for a component being phased out.
 
-4. **Enables maintenance upgrade isolation.** Per-pool maintenance exclusions prevent GKE auto-upgrades from disrupting maestro node. Note: maintenance windows cluster-scoped — only exclusions are per-pool (see Section 7).
+### Still recommended (independent of node pool)
 
-5. **Low risk, easy rollback.** Add tainted node pool, add `nodeSelector`/`tolerations` to Helm values, redeploy. Rollback = remove values, destroy pool.
-
-6. **Makes HYPERFLEET-1113 safer.** HYPERFLEET-1113 (scale shared pool to 1 node) is gated on E2E cleanup (HYPERFLEET-1106), not on this pool. But with maestro on its own node, scale-down carries less risk.
-
-7. **Accepted trade-off: single-node SPOF.** 1-node tainted pool means maestro has nowhere to reschedule if node dies (~2-5 min outage during auto-repair). Acceptable for dev/CI cluster where autoscaler-eviction mid-test more damaging than brief clean outage (see Section 7a).
-
-### Blockers before implementation
-
-1. **[HARD BLOCKER] Upstream chart PR required.** Upstream maestro Helm charts (`maestro-server` and `maestro-agent`) do **not** support `nodeSelector` or `tolerations` in deployment templates. Verified against `main` branch on 2026-06-18 — none of four templates (server, agent, postgresql, mosquitto) include these fields. [HYPERFLEET-1120's upstream PR #542](https://github.com/openshift-online/maestro/pull/542) (merged 2026-06-16) added only `podAnnotations` and `priorityClassName`. New upstream PR needed — add `nodeSelector` and `tolerations` to all four deployment templates across two charts (`maestro-server` = server/postgresql/mosquitto; `maestro-agent` = agent). No existing upstream issue or PR tracks this.
-
-2. **Reconcile Terraform state** with actual cluster config (tfvars says 1 node, live cluster has 2).
-
-3. **Add resource requests/limits** to agent, db, mqtt pods. Currently unbounded — no requests, no limits. Actual OOM exposure, **independent of node pool decision**. Can and should be done first via existing upstream chart values (server chart supports `resources:`; agent/db/mqtt need upstream addition or direct value overrides). Higher urgency than node pool.
-
-### What this does NOT replace
-
-Chart-level protections (safe-to-evict, PDB, PriorityClass) remain necessary. Dedicated pool addresses workload isolation and upgrade control; PDB addresses voluntary disruptions; PriorityClass addresses scheduling priority.
+- **HYPERFLEET-1122: PDB** (`minAvailable: 1`) — protects against voluntary disruptions (drain, upgrade). Not yet implemented.
+- **Resource requests/limits** on agent, db, mqtt pods — currently unbounded, actual OOM exposure risk.
 
 ---
 
@@ -361,12 +346,8 @@ Confirm before decision meeting to avoid derailing on verifiable facts:
 
 ## Decision Record
 
-**Status:** Pending team discussion
-
-<!-- After team discussion, update this section:
-**Decision:** adopt / adopt later / reject
-**Date:** YYYY-MM-DD
-**Forum:** sprint planning / architecture sync / Slack thread
-**Participants:** ...
-**Notes:** ...
--->
+**Decision:** Reject
+**Date:** 2026-06-23
+**Forum:** Async Slack discussion (office hours)
+**Participants:** amarin, dandreev, rbenevideds
+**Notes:** Spike analysis (Section 7a) showed dedicated 1-node pool worsens resilience — pod loses immediate reschedule capability. Combined with maestro sunset, complexity not justified. Chart-level protections (safe-to-evict, PDB, PriorityClass) remain the correct approach.
