@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document records the review and triage of all Snyk Code (SAST) findings for the HyperFleet v1.0.0 release candidate. It covers source-code static analysis only — penetration testing, threat modeling, and container image vulnerability scanning (Clair/Pyxis) are handled separately under the existing Section 4.5 release gate.
+This document records the review and triage of all Snyk Code (SAST) findings for the HyperFleet v1.0.0 release candidate. It covers source-code static analysis only — container image vulnerability scanning is handled under the existing [Section 4.5 release gate](../hyperfleet-release-process.md#45-security--compliance); penetration testing and threat modeling are out of scope.
 
 SAST scanning is configured in **advisory mode** per [HYPERFLEET-1166](https://redhat.atlassian.net/browse/HYPERFLEET-1166). Findings are not release-gating under the current Enterprise Contract policy (`app-interface-standard`). This sign-off documents the team's proactive review as a supplement to the existing security gates.
 
@@ -16,7 +16,7 @@ SAST scanning is configured in **advisory mode** per [HYPERFLEET-1166](https://r
 
 ### Limitations
 
-Results are from CI-produced SARIF (Konflux pipeline), which applies `--severity-threshold=high` and Red Hat Known False Positive (KFP) filtering. Lower-severity findings that would appear in a local `snyk code test` run may be suppressed. The assurance in this sign-off is bounded by what the CI scan was configured to report.
+Results are from CI-produced SARIF (Konflux pipeline). The pipeline applies `--severity-threshold=high` to govern the build gate (pass/fail exit code); the SARIF retrieved via OCI referrers contains findings at all severity levels. Red Hat Known False Positive (KFP) filtering is also applied, which may suppress findings that would appear in a local `snyk code test` run. The assurance in this sign-off is bounded by what the CI scan was configured to report.
 
 ## Scan metadata
 
@@ -70,7 +70,7 @@ All three commits are the upstream `openshift-hyperfleet/*` main HEAD as of 2026
 
 ### hyperfleet-sentinel
 
-No findings.
+No findings. SARIF report confirmed well-formed with scan exit code 0.
 
 ### hyperfleet-adapter
 
@@ -88,7 +88,7 @@ These are **scan-noise reduction and hardening** tickets, not defect remediation
 
 | Ticket | Type | Component | Scope |
 |--------|------|-----------|-------|
-| [HYPERFLEET-1233](https://redhat.atlassian.net/browse/HYPERFLEET-1233) | Hardening | hyperfleet-adapter | Finding #17: add startup warning log for insecure TLS mode, enrich `//nolint:gosec` comment with rationale. Findings #18–22: test credential cleanup. |
+| [HYPERFLEET-1233](https://redhat.atlassian.net/browse/HYPERFLEET-1233) | Hardening | hyperfleet-adapter | Finding #17: add startup warning log for insecure TLS mode, enrich `//nolint:gosec` comment with rationale. Findings #18–19: test credential cleanup. Findings #20–22: add `//nolint` annotations for expected permissive TLS in envtest fixtures. |
 | [HYPERFLEET-1234](https://redhat.atlassian.net/browse/HYPERFLEET-1234) | Hygiene | hyperfleet-api | Finding #9: remove hardcoded default username from config constructor. Findings #1–8, #10–16: extract test credentials to constants. |
 
 ## Sign-off
