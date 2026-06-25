@@ -50,8 +50,8 @@ API read thresholds are consistent across both environments.
 | GET /clusters/{id} (large payload)    | 4.34ms  | 32.61ms | 50ms      |
 | GET /clusters (no filter)             | 5.10ms  | 32.63ms | 50ms      |
 | GET /clusters (search filter)         | 4.89ms  | 33.03ms | 50ms      |
-| GET /clusters (pageSize=10)           | 4.22ms  | 31.42ms | 50ms      |
-| GET /clusters (page=1, pageSize=10)   | 4.23ms  | 33.30ms | 50ms      |
+| GET /clusters (size=10)               | 4.22ms  | 31.42ms | 50ms      |
+| GET /clusters (page=1, size=10)       | 4.23ms  | 33.30ms | 50ms      |
 
 
 API read latencies on Prow are higher than GKE dev (~30ms vs ~3-5ms) but pass comfortably within the 50ms threshold.
