@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Architecture Team
-Last Updated: 2026-03-11
+Last Updated: 2026-06-24
 ---
 
 # HyperFleet Cluster Status JSON Guide
@@ -17,15 +17,16 @@ Last Updated: 2026-03-11
   - [Adapter Implementation Pattern](#adapter-implementation-pattern)
 - [The Adapter Status Contract](#the-adapter-status-contract)
   - [Reporting Status: Always PUT](#reporting-status-always-put)
-  - [CRITICAL: Always Update `last_updated_time`](#critical-always-update-last_updated_time)
+  - [CRITICAL: Always Update `observed_time`](#critical-always-update-observed_time)
   - [Implementation via Adapter Configuration (PR #18)](#implementation-via-adapter-configuration-pr-18)
-  - [ClusterStatus Object Structure](#clusterstatus-object-structure)
-  - [ClusterStatus Fields](#clusterstatus-fields)
-  - [AdapterStatus Fields (within adapter_statuses array)](#adapterstatus-fields-within-adapter_statuses-array)
+  - [Status Response Structure](#status-response-structure)
+  - [ClusterStatus Fields (aggregated, embedded in Cluster resource)](#clusterstatus-fields-aggregated-embedded-in-cluster-resource)
+  - [AdapterStatus Fields (returned by GET /statuses)](#adapterstatus-fields-returned-by-get-statuses)
 - [The Three Required Conditions](#the-three-required-conditions)
   - [1. Available](#1-available)
   - [2. Applied](#2-applied)
   - [3. Health](#3-health)
+- [The Finalized Condition (Deletion Lifecycle)](#the-finalized-condition-deletion-lifecycle)
 - [Additional Conditions (Optional)](#additional-conditions-optional)
   - [Rules for Additional Conditions](#rules-for-additional-conditions)
   - [Example: DNS Adapter with Additional Conditions](#example-dns-adapter-with-additional-conditions)
@@ -64,7 +65,7 @@ Last Updated: 2026-03-11
   - [Condition Generation Examples](#condition-generation-examples)
 - [Common Status Query Patterns](#common-status-query-patterns)
   - [1. Wait for Specific Adapter](#1-wait-for-specific-adapter)
-  - [2. Check If Cluster is Ready](#2-check-if-cluster-is-ready)
+  - [2. Check If Cluster is Reconciled](#2-check-if-cluster-is-reconciled)
   - [3. Get Failed Adapters](#3-get-failed-adapters)
   - [4. Display Adapter Progress](#4-display-adapter-progress)
 - [Condition Reference](#condition-reference)
@@ -121,15 +122,15 @@ HyperFleet uses a **condition-based status reporting contract** where adapters r
 
 ```
 /v1/clusters/{clusterId}                    # Cluster resource (with aggregated status)
-/v1/clusters/{clusterId}/statuses           # ClusterStatus resource (detailed adapter statuses)
+/v1/clusters/{clusterId}/statuses           # Adapter statuses (paginated AdapterStatusList)
 ```
 
 ### Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| **GET** | `/v1/clusters/{clusterId}` | Get cluster with aggregated status (phase + adapter availability) |
-| **GET** | `/v1/clusters/{clusterId}/statuses` | Get the ClusterStatus with all adapter statuses (optional - for querying) |
+| **GET** | `/v1/clusters/{clusterId}` | Get cluster with aggregated status conditions (`Reconciled`, `LastKnownReconciled`) |
+| **GET** | `/v1/clusters/{clusterId}/statuses` | Get paginated `AdapterStatusList` with detailed per-adapter statuses |
 | **PUT** | `/v1/clusters/{clusterId}/statuses` | Adapter reports status (API handles upsert internally) |
 
 > **Note**: This document will be updated with references to the Adapter Configuration Framework from [PR #18](https://github.com/openshift-hyperfleet/architecture/pull/18) once it is merged. The PR introduces a declarative YAML-based system for adapter configuration, event handling, and status reporting.
@@ -146,27 +147,25 @@ When an adapter needs to report its status, it **always PUTs**. The API handles 
 {
   "adapter": "validation",           // Identifies which adapter is reporting
   "observed_generation": 1,
+  "observed_time": "2025-10-17T12:02:00Z",  // When adapter checked (now())
   "conditions": [
     {
       "type": "Available",
       "status": "True",
       "reason": "JobSucceeded",
-      "message": "Job completed successfully",
-      "last_transition_time": "2025-10-17T12:02:00Z"
+      "message": "Job completed successfully"
     },
     {
       "type": "Applied",
       "status": "True",
       "reason": "JobLaunched",
-      "message": "Job created successfully",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Job created successfully"
     },
     {
       "type": "Health",
       "status": "True",
       "reason": "NoErrors",
-      "message": "Adapter is healthy",
-      "last_transition_time": "2025-10-17T12:02:00Z"
+      "message": "Adapter is healthy"
     }
   ],
   "data": {
@@ -177,24 +176,22 @@ When an adapter needs to report its status, it **always PUTs**. The API handles 
   },
   "metadata": {
     "job_name": "validation-cls-123-gen1"
-  },
-  "last_updated_time": "2025-10-17T12:02:00Z"    // When adapter checked (now())
+  }
 }
 ```
 
-**Response**: `200 OK` with updated ClusterStatus object (whether first report or subsequent update)
+**Response**: `201 Created` with the persisted `AdapterStatus` object, or `204 No Content` if the report was silently discarded (stale generation or timestamp).
 
 **What Happens (API-side)**:
 1. API receives PUT with `adapter` field identifying which adapter is reporting
-2. API finds the adapter entry in `adapter_statuses` array (or creates if first time)
-3. If first report: API INSERTs adapter with `created_at = now()`
-4. If subsequent report: API UPDATEs adapter, preserving `created_at` and updating `updated_at`
-5. API recalculates `cluster.status.last_updated_time = min(adapters[].last_updated_time)`
-   - This uses the OLDEST adapter timestamp to represent status confidence
-   - Ensures Sentinel triggers reconciliation when ANY adapter is stale
-6. API recalculates Cluster aggregated status (phase + adapters array)
-
-**Response**: `200 OK` with updated ClusterStatus object (whether first report or update)
+2. API validates the request: mandatory conditions (Available, Applied, Health) present, `observed_time` within acceptable range
+3. API finds the existing `AdapterStatus` for this adapter (or creates one if first report)
+4. If first report: API creates the `AdapterStatus` with `created_time = now()`
+5. If subsequent report: API updates the `AdapterStatus`, preserving `created_time`
+6. API maps `observed_time` to the stored `last_report_time` field
+7. API recalculates aggregated resource conditions: `Reconciled` (all required adapters Available=True at current generation) and `LastKnownReconciled` (sticky cross-generation signal)
+8. API generates per-adapter `{AdapterName}Successful` conditions from each adapter's Available status
+9. If the resource is soft-deleted, aggregation switches to requiring `Finalized=True` instead of `Available=True`
 
 ### Adapter Implementation Pattern
 
@@ -207,12 +204,12 @@ function reportStatus(clusterId, adapterStatus) {
   body = {
     adapter: "dns",              // Identifies which adapter
     observed_generation: 1,
+    observed_time: now(),        // When adapter checked
     conditions: [...],
-    data: {...},
-    last_updated_time: now()           // When adapter checked
+    data: {...}
   }
 
-  // API returns 200 OK whether first report or update
+  // API returns 201 Created or 204 No Content (if stale)
 }
 ```
 
@@ -240,27 +237,25 @@ Adapters **always PUT** to report status. The API handles upsert internally (INS
 {
   "adapter": "validation",           // Identifies which adapter is reporting
   "observed_generation": 1,
+  "observed_time": "2025-10-17T12:02:00Z",   // When adapter checked (now())
   "conditions": [
     {
       "type": "Available",
       "status": "True",
       "reason": "JobSucceeded",
-      "message": "Job completed successfully after 115 seconds",
-      "last_transition_time": "2025-10-17T12:02:00Z"
+      "message": "Job completed successfully after 115 seconds"
     },
     {
       "type": "Applied",
       "status": "True",
       "reason": "JobLaunched",
-      "message": "Kubernetes Job created successfully",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Kubernetes Job created successfully"
     },
     {
       "type": "Health",
       "status": "True",
       "reason": "AllChecksPassed",
-      "message": "All validation checks passed",
-      "last_transition_time": "2025-10-17T12:02:00Z"
+      "message": "All validation checks passed"
     }
   ],
   "data": {
@@ -272,30 +267,29 @@ Adapters **always PUT** to report status. The API handles upsert internally (INS
   },
   "metadata": {
     "job_name": "validation-cls-123-gen1",
-    "executionTime": "115s"
-  },
-  "last_updated_time": "2025-10-17T12:02:00Z"   // When adapter checked (now())
+    "duration": "115s"
+  }
 }
 ```
 
-**API Response**: `200 OK` (whether first report or subsequent update)
+**API Response**: `201 Created` with the persisted `AdapterStatus` object, or `204 No Content` if the report was discarded (stale generation or timestamp)
 
 **Note**: No `generation` field on ClusterStatus itself. Each adapter reports its own `observed_generation`.
 
-### CRITICAL: Always Update `last_updated_time`
+### CRITICAL: Always Update `observed_time`
 
 **Required Behavior**: Adapters MUST update their status on EVERY evaluation, regardless of whether they take action or skip work.
 
 **Why This Matters**:
 
-The Sentinel uses `last_updated_time` timestamps to calculate max age intervals for publishing reconciliation events. If adapters do not update `last_updated_time` when they skip work (e.g., preconditions not met), the Sentinel will create an infinite event loop:
+The Sentinel uses `observed_time` (stored as `last_report_time` on the API side) to calculate max age intervals for publishing reconciliation events. If adapters do not report status when they skip work (e.g., preconditions not met), the Sentinel will create an infinite event loop:
 
 ```
 Time 10:00 - DNS adapter receives reconciliation event
 Time 10:00 - DNS checks preconditions: Validation adapter not complete
 Time 10:00 - DNS does NOT update status (skips work)
-            ❌ cluster.status.last_updated_time remains at 09:50
-Time 10:10 - Sentinel sees last_updated_time=09:50, max age expired (10s)
+            ❌ adapter's last_report_time remains at 09:50
+Time 10:10 - Sentinel sees stale report time, max age expired (10s)
 Time 10:10 - Sentinel publishes ANOTHER event
 Time 10:10 - DNS receives event AGAIN, checks preconditions AGAIN...
             ↻ INFINITE LOOP until validation completes
@@ -309,39 +303,36 @@ When an adapter evaluates a cluster but determines it should not take action (pr
 {
   "adapter": "dns",
   "observed_generation": 1,
+  "observed_time": "2025-10-17T10:00:00Z",  // ← CRITICAL: Update timestamp even when skipping work
   "conditions": [
     {
       "type": "Available",
       "status": "False",
       "reason": "PreconditionsNotMet",
-      "message": "Waiting for validation adapter to complete",
-      "last_transition_time": "2025-10-17T10:00:00Z"
+      "message": "Waiting for validation adapter to complete"
     },
     {
       "type": "Applied",
       "status": "False",
       "reason": "PreconditionsNotMet",
-      "message": "Waiting for validation adapter",
-      "last_transition_time": "2025-10-17T10:00:00Z"
+      "message": "Waiting for validation adapter"
     },
     {
       "type": "Health",
       "status": "True",
       "reason": "NoErrors",
-      "message": "Adapter is healthy",
-      "last_transition_time": "2025-10-17T10:00:00Z"
+      "message": "Adapter is healthy"
     }
-  ],
-  "last_updated_time": "2025-10-17T10:00:00Z"  // ← CRITICAL: Update timestamp even when skipping work
+  ]
 }
 ```
 
 **Integration Testing Requirement**:
 
 Integration tests for adapters MUST verify:
-- ✅ Adapter updates `last_updated_time` when preconditions are met and work is performed
-- ✅ Adapter updates `last_updated_time` when preconditions are NOT met and work is skipped
-- ✅ Sentinel correctly calculates max age from adapter `last_updated_time` timestamps
+- ✅ Adapter sets `observed_time` to current time when preconditions are met and work is performed
+- ✅ Adapter sets `observed_time` to current time when preconditions are NOT met and work is skipped
+- ✅ Sentinel correctly calculates max age from adapter report timestamps
 
 **Reference**: See the Sentinel architecture documentation for details on the max age strategy and reconciliation loop.
 
@@ -384,17 +375,21 @@ postProcessing:
 
 This configuration-driven approach ensures consistent status reporting across all adapters without requiring code changes.
 
-### ClusterStatus Object Structure
+### Status Response Structure
 
-The ClusterStatus object is a **RESTful resource** that contains ALL adapter statuses for a cluster in one place:
+Status in HyperFleet has two tiers:
+
+1. **Aggregated status** (`ClusterStatus`) is embedded in the Cluster resource at `cluster.status`. It contains only computed `ResourceCondition` entries (`Reconciled`, `LastKnownReconciled`, `{AdapterName}Successful`). You cannot write to it directly.
+2. **Adapter statuses** are returned by `GET /clusters/{id}/statuses` as a paginated `AdapterStatusList`. Each item is an individual `AdapterStatus` object.
 
 ```json
+GET /api/hyperfleet/v1/clusters/cls-550e8400/statuses
+
 {
-  "id": "status-cls-550e8400",
-  "type": "clusterStatus",
-  "href": "/api/hyperfleet/v1/clusters/cls-550e8400/statuses",
-  "cluster_id": "cls-550e8400",
-  "adapter_statuses": [
+  "page": 1,
+  "size": 2,
+  "total": 2,
+  "items": [
     {
       "adapter": "validation",
       "observed_generation": 1,
@@ -430,9 +425,10 @@ The ClusterStatus object is a **RESTful resource** that contains ALL adapter sta
       },
       "metadata": {
         "job_name": "validation-cls-123-gen1",
-        "executionTime": "115s"
+        "duration": "115s"
       },
-      "last_updated_time": "2025-10-17T12:02:00Z"
+      "created_time": "2025-10-17T12:00:00Z",
+      "last_report_time": "2025-10-17T12:02:00Z"
     },
     {
       "adapter": "dns",
@@ -463,55 +459,59 @@ The ClusterStatus object is a **RESTful resource** that contains ALL adapter sta
       "data": {
         "recordsCreated": ["api.my-cluster.example.com", "*.apps.my-cluster.example.com"]
       },
-      "last_updated_time": "2025-10-17T12:05:00Z"
+      "created_time": "2025-10-17T12:03:00Z",
+      "last_report_time": "2025-10-17T12:05:00Z"
     }
-  ],
-  "last_updated_time": "2025-10-17T12:05:00Z"
+  ]
 }
 ```
 
-### ClusterStatus Fields
+### ClusterStatus Fields (aggregated, embedded in Cluster resource)
 
 > **Schema Reference**: See [ClusterStatus schema definition](https://github.com/openshift-hyperfleet/hyperfleet-api-spec/blob/main/schemas/core/openapi.yaml) in the API spec for complete field definitions, types, and validation rules.
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
-| `id` | **YES** | string | Unique ID for this ClusterStatus object |
-| `type` | **YES** | string | Always "clusterStatus" |
-| `href` | **YES** | string | API path to this ClusterStatus resource |
-| `clusterId` | **YES** | string | ID of the cluster this status belongs to |
-| `adapter_statuses` | **YES** | array | Array of adapter status objects |
-| `last_updated_time` | **YES** | timestamp | When this ClusterStatus was last updated |
+| `conditions` | **YES** | array | Aggregated `ResourceCondition` entries computed by the API |
 
-### AdapterStatus Fields (within adapter_statuses array)
+Mandatory conditions (present from resource creation):
+
+- `Reconciled`: True when the resource's desired state has been fully reconciled by all adapters at the current generation
+- `LastKnownReconciled`: Sticky cross-generation condition. Stays True as long as all required adapters were reconciled at a common observed generation, even if a newer generation is being processed
+
+Per-adapter conditions (added as adapters report):
+
+- `{AdapterName}Successful`: True when the adapter's `Available` condition is True
+
+### AdapterStatus Fields (returned by GET /statuses)
 
 > **Schema Reference**: See [AdapterStatus schema definition](https://github.com/openshift-hyperfleet/hyperfleet-api-spec/blob/main/schemas/core/openapi.yaml) in the API spec for complete field definitions, types, and validation rules.
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
 | `adapter` | **YES** | string | Adapter name (e.g., "validation", "dns") |
-| `observed_generation` | **YES** | integer | Cluster generation this adapter reconciled |
-| `conditions` | **YES** | array | **Minimum 3 conditions** (Available, Applied, Health) |
-| `data` | **NO** | JSONB | Adapter-specific structured data (optional) |
-| `metadata` | **NO** | object | Additional metadata (optional) |
-| `last_updated_time` | **YES** | timestamp | When this adapter status was last updated |
+| `observed_generation` | **YES** | integer | Resource generation this adapter reconciled |
+| `conditions` | **YES** | array | `AdapterCondition` entries (typically: Available, Applied, Health, Finalized) |
+| `data` | **NO** | object | Adapter-specific structured data |
+| `metadata` | **NO** | object | Job execution metadata (`job_name`, `job_namespace`, `attempt`, `started_time`, `completed_time`, `duration`) |
+| `created_time` | **YES** | timestamp | When this adapter status was first created (API-managed) |
+| `last_report_time` | **YES** | timestamp | When this adapter last reported (API-managed, updated every PUT) |
 
 **Key Points**:
-- **ONE ClusterStatus object per cluster** - All adapter statuses grouped together
-- ClusterStatus does NOT have a generation field - it reflects current observed state
-- Each adapter in `adapter_statuses` has `observed_generation` indicating which cluster generation it has reconciled
+- `GET /clusters/{id}/statuses` returns a paginated `AdapterStatusList`, not a single object
+- `ClusterStatus` is a computed sub-object on the Cluster resource (read-only). It has no `id`, `type`, or `href` of its own.
+- Each `AdapterStatus` is independent. `observed_generation` indicates which resource generation the adapter reconciled.
 - Cluster spec has `generation` (user's intent), adapters report `observed_generation` (observed state)
-- Adapters always PUT with `adapter` field in payload - API handles upsert internally
-- API creates ClusterStatus on first report, updates adapter entry on subsequent reports
-- This is much more RESTful: `/clusters/{id}/statuses` represents the complete status of the cluster
-- Prevents scattered status objects - everything in one cohesive resource
-- The Cluster object still contains only aggregated status (see below)
+- Adapters always PUT with `adapter` field in payload. The API handles upsert internally.
+- `last_report_time` is API-managed and updated on every PUT, even if conditions haven't changed. Sentinel uses it to detect adapter liveness.
+- `last_transition_time` appears on conditions in GET responses but is API-managed. Adapters do not send it in PUT requests.
+- The Cluster object contains only aggregated status (see below)
 
 ---
 
 ## The Three Required Conditions
 
-Every adapter status update **MUST** include these three conditions:
+Every adapter status update **MUST** include these three conditions. The API returns `400 Bad Request` if any of the three are missing from the PUT request.
 
 ### 1. Available
 
@@ -530,8 +530,7 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Available",
   "status": "True",
   "reason": "JobSucceeded",
-  "message": "Validation Job completed successfully",
-  "last_transition_time": "2025-10-17T12:02:00Z"
+  "message": "Validation Job completed successfully"
 }
 
 // Failure
@@ -539,8 +538,7 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Available",
   "status": "False",
   "reason": "JobFailed",
-  "message": "Validation failed: Route53 zone not found for domain example.com",
-  "last_transition_time": "2025-10-17T12:02:00Z"
+  "message": "Validation failed: Route53 zone not found for domain example.com"
 }
 
 // In Progress
@@ -548,8 +546,7 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Available",
   "status": "False",
   "reason": "JobRunning",
-  "message": "Validation Job is still executing",
-  "last_transition_time": "2025-10-17T12:00:05Z"
+  "message": "Validation Job is still executing"
 }
 ```
 
@@ -568,8 +565,7 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Applied",
   "status": "True",
   "reason": "JobLaunched",
-  "message": "Kubernetes Job 'validation-cls-123-gen1' created successfully",
-  "last_transition_time": "2025-10-17T12:00:05Z"
+  "message": "Kubernetes Job 'validation-cls-123-gen1' created successfully"
 }
 
 // Creation Failed
@@ -577,8 +573,7 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Applied",
   "status": "False",
   "reason": "ResourceQuotaExceeded",
-  "message": "Failed to create Job: namespace quota exceeded",
-  "last_transition_time": "2025-10-17T12:00:05Z"
+  "message": "Failed to create Job: namespace quota exceeded"
 }
 
 // Not Yet Attempted
@@ -586,8 +581,7 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Applied",
   "status": "False",
   "reason": "PreconditionsNotMet",
-  "message": "Waiting for validation to complete",
-  "last_transition_time": "2025-10-17T12:00:05Z"
+  "message": "Waiting for validation to complete"
 }
 ```
 
@@ -608,8 +602,7 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Health",
   "status": "True",
   "reason": "AllChecksPassed",
-  "message": "Adapter executed normally without errors",
-  "last_transition_time": "2025-10-17T12:02:00Z"
+  "message": "Adapter executed normally without errors"
 }
 
 // Unhealthy (unexpected error)
@@ -617,8 +610,7 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Health",
   "status": "False",
   "reason": "UnexpectedError",
-  "message": "Failed to connect to Kubernetes API after 3 retries",
-  "last_transition_time": "2025-10-17T12:02:00Z"
+  "message": "Failed to connect to Kubernetes API after 3 retries"
 }
 
 // Unhealthy (resource missing)
@@ -626,10 +618,76 @@ Every adapter status update **MUST** include these three conditions:
   "type": "Health",
   "status": "False",
   "reason": "ResourceNotFound",
-  "message": "Job 'validation-cls-123-gen1' not found in cluster",
-  "last_transition_time": "2025-10-17T12:02:00Z"
+  "message": "Job 'validation-cls-123-gen1' not found in cluster"
 }
 ```
+
+---
+
+## The Finalized Condition (Deletion Lifecycle)
+
+When a resource is soft-deleted (i.e., `deleted_time` is set), adapters participate in the deletion lifecycle by reporting a `Finalized` condition. This condition is **optional** during normal provisioning but becomes critical during deletion.
+
+### How Finalized Works
+
+1. Resource is soft-deleted via the API (sets `deleted_time`)
+2. Sentinel publishes reconciliation events for the soft-deleted resource
+3. Each adapter performs its cleanup work (delete Jobs, DNS records, etc.)
+4. Each adapter reports `Finalized: True` at the current generation via PUT
+5. Once **all** required adapters report `Finalized: True`, the API hard-deletes the resource from the database
+
+### Aggregation Behavior
+
+The `Reconciled` aggregated condition changes meaning based on deletion state:
+
+- **Normal lifecycle** (no `deleted_time`): `Reconciled=True` when all required adapters have `Available=True` at current generation
+- **Deletion lifecycle** (`deleted_time` set): `Reconciled=True` when all required adapters have `Finalized=True` at current generation, and no child resources remain (e.g., no nodepools for a cluster)
+
+### Example: Adapter Reporting Finalized
+
+**PUT** `/v1/clusters/cls-123/statuses`
+
+```json
+{
+  "adapter": "dns",
+  "observed_generation": 2,
+  "observed_time": "2025-10-17T13:00:00Z",
+  "conditions": [
+    {
+      "type": "Available",
+      "status": "True",
+      "reason": "CleanupComplete",
+      "message": "DNS records deleted successfully"
+    },
+    {
+      "type": "Applied",
+      "status": "True",
+      "reason": "ResourcesRemoved",
+      "message": "All DNS resources cleaned up"
+    },
+    {
+      "type": "Health",
+      "status": "True",
+      "reason": "NoErrors",
+      "message": "Adapter is healthy"
+    },
+    {
+      "type": "Finalized",
+      "status": "True",
+      "reason": "CleanupComplete",
+      "message": "Adapter has completed all deletion cleanup"
+    }
+  ]
+}
+```
+
+### Key Points
+
+- `Finalized` is **not** in the mandatory set (Available, Applied, Health are mandatory). Missing `Finalized` is treated as "not finalized" (same as `False`).
+- Adapters only need to report `Finalized` when handling deletion events. During normal create/update flows, omit it.
+- The API triggers hard-delete only when the final adapter's PUT includes `Finalized=True` and all other required adapters have already finalized.
+- For clusters, hard-delete also requires that no child nodepools remain (`ReconciledWaitingForChildren` reason if nodepools still exist).
+- If an adapter fails to report `Finalized` and the resource is stuck in Finalizing state, operators can use the force-delete endpoints (`POST /clusters/{cluster_id}/force-delete` or `POST /clusters/{cluster_id}/nodepools/{nodepool_id}/force-delete`) as an escape hatch (requires a `reason` for audit).
 
 ---
 
@@ -649,48 +707,44 @@ Adapters **MAY** send additional conditions beyond the three required ones. Thes
 
 ### Example: DNS Adapter with Additional Conditions
 
-This example shows an adapter status payload (what gets PUT to the API and stored in the ClusterStatus `adapter_statuses` array):
+This example shows an adapter status payload (what gets PUT to the API and persisted as an `AdapterStatus` object):
 
 ```json
 {
   "adapter": "dns",
   "observed_generation": 1,
+  "observed_time": "2025-10-17T12:05:00Z",
   "conditions": [
     {
       "type": "Available",
       "status": "True",
       "reason": "AllRecordsCreated",
-      "message": "All DNS records created and verified",
-      "last_transition_time": "2025-10-17T12:05:00Z"
+      "message": "All DNS records created and verified"
     },
     {
       "type": "Applied",
       "status": "True",
       "reason": "JobLaunched",
-      "message": "DNS Job created successfully",
-      "last_transition_time": "2025-10-17T12:03:00Z"
+      "message": "DNS Job created successfully"
     },
     {
       "type": "Health",
       "status": "True",
       "reason": "NoErrors",
-      "message": "DNS adapter executed without errors",
-      "last_transition_time": "2025-10-17T12:05:00Z"
+      "message": "DNS adapter executed without errors"
     },
     // Additional conditions
     {
       "type": "APIRecordCreated",
       "status": "True",
       "reason": "Route53Updated",
-      "message": "Created A record for api.my-cluster.example.com",
-      "last_transition_time": "2025-10-17T12:04:30Z"
+      "message": "Created A record for api.my-cluster.example.com"
     },
     {
       "type": "AppsWildcardCreated",
       "status": "True",
       "reason": "Route53Updated",
-      "message": "Created wildcard record for *.apps.my-cluster.example.com",
-      "last_transition_time": "2025-10-17T12:04:45Z"
+      "message": "Created wildcard record for *.apps.my-cluster.example.com"
     }
   ]
 }
@@ -1708,34 +1762,31 @@ The following examples show **individual adapter status payloads** that adapters
 {
   "adapter": "validation",
   "observed_generation": 1,
+  "observed_time": "2025-10-17T12:00:05Z",
   "conditions": [
     {
       "type": "Available",
       "status": "False",
       "reason": "JobRunning",
-      "message": "Validation Job is executing",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Validation Job is executing"
     },
     {
       "type": "Applied",
       "status": "True",
       "reason": "JobLaunched",
-      "message": "Kubernetes Job 'validation-cls-123-gen1' created successfully",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Kubernetes Job 'validation-cls-123-gen1' created successfully"
     },
     {
       "type": "Health",
       "status": "True",
       "reason": "NoErrors",
-      "message": "Adapter is healthy",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Adapter is healthy"
     }
   ],
   "metadata": {
     "job_name": "validation-cls-123-gen1",
     "job_namespace": "hyperfleet-jobs"
-  },
-  "last_updated_time": "2025-10-17T12:00:05Z"
+  }
 }
 ```
 
@@ -1756,27 +1807,25 @@ The following examples show **individual adapter status payloads** that adapters
 {
   "adapter": "validation",
   "observed_generation": 1,
+  "observed_time": "2025-10-17T12:02:00Z",
   "conditions": [
     {
       "type": "Available",
       "status": "True",
       "reason": "JobSucceeded",
-      "message": "Job completed successfully after 115 seconds",
-      "last_transition_time": "2025-10-17T12:02:00Z"
+      "message": "Job completed successfully after 115 seconds"
     },
     {
       "type": "Applied",
       "status": "True",
       "reason": "JobLaunched",
-      "message": "Kubernetes Job created successfully",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Kubernetes Job created successfully"
     },
     {
       "type": "Health",
       "status": "True",
       "reason": "AllChecksPassed",
-      "message": "All validation checks passed",
-      "last_transition_time": "2025-10-17T12:02:00Z"
+      "message": "All validation checks passed"
     }
   ],
   "data": {
@@ -1792,9 +1841,8 @@ The following examples show **individual adapter status payloads** that adapters
   },
   "metadata": {
     "job_name": "validation-cls-123-gen1",
-    "completedAt": "2025-10-17T12:02:00Z"
-  },
-  "last_updated_time": "2025-10-17T12:02:00Z"
+    "completed_time": "2025-10-17T12:02:00Z"
+  }
 }
 ```
 
@@ -1818,27 +1866,25 @@ The following examples show **individual adapter status payloads** that adapters
 {
   "adapter": "validation",
   "observed_generation": 1,
+  "observed_time": "2025-10-17T12:02:00Z",
   "conditions": [
     {
       "type": "Available",
       "status": "False",
       "reason": "ValidationFailed",
-      "message": "Route53 zone not found for domain example.com. Create a public hosted zone before provisioning cluster.",
-      "last_transition_time": "2025-10-17T12:02:00Z"
+      "message": "Route53 zone not found for domain example.com. Create a public hosted zone before provisioning cluster."
     },
     {
       "type": "Applied",
       "status": "True",
       "reason": "JobLaunched",
-      "message": "Kubernetes Job created successfully",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Kubernetes Job created successfully"
     },
     {
       "type": "Health",
       "status": "True",
       "reason": "NoErrors",
-      "message": "Adapter executed normally (validation logic failed, not adapter error)",
-      "last_transition_time": "2025-10-17T12:02:00Z"
+      "message": "Adapter executed normally (validation logic failed, not adapter error)"
     }
   ],
   "data": {
@@ -1851,8 +1897,7 @@ The following examples show **individual adapter status payloads** that adapters
     "checksPassed": 14,
     "checksFailed": 1,
     "failedChecks": ["route53_zone"]
-  },
-  "last_updated_time": "2025-10-17T12:02:00Z"
+  }
 }
 ```
 
@@ -1875,27 +1920,25 @@ The following examples show **individual adapter status payloads** that adapters
 {
   "adapter": "validation",
   "observed_generation": 1,
+  "observed_time": "2025-10-17T12:00:05Z",
   "conditions": [
     {
       "type": "Available",
       "status": "False",
       "reason": "ResourceCreationFailed",
-      "message": "Failed to create validation Job",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Failed to create validation Job"
     },
     {
       "type": "Applied",
       "status": "False",
       "reason": "ResourceQuotaExceeded",
-      "message": "Failed to create Job: namespace resource quota exceeded (cpu limit reached)",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Failed to create Job: namespace resource quota exceeded (cpu limit reached)"
     },
     {
       "type": "Health",
       "status": "False",
       "reason": "UnexpectedError",
-      "message": "Adapter could not complete due to resource quota limits",
-      "last_transition_time": "2025-10-17T12:00:05Z"
+      "message": "Adapter could not complete due to resource quota limits"
     }
   ],
   "data": {
@@ -1904,8 +1947,7 @@ The following examples show **individual adapter status payloads** that adapters
       "message": "CPU limit reached",
       "namespace": "hyperfleet-jobs"
     }
-  },
-  "last_updated_time": "2025-10-17T12:00:05Z"
+  }
 }
 ```
 
@@ -2510,62 +2552,51 @@ These examples show how specific cluster conditions are generated based on adapt
 ### 1. Wait for Specific Adapter
 
 To poll until an adapter completes:
-1. Fetch the cluster repeatedly (e.g., every 5 seconds): `GET /v1/clusters/{clusterId}`
-2. Find the adapter in `status.adapters` array
-3. Check if adapter exists (has reported at least once)
+1. Fetch adapter statuses: `GET /v1/clusters/{clusterId}/statuses`
+2. Find the adapter by `adapter` name in the `items` array
+3. If not found, the adapter has not reported yet. Continue polling.
 4. Verify `observed_generation === cluster.generation` (not stale)
-5. Check `available` field:
-   - `"True"` → adapter succeeded, stop polling
-   - `"False"` → adapter failed or in progress
-6. If `"False"`, fetch detailed status to check reason:
-   - `GET /v1/clusters/{clusterId}/statuses?generation={generation}`
-   - Find the adapter in `adapter_statuses` array
-   - Check `Available` condition's `reason`:
+5. Check `Available` condition:
+   - `status: "True"` → adapter succeeded, stop polling
+   - `status: "False"` → check `reason`:
      - `JobRunning` or `JobPending` → still in progress, continue polling
-     - Other reasons → adapter actually failed, stop polling
-7. Implement timeout (e.g., 10 minutes)
+     - Other reasons → adapter failed, stop polling
+6. Implement timeout (e.g., 10 minutes)
 
-### 2. Check If Cluster is Ready
+### 2. Check If Cluster is Reconciled
 
 To verify cluster is fully provisioned:
 1. Fetch cluster: `GET /v1/clusters/{clusterId}`
-2. Check the `Ready` condition in `status.conditions`:
-   - `status.conditions.Ready === "True"` — cluster is ready
-3. Optionally verify each adapter in `status.adapters`:
-   - All have `observed_generation === cluster.generation`
-   - All have `available === "True"`
+2. Check the `Reconciled` condition in `status.conditions`:
+   - `status: "True"` → all required adapters report `Available=True` at the current generation
+3. For a stickier signal, check `LastKnownReconciled`:
+   - `status: "True"` → all adapters were reconciled at a common generation (stays True even while a new generation is being processed)
 
 ### 3. Get Failed Adapters
 
 To identify which adapters have failed:
 1. Fetch cluster: `GET /v1/clusters/{clusterId}`
-2. Iterate through `status.adapters`
-3. For each adapter:
-   - If `observed_generation < cluster.generation` → stale, skip
-   - If `available === "False"`, collect adapter name
-4. Fetch detailed status for all adapters:
-   - `GET /v1/clusters/{clusterId}/statuses?generation={generation}`
-5. For each failed adapter (from step 3), find it in `adapter_statuses` array:
+2. Check per-adapter conditions in `status.conditions`:
+   - `{AdapterName}Successful: "False"` → that adapter has a problem
+3. Fetch detailed status for specifics: `GET /v1/clusters/{clusterId}/statuses`
+4. For each failed adapter, find it by `adapter` name in `items`:
    - Get `Available` condition's `message` and `reason`
    - Get `Health` condition to determine if it's a health issue
-6. Return list with failure details
+5. Return list with failure details
 
 ### 4. Display Adapter Progress
 
 To show progress UI:
-1. Fetch cluster: `GET /v1/clusters/{clusterId}`
-2. For each adapter in `status.adapters`:
-   - `available: "True"` → Completed
-   - `available: "False"` → Need to check details
-3. Fetch detailed status: `GET /v1/clusters/{clusterId}/statuses?generation={generation}`
-4. For adapters with `available: "False"`:
-   - Find adapter in `adapter_statuses` array
+1. Fetch adapter statuses: `GET /v1/clusters/{clusterId}/statuses`
+2. For each adapter in `items`:
    - Check conditions:
-     - `Health: False` → Unhealthy
-     - `Available: False` with `JobRunning` reason → Running
-     - `Available: False` with failure reason → Failed
-     - `Applied: False` → Pending
-5. Display adapter name, status icon, generation, and message from conditions
+     - `Available: "True"` → Completed
+     - `Available: "False"` with `JobRunning` reason → Running
+     - `Available: "False"` with failure reason → Failed
+     - `Health: "False"` → Unhealthy
+     - `Applied: "False"` → Pending
+3. Compare `observed_generation` to `cluster.generation` to detect stale adapters
+4. Display adapter name, status icon, generation, and message from conditions
 
 **Example Output**:
 ```
@@ -2873,22 +2904,18 @@ For a complete example of an adapter configuration that implements this status c
 
 ### Architecture Overview
 
-**ClusterStatus Object** (detailed, verbose):
-- ONE ClusterStatus per cluster containing all adapter statuses
-- Adapters always PUT: `PUT /v1/clusters/{clusterId}/statuses` with `adapter` field in payload
+**Adapter Statuses** (detailed, per-adapter):
+- Adapters always PUT: `PUT /v1/clusters/{clusterId}/statuses` with `adapter`, `observed_generation`, `observed_time`, and required conditions in payload
 - API handles upsert internally: INSERT on first report, UPDATE on subsequent reports
-- Contains `adapter_statuses` array with full conditions, data, and metadata for each adapter
-- Retrieved via `GET /v1/clusters/{clusterId}/statuses` (optional - for querying)
-- **RESTful design**: Single resource represents complete cluster status
+- Each `AdapterStatus` contains conditions, data, and metadata for one adapter
+- Retrieved as a paginated list via `GET /v1/clusters/{clusterId}/statuses`
 
 **Cluster Object** (complete resource):
-- Contains `id`, `name`, `generation`, `spec`, and `metadata`
-- Contains `status` field with aggregated status:
-  - `phase`: "Pending", "Provisioning", "Ready", "Failed", or "Degraded"
-  - `phaseDescription`: Human-readable description from configuration
-  - `conditions`: Array of cluster-level conditions (AllAdaptersReady, etc.)
-  - `adapters`: Array of `{name, available, observed_generation}`
-- Phase calculated by aggregating all adapter `available` conditions using hardcoded priority and expr evaluation
+- Contains `id`, `name`, `generation`, `spec`, and lifecycle fields
+- Contains `status` field with aggregated `ClusterStatus`:
+  - `conditions`: Array of `ResourceCondition` entries computed by the API
+  - Mandatory: `Reconciled` (all adapters at current generation), `LastKnownReconciled` (sticky cross-generation)
+  - Per-adapter: `{AdapterName}Successful` (reflects that adapter's `Available` condition)
 - Retrieved via `GET /v1/clusters/{clusterId}`
 
 ### Timestamp Fields Explained
@@ -2926,12 +2953,12 @@ If one adapter is stuck but others keep updating, using `max()` or `now()` would
 
 ### The Contract
 
-1. **Three required conditions**: Available, Applied, Health (in each adapter status)
-2. **Single ClusterStatus object**: All adapter statuses grouped in `adapter_statuses` array
+1. **Three required conditions**: Available, Applied, Health (in each adapter PUT request). API returns `400` if any are missing.
+2. **Paginated adapter statuses**: `GET /statuses` returns `AdapterStatusList` with individual `AdapterStatus` items
 3. **Optional data field**: JSONB for structured information per adapter
-4. **Additional conditions allowed**: All must be positive assertions
+4. **Additional conditions allowed**: All must be positive assertions (e.g., `Finalized` for deletion)
 5. **Adapter aggregates**: All condition statuses determine Available
-6. **Cluster aggregates**: All adapter Available conditions determine phase
+6. **Cluster aggregates**: All adapter `Available` conditions determine `Reconciled` and `{AdapterName}Successful`
 
 ### Condition Meanings
 
@@ -2941,15 +2968,12 @@ If one adapter is stuck but others keep updating, using `max()` or `now()` would
 
 ### Key Principles
 
-1. **Two-tier status model** - Aggregated status in cluster object for quick access, detailed adapter statuses in ClusterStatus resource
-2. **RESTful design** - ONE ClusterStatus object per cluster with all adapter statuses
-3. **expr-based evaluation** - Flexible condition evaluation using expr-lang without code changes
-4. **Conditions are the contract** - Required by API (Available, Applied, Health)
-5. **Positive assertions** - All condition types should be positive
-6. **Aggregation logic** - Available reflects all sub-conditions
-7. **Hardcoded phase priority** - Phase evaluation uses fixed business logic, not configurable rules
-8. **Health vs Business Logic** - Health is about adapter errors, not validation failures
-9. **Structured data** - Use `data` field for details beyond conditions
-10. **Phase simplicity (MVP)** - Two phases for MVP: Ready/Not Ready. Additional phases (Pending, Provisioning, Failed, Degraded) planned for Post-MVP
+1. **Two-tier status model** - Aggregated `ClusterStatus` conditions on the Cluster resource for quick access, detailed `AdapterStatus` objects via `GET /statuses` for specifics
+2. **Conditions are the contract** - Three required (Available, Applied, Health), plus optional `Finalized` for deletion
+3. **Positive assertions** - All condition types should be positive
+4. **Aggregation logic** - `Reconciled` reflects all adapters' `Available` at the current generation. `{AdapterName}Successful` mirrors each adapter's `Available`.
+5. **Health vs Business Logic** - Health is about adapter errors, not validation failures
+6. **Structured data** - Use `data` field for details beyond conditions
+7. **API-managed timestamps** - `last_transition_time`, `created_time`, `last_report_time` are set by the API, not by adapters
 
 ---
