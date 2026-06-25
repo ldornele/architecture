@@ -354,6 +354,7 @@ Content-Type: application/problem+json
 
 | Code | Title | Description |
 |------|-------|-------------|
+| `HYPERFLEET-NTF-000` | Endpoint Not Found | No route matched the request URL (catch-all 404) |
 | `HYPERFLEET-NTF-001` | Resource Not Found | Requested resource does not exist |
 | `HYPERFLEET-NTF-002` | Cluster Not Found | Cluster with given ID not found |
 | `HYPERFLEET-NTF-003` | NodePool Not Found | NodePool with given ID not found |
