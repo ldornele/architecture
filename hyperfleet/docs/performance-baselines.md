@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Team
-Last Updated: 2026-06-24
+Last Updated: 2026-06-26
 ---
 
 # Performance Baselines
@@ -23,7 +23,7 @@ Last Updated: 2026-06-24
 
 Lightweight performance baselines for core HyperFleet operations, captured for the v1.0.0 release. These baselines measure the overhead HyperFleet introduces, not infrastructure capacity.
 
-Baselines are captured from two environments. The Prow CI environment is the source of truth for thresholds enforced in CI. The GKE dev environment is useful for local development comparison.
+Baselines are captured from two environments. The Prow CI environment provides the baselines from which CI thresholds are derived. The GKE dev environment is useful for local development comparison.
 
 ## Environment
 
@@ -40,38 +40,30 @@ Both environments run the same stack: API, Sentinel (clusters + nodepools), 3 ad
 
 ### API reads
 
-API read thresholds are consistent across both environments.
-
-
-| Operation                             | GKE dev | Prow CI | Threshold |
-| ------------------------------------- | ------- | ------- | --------- |
-| GET /clusters/{id} (small payload)    | 2.19ms  | 32.72ms | 50ms      |
-| GET /clusters/{id} (medium payload)   | 2.82ms  | 30.99ms | 50ms      |
-| GET /clusters/{id} (large payload)    | 4.34ms  | 32.61ms | 50ms      |
-| GET /clusters (no filter)             | 5.10ms  | 32.63ms | 50ms      |
-| GET /clusters (search filter)         | 4.89ms  | 33.03ms | 50ms      |
-| GET /clusters (size=10)               | 4.22ms  | 31.42ms | 50ms      |
-| GET /clusters (page=1, size=10)       | 4.23ms  | 33.30ms | 50ms      |
-
-
-API read latencies on Prow are higher than GKE dev (~30ms vs ~3-5ms) but pass comfortably within the 50ms threshold.
+| Operation                             | GKE dev | Prow CI |
+| ------------------------------------- | ------- | ------- |
+| GET /clusters/{id} (small payload)    | 2.19ms  | 32.72ms |
+| GET /clusters/{id} (medium payload)   | 2.82ms  | 30.99ms |
+| GET /clusters/{id} (large payload)    | 4.34ms  | 32.61ms |
+| GET /clusters (no filter)             | 5.10ms  | 32.63ms |
+| GET /clusters (search filter)         | 4.89ms  | 33.03ms |
+| GET /clusters (size=10)               | 4.22ms  | 31.42ms |
+| GET /clusters (page=1, size=10)       | 4.23ms  | 33.30ms |
 
 ### Reconciliation operations
 
-Thresholds are calibrated from Prow CI baselines with ~50% headroom to absorb run-to-run variance on the shared cluster.
-
-
-| Operation                               | GKE dev | Prow CI | Threshold |
-| --------------------------------------- | ------- | ------- | --------- |
-| Cluster create-to-reconciled            | 10.02s  | ~60s    | 90s       |
-| Cluster update-to-re-reconciled         | 20.06s  | ~40s    | 60s       |
-| Cluster delete-to-hard-delete           | 40.09s  | ~40s    | 60s       |
-| Cluster cascade delete (with nodepools) | 40.08s  | ~50s    | 75s       |
-| NodePool create-to-reconciled           | 10.02s  | ~20s    | 30s       |
-| NodePool delete-to-hard-delete          | 20.05s  | ~20s    | 30s       |
-
+| Operation                               | GKE dev | Prow CI |
+| --------------------------------------- | ------- | ------- |
+| Cluster create-to-reconciled            | 10.02s  | ~60s    |
+| Cluster update-to-re-reconciled         | 20.06s  | ~40s    |
+| Cluster delete-to-hard-delete           | 40.09s  | ~40s    |
+| Cluster cascade delete (with nodepools) | 40.08s  | ~50s    |
+| NodePool create-to-reconciled           | 10.02s  | ~20s    |
+| NodePool delete-to-hard-delete          | 20.05s  | ~20s    |
 
 Prow CI latencies are higher than GKE dev due to shared cluster resources.
+
+CI thresholds for both API reads and reconciliation operations are defined in [`pkg/config/thresholds.go`](https://github.com/openshift-hyperfleet/hyperfleet-e2e/blob/main/pkg/config/thresholds.go) in the `hyperfleet-e2e` repo. Thresholds apply a margin over Prow CI baselines to absorb run-to-run variance.
 
 ## How to reproduce
 
