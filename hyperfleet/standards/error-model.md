@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Platform Team
-Last Updated: 2026-01-02
+Last Updated: 2026-06-26
 ---
 
 # HyperFleet Error Model and Codes Standard
@@ -110,8 +110,10 @@ HyperFleet APIs MUST return errors using the [RFC 9457](https://www.rfc-editor.o
 | `type` | URI | Yes | URI reference identifying the problem type |
 | `title` | string | Yes | Short, human-readable summary of the problem type |
 | `status` | integer | Yes | HTTP status code (100-599) |
-| `detail` | string | Yes | Human-readable explanation specific to this occurrence |
+| `detail` | string | No | Human-readable explanation specific to this occurrence |
 | `instance` | URI | No | URI reference identifying the specific occurrence |
+
+> HyperFleet implementations SHOULD always populate `detail` to provide actionable context to API consumers. The field is schema-optional per [RFC 9457 Section 3.1](https://www.rfc-editor.org/rfc/rfc9457.html#section-3.1), but omitting it degrades the developer experience for partners consuming error responses.
 
 ### HyperFleet Extension Fields
 
