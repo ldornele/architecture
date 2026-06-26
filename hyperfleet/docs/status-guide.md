@@ -687,7 +687,7 @@ The `Reconciled` aggregated condition changes meaning based on deletion state:
 - Adapters only need to report `Finalized` when handling deletion events. During normal create/update flows, omit it.
 - The API triggers hard-delete only when the final adapter's PUT includes `Finalized=True` and all other required adapters have already finalized.
 - For clusters, hard-delete also requires that no child nodepools remain (`ReconciledWaitingForChildren` reason if nodepools still exist).
-- If an adapter fails to report `Finalized` and the resource is stuck in Finalizing state, operators can use the force-delete endpoints (`POST /clusters/{cluster_id}/force-delete` or `POST /clusters/{cluster_id}/nodepools/{nodepool_id}/force-delete`) as an escape hatch (requires a `reason` for audit).
+- If an adapter fails to report `Finalized` and the resource is stuck in Finalizing state, operators can use the force-delete endpoints (`POST /v1/clusters/{clusterId}/force-delete` or `POST /v1/clusters/{clusterId}/nodepools/{nodepoolId}/force-delete`) as an escape hatch (requires a `reason` for audit).
 
 ---
 
