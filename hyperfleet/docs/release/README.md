@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Team
-Last Updated: 2026-05-11
+Last Updated: 2026-06-22
 ---
 
 # Release Documentation
@@ -16,6 +16,19 @@ Last Updated: 2026-05-11
 | [Glossary](./glossary.md) | Definitions of terms used across the release docs |
 | [ADR 0014](../../adrs/0014-konflux-build-and-release.md) | Decision record for adopting Konflux |
 | [ADR 0016](../../adrs/0016-helm-oci-distribution.md) | Decision record for Helm OCI distribution |
+
+## Operations
+
+Engineer-facing operational docs — what to read *during* a release or *when something fails*. The `operations/` subdirectory.
+
+| Document | Purpose |
+|----------|---------|
+| [Release Runbook](./operations/release-runbook.md) | Copy-paste command sequence for RC → GA, fix cycle, and hotfix |
+| [Pipeline Anatomy](./operations/pipeline-anatomy.md) | Reading a Konflux PipelineRun, the build-vs-release distinction, where to look in the UI |
+| [Debugging](./operations/debugging.md) | Failure-mode runbook organized by symptom |
+| [Configuration Map](./operations/configuration-map.md) | Every release-related config file across the six repos — what it does, who reviews it |
+| [Notifications](./operations/notifications.md) | Slack `#hyperfleet-e2e-status`, Pyxis, GitHub PR checks, and Prow status signals |
+| [Support](./operations/support.md) | Slack channels, JIRA queues, Konflux UI, escalation contacts |
 
 ## Prow Test and Release
 
