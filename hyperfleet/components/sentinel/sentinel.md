@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Sentinel Team
-Last Updated: 2026-03-20
+Last Updated: 2026-06-30
 ---
 
 # HyperFleet Sentinel
@@ -534,6 +534,7 @@ If a cluster stays in "Provisioning" state for 2 hours, `last_transition_time` w
 - No coordination between Sentinel instances
 - Possible to have gaps (resources not selected by any Sentinel) or overlaps (resources selected by multiple Sentinels)
 - Operators must ensure their resource selectors provide desired coverage
+- See also: [Sharding Coverage Design](../../docs/sharding-coverage-design.md)
 
 **How Resource Filtering Works**:
 1. Each Sentinel deployment uses ONE YAML configuration file (sentinel-config.yaml)
@@ -1100,7 +1101,7 @@ For logging configuration standards, see [Logging Specification](../../standards
 
 - ❌ **Polling overhead**: Sentinel fetches all matching resources on every poll cycle (default 5s), even when most resources are stable. This creates constant API load proportional to resource count, not to activity level.
 - ❌ **No guaranteed exactly-once delivery**: If Sentinel publishes to the broker and then crashes, the event may be re-published on the next cycle. Mitigated by requiring all adapters to be idempotent.
-- ⚠️ **Gap/overlap risk with label-based sharding**: Resource selectors are label filters, not true shards. Operators must manually ensure full resource coverage — there is no automated verification that all resources are watched by at least one Sentinel instance.
+- ⚠️ **Gap/overlap risk with label-based sharding**: Resource selectors are label filters, not true shards. Operators must manually ensure full resource coverage — there is no automated verification that all resources are watched by at least one Sentinel instance. See [Sharding Coverage Design](../../docs/sharding-coverage-design.md).
 - ⚠️ **Minimum reconciliation latency equals poll interval**: A resource spec change is not reconciled until the next poll cycle (up to 5s). This is acceptable for cluster provisioning use cases but unsuitable for latency-sensitive workflows.
 - ⚠️ **Broker dependency**: If the message broker is unavailable, Sentinel cannot trigger reconciliation events. Adapters are not notified; the cluster remains in its current state until the broker recovers.
 
@@ -1108,7 +1109,7 @@ For logging configuration standards, see [Logging Specification](../../standards
 
 - **Single-instance MVP**: The initial deployment uses a single Sentinel watching all resources (`resource_selector: []`). Multi-Sentinel sharding requires manual operator coordination with no automated coverage verification.
   - **Impact**: Low at MVP cluster counts; becomes a reliability risk as the number of managed clusters grows.
-  - **Remediation**: Post-MVP, add automated shard coverage validation or implement coordinated sharding with a registry.
+  - **Remediation**: Post-MVP, surface stuck resources via an API-side stale-resource metric that catches sharding gaps (among other causes). See [Sharding Coverage Design](../../docs/sharding-coverage-design.md).
 
 - **Polling instead of watching**: Sentinel polls the API on a fixed interval rather than reacting to resource change events via a push mechanism. This wastes compute on stable resources and introduces latency proportional to the poll interval.
   - **Impact**: Constant background API load; up to 5s reaction time to spec changes.
