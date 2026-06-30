@@ -45,7 +45,6 @@ The API already has access to all resources and their reconciliation state, so n
 
 This does not identify the cause (could be a sharding gap, a broken adapter, or a dead broker). The operator investigates by querying the API for stuck resources and comparing their labels against deployed sentinels.
 
-
 ```mermaid
 flowchart LR
     A[API] -->|periodic DB query| B[Count stuck resources]
@@ -82,7 +81,6 @@ flowchart LR
 - The DB query is a `COUNT(*)` using an existing BTREE index on the Reconciled condition, comparable to existing API list queries
 - Detects all stuck resources (not just sharding gaps), at the cost of less precise root-cause information
 
-
 ## Alternatives Considered
 
 ### Catchall Sentinel
@@ -90,7 +88,6 @@ flowchart LR
 **What**: Deploy a sentinel with an empty `resource_selector` that watches all resources. Already works with no code changes.
 
 **Why Rejected**: Sentinel has one mode: poll, evaluate, publish. A catchall would evaluate all resources and publish duplicate events for any resource that a sharded sentinel also covers. Making it detect-only would require a new mode and knowledge of what other sentinels cover, reintroducing the coordination problem the stateless design avoids.
-
 
 ### API-Side Sharding
 
@@ -121,7 +118,6 @@ flowchart LR
 **What**: Keep the current behavior and rely on existing documentation that describes sharding coverage as an operator responsibility.
 
 **Why Rejected**: Documentation alone does not proactively notify operators when a gap occurs. Resources can sit unreconciled indefinitely without anyone being aware.
-
 
 ## Additional Resources
 
