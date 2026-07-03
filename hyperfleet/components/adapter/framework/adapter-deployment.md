@@ -11,6 +11,7 @@ Last Updated: 2026-01-02
 This document describes how to deploy the HyperFleet Adapter Framework in Kubernetes.
 
 **Related Documentation:**
+
 - [Adapter Framework Design](./adapter-frame-design.md) - Architecture overview
 - `adapter-config-template-MVP.yaml` - Configuration structure
 - [Adapter Design Decisions](./adapter-design-decisions.md) - Architecture decisions
@@ -36,18 +37,21 @@ This document describes how to deploy the HyperFleet Adapter Framework in Kubern
 ### Single Image, Multiple Configurations
 
 **Architecture:**
+
 - **One Image**: `quay.io/hyperfleet/adapter-framework:v1.0.0`
 - **Multiple Deployments**: Validation, DNS, Placement adapters (same image)
 - **Config-Driven**: Different ConfigMaps per adapter type
 - **Helm-Managed**: Helm templates generate all resources
 
 **Benefits:**
+
 - ✅ Single binary to build/test/maintain
 - ✅ Update adapter logic without rebuilding image
 - ✅ Consistent behavior across adapters
 - ✅ Easy rollback via Helm
 
 **Configuration Layers:**
+
 1. **Adapter Logic ConfigMap** (per adapter) - event filters, resources, post-processing
 2. **Broker ConfigMap** (per environment) - broker connection
 3. **Environment ConfigMap** (per environment) - API URL, basic settings
@@ -61,7 +65,7 @@ This document describes how to deploy the HyperFleet Adapter Framework in Kubern
 
 ### Repository Structure
 
-```
+```text
 hyperfleet-adapter/
 ├── charts/
 │   ├── Chart.yaml
@@ -227,6 +231,7 @@ adapters:
 ### Helm Template Examples
 
 **templates/deployment-validation.yaml:**
+
 ```yaml
 {{- if .Values.adapters.validation.enabled }}
 apiVersion: apps/v1
@@ -302,6 +307,7 @@ spec:
 ```
 
 **templates/configmap-adapter-validation.yaml:**
+
 ```yaml
 {{- if .Values.adapters.validation.enabled }}
 apiVersion: v1
@@ -316,6 +322,7 @@ data:
 ```
 
 **templates/configmap-environment.yaml:**
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -329,6 +336,7 @@ data:
 ```
 
 **templates/configmap-observability.yaml:**
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -398,6 +406,7 @@ data:
 ```
 
 **Characteristics:**
+
 - ✅ Kubernetes-native, no external dependencies
 - ✅ Fast pod startup
 - ✅ Works offline
@@ -495,16 +504,19 @@ readinessProbe:
 ### Endpoints
 
 **`/healthz` (Liveness):**
+
 - Returns `200 OK` if adapter is alive
 - Checks: process running, not deadlocked
 - Failure → Kubernetes restarts pod
 
 **`/readyz` (Readiness):**
+
 - Returns `200 OK` if adapter is ready to serve traffic
 - Checks: broker connected, API accessible, config loaded
 - Failure → Kubernetes removes pod from service
 
 **Port Configuration:**
+
 - Metrics: `9090` (Prometheus scraping)
 - Health: `8080` (Liveness and readiness probes)
 
@@ -519,7 +531,8 @@ For complete health and readiness endpoint standards, see [Health Endpoints Spec
 **Exposed on**: `http://:9090/metrics`
 
 **Key Metrics:**
-```
+
+```text
 # Events processed
 adapter_events_processed_total{adapter_type="validation",status="success"}
 adapter_events_processed_total{adapter_type="validation",status="failure"}
@@ -682,6 +695,7 @@ kubectl logs <pod-name> -n hyperfleet-system
 ```
 
 **Common Issues:**
+
 - ConfigMap not found → Check ConfigMap exists: `kubectl get cm -n hyperfleet-system`
 - Secret not found → Check Secret exists: `kubectl get secret hyperfleet-api-token -n hyperfleet-system`
 - ImagePullBackOff → Check image tag and registry access

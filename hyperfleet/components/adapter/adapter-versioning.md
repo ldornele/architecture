@@ -5,6 +5,7 @@ Last Updated: 2025-11-05
 ---
 
 # HyperFleet Adapter Versioning Strategy
+
 - **Date:** 2025-10-30
 - **Related Jira(s):** [HYPERFLEET-65](https://issues.redhat.com/browse/HYPERFLEET-65)
 
@@ -35,6 +36,7 @@ Last Updated: 2025-11-05
 **What are Adapters?**
 
 Adapters are event-driven services that:
+
 1. Consume CloudEvents from Sentinel
 2. Execute provisioning tasks (e.g., create DNS records, provision infrastructure)
 3. Report status back to the HyperFleet API
@@ -50,12 +52,14 @@ This document defines the versioning strategy for both the adapter **binary** an
 ### Versioning Scheme
 
 **Adapter Binary:** This component uses semantic versioning with the following criteria:
+
 - **MAJOR**: Breaking changes to config schema, breaking event schema support, breaking API interactions
 - **MINOR**: New adapter types, new config options, new event schema support (additive)
 - **PATCH**: Bug fixes, performance improvements, no config or schema changes
 
 **Example:**
-```
+
+```text
 v1.0.0: Initial adapter binary supporting DNS and validation adapter types
 v1.1.0: Add support for infrastructure adapter type (new adapter type = MINOR)
 v1.1.1: Fix bug in DNS record creation (bug fix = PATCH)
@@ -71,20 +75,24 @@ v2.0.0: Change config schema format from YAML to custom format (breaking = MAJOR
 **Critical concept:** Config version is **independent** from binary version.
 
 Adapters are deployed as a single binary with different configurations:
+
 - Each deployment has its own config (e.g., DNS adapter config, infrastructure adapter config)
 - Configs are packaged and versioned separately as Helm charts
 - **Config version != Binary version**
 
 ### Config Schema Versioning
 
+<!-- markdownlint-disable-next-line MD036 -->
 **Config Schema: Coupled to Adapter Binary MAJOR.MINOR**
+
 - Config schema version = Adapter Binary MAJOR.MINOR (e.g., Adapter v1.2.3 uses config schema `1.2`)
 - PATCH versions of the binary never change the config schema
 - Each config deployment includes schema version for validation
 - Same binary can be deployed with multiple different configs
 
 **Example:**
-```
+
+```text
 Adapter Binary v1.2.5 uses Config Schema 1.2
   ├─ DNS Adapter Config v0.5.2 (uses schema 1.2)
   ├─ Infrastructure Adapter Config v0.3.1 (uses schema 1.2)
@@ -94,17 +102,20 @@ Adapter Binary v1.2.5 uses Config Schema 1.2
 ### Config Evolution Rules
 
 **MAJOR version bumps (breaking config changes):**
+
 - Removing required config fields
 - Changing field types
 - Renaming fields
 - Changing field semantics
 
 **MINOR version bumps (additive config changes):**
+
 - Adding new optional config fields
 - Adding support for new adapter types
 - Adding new broker types
 
 **PATCH version bumps:**
+
 - Bug fixes
 - Performance improvements
 - No config schema changes
@@ -112,10 +123,12 @@ Adapter Binary v1.2.5 uses Config Schema 1.2
 ### Config Packaging and Distribution
 
 **Helm Chart Versioning:**
+
 - Each adapter config is packaged as a Helm chart
 - Chart version and app version are coupled — both track the same git tag (see [Helm Chart Conventions](../../standards/helm-chart-conventions.md) Section 3)
 
 **Example deployment manifest:**
+
 ```yaml
 # DNS Adapter Helm Chart v0.5.2
 apiVersion: v1
@@ -139,7 +152,8 @@ data:
 ```
 
 **Key relationships:**
-```
+
+```text
 DNS Adapter Config v0.5.2
   ├─ Uses Config Schema 1.2 (from Binary v1.2.x)
   ├─ Deployed with Binary v1.2.5
@@ -150,7 +164,7 @@ DNS Adapter Config v0.5.2
 
 **Scenario:** Same binary, different config versions
 
-```
+```text
 Adapter Binary v1.2.5 is deployed 3 times:
 
 Deployment 1: DNS Adapter
@@ -170,6 +184,7 @@ Deployment 3: Validation Adapter
 ```
 
 **Why different config versions?**
+
 - Each adapter type evolves independently
 - DNS config might need frequent updates for new DNS providers
 - Infrastructure config might be stable
@@ -180,7 +195,8 @@ Deployment 3: Validation Adapter
 **Critical requirement:** Test matrix must cover **binaries × configs × platforms**
 
 **Example test matrix:**
-```
+
+```text
 Binary Versions: v1.2.4, v1.2.5, v1.3.0
 Config Versions (DNS): v0.5.1, v0.5.2, v0.6.0
 Config Versions (Infra): v0.3.0, v0.3.1
@@ -195,6 +211,7 @@ Test Coverage:
 ```
 
 **Why this matters:**
+
 - Config changes might work with one binary version but break with another
 - Platform-specific behavior might differ
 - Helm chart upgrades need validation across supported binary versions
@@ -206,6 +223,7 @@ Test Coverage:
 **Adapters consume CloudEvents published by Sentinel** - see [Sentinel Versioning Strategy](../sentinel/sentinel-versioning.md) for full details on event schema versioning.
 
 **Adapter implementation requirements:**
+
 - **AsyncAPI code generation**: Event structs are generated from AsyncAPI schema (similar to API client generation from OpenAPI)
 - **Schema version from spec**: Schema version embedded in generated code from AsyncAPI spec file
 - **Multi-schema support**: Adapters must support multiple event schema versions during transitions
@@ -214,7 +232,7 @@ Test Coverage:
 **Schema support documentation:**
 Each adapter version documents supported event schemas in its release notes and exposes schema version via metadata endpoint:
 
-```
+```text
 Adapter Binary v1.0.0 → supports Sentinel schema 1.0
 Adapter Binary v1.1.0 → supports Sentinel schema 1.0, 1.1
 Adapter Binary v2.0.0 → supports Sentinel schema 1.1, 2.0 (for migration)
@@ -229,24 +247,29 @@ When Sentinel introduces a breaking event schema change, follow the expand-contr
 ## 5. Adapter ↔ HyperFleet API Compatibility
 
 **Adapters interact with HyperFleet API for READ and WRITE operations:**
+
 - Fetch cluster details (READ)
 - Report adapter status and provisioning results (WRITE)
 
 **Adapter status report payloads:**
+
 - When adapters report status or provisioning results, they PUT to HyperFleet API endpoints
 - Status payload structure follows the API schema version from the imported API client library
 
 **API version targeting:**
+
 - Adapters target ONE HyperFleet API version at a time
 - API version determined by the imported client library in `go.mod`
 - No need to support multiple API versions simultaneously
 
 **For MVP:**
+
 - Adapters import API client code from API repository or use generated OpenAPI client
 - Example: `import "github.com/openshift-hyperfleet/hyperfleet-api/pkg/client"`
 - Version coupling: Adapter Binary v1.x.x imports API v1 client, Adapter Binary v2.x.x imports API v2 client
 
 **When API version changes:**
+
 1. New API major version released (e.g., v2 launches)
 2. Update Adapter Binary's `go.mod` to import API v2 client library
 3. Update Adapter Binary code to handle any API changes
@@ -262,11 +285,13 @@ When Sentinel introduces a breaking event schema change, follow the expand-contr
 **Adapters expose version information via:**
 
 **Internal HTTP endpoints** (can be disabled via flag for security-sensitive deployments):
+
 - Health/readiness endpoints for Kubernetes liveness and readiness probes
 - Prometheus metrics endpoint exposing version labels
 - Metadata endpoint (internal-only) returning binary version, config version, schema version, git SHA, and build timestamp
 
 **Example metadata response:**
+
 ```json
 {
   "service": "hyperfleet-adapter",
@@ -281,12 +306,14 @@ When Sentinel introduces a breaking event schema change, follow the expand-contr
 ```
 
 **Container image tags:**
-```
+
+```text
 quay.io/openshift-hyperfleet/adapter:1.2.5      # Binary semantic version
 quay.io/openshift-hyperfleet/adapter:a1b2c3d    # Git SHA
 ```
 
 **Kubernetes pod labels and annotations:**
+
 ```yaml
 labels:
   app.kubernetes.io/version: "1.2.5"                    # Binary version
@@ -304,12 +331,14 @@ annotations:
 ### Config Version Bumping Guidelines
 
 **When to bump config version:**
+
 - **MAJOR**: Breaking changes to adapter-specific config (e.g., changing DNS provider field structure)
 - **MINOR**: New optional fields, new features (e.g., adding support for new DNS record types)
 - **PATCH**: Bug fixes, documentation updates, no functional changes
 
 **Example: DNS Adapter Config evolution:**
-```
+
+```text
 v0.1.0: Initial DNS adapter config
 v0.2.0: Add support for CloudFlare provider (new optional field)
 v0.2.1: Fix typo in Route53 example
@@ -321,7 +350,8 @@ v2.0.0: Rename "zoneId" to "hostedZoneId" (breaking change)
 ### Binary and Config Compatibility Matrix
 
 **Supported combinations:**
-```
+
+```text
 Binary v1.2.x supports Config Schema 1.2
   ├─ DNS Config v0.5.x ✓
   ├─ DNS Config v0.6.x ✓

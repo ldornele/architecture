@@ -6,7 +6,6 @@ Last Updated: 2025-11-17
 
 # GKE Cluster Automation with Config Connector
 
-
 These scripts have been deprecated in favor of the [infra](https://github.com/openshift-hyperfleet/hyperfleet-infra) repository.
 
 ---
@@ -43,6 +42,7 @@ This automation provides:
 ### Required Tools
 
 1. **gcloud CLI** - Google Cloud SDK
+
    ```bash
    # Install from https://cloud.google.com/sdk/docs/install
    # Verify installation:
@@ -50,6 +50,7 @@ This automation provides:
    ```
 
 2. **kubectl** - Kubernetes command-line tool
+
    ```bash
    # Install from https://kubernetes.io/docs/tasks/tools/
    # Verify installation:
@@ -141,6 +142,7 @@ For quick commands to create and manage clusters, see [Quickstart.md](Quickstart
 | `LABELS` | Cluster labels (comma-separated) | `` |
 
 **Example:**
+
 ```bash
 LABELS="environment=production,team=platform,cost-center=engineering"
 ```
@@ -150,18 +152,21 @@ LABELS="environment=production,team=platform,cost-center=engineering"
 ### Autopilot Mode
 
 **Best for:**
+
 - Most production workloads
 - Teams wanting fully managed infrastructure
 - Cost optimization through auto-scaling
 - Reduced operational overhead
 
 **Features:**
+
 - Fully managed nodes
 - Automatic scaling and updates
 - Regional deployment (high availability)
 - Pay-per-pod pricing model
 
 **Configuration:**
+
 ```bash
 CLUSTER_MODE="autopilot"
 ```
@@ -172,7 +177,7 @@ CLUSTER_MODE="autopilot"
 
 When creating Autopilot clusters in organizations with strict machine type policies, you may encounter the following error:
 
-```
+```text
 ERROR: (gcloud.container.clusters.create-auto) Operation [<Operation
  clusterConditions: [<StatusCondition
  canonicalCode: CanonicalCodeValueValuesEnum(FAILED_PRECONDITION, 10)
@@ -195,17 +200,20 @@ Note: We are not using Autopilot mode due to current policy restrictions.
 ### Standard Mode
 
 **Best for:**
+
 - Workloads requiring specific node configurations
 - Custom machine types or GPU requirements
 - Fine-grained control over cluster resources
 
 **VM Types:**
+
 - **Standard VMs** (default): Guaranteed availability, suitable for production
 - **Spot VMs**: Up to 91% cheaper, can be preempted. Best for dev/test, batch jobs, and fault-tolerant workloads
 
 **Deployment Types:**
 
 #### Regional (Recommended for Production)
+
 - Multi-zone deployment across 3 zones
 - High availability and fault tolerance
 - Nodes distributed evenly across zones
@@ -218,6 +226,7 @@ USE_SPOT_VMS="false"  # or "true" for cost savings
 ```
 
 #### Zonal (Development/Testing)
+
 - Single zone deployment
 - Lower cost
 - Suitable for dev/test environments
@@ -235,6 +244,7 @@ USE_SPOT_VMS="true"  # Enable Spot VMs for cost optimization
 ### Option 1: Create New Network
 
 The script will create:
+
 - Custom VPC network
 - Subnet with specified CIDR range
 - Firewall rules for internal communication
@@ -309,6 +319,7 @@ Understanding the cost implications of different GKE cluster configurations is c
 - **Right-size Machine Types:** Start with smaller instances and scale up as needed
 
 **Note:** These estimates are based on GKE Standard mode pricing and may not include additional costs for:
+
 - Persistent storage (disks)
 - Load balancers
 - Network egress
@@ -322,7 +333,7 @@ Team members can get access to any cluster by using the same environment file th
 
 ### Share Access with Team Members
 
-**Recommended: Use the get-cluster-access.sh script**
+#### Recommended: Use the get-cluster-access.sh script
 
 ```bash
 ./get-cluster-access.sh
@@ -330,9 +341,10 @@ Team members can get access to any cluster by using the same environment file th
 
 This displays the exact `gcloud` command team members should run to get cluster credentials.
 
-**Manual command (if needed)**
+#### Manual command (if needed)
 
 For **Autopilot** or **Regional Standard** clusters:
+
 ```bash
 gcloud container clusters get-credentials CLUSTER_NAME \
     --region=REGION \
@@ -340,6 +352,7 @@ gcloud container clusters get-credentials CLUSTER_NAME \
 ```
 
 For **Zonal Standard** clusters:
+
 ```bash
 gcloud container clusters get-credentials CLUSTER_NAME \
     --zone=ZONE \
@@ -355,6 +368,7 @@ Team members need one of:
 - `roles/container.admin` - Administrative access
 
 **Grant access:**
+
 ```bash
 gcloud projects add-iam-policy-binding PROJECT_ID \
     --member="user:teammate@example.com" \
@@ -412,6 +426,7 @@ spec:
 ```
 
 Apply the resources:
+
 ```bash
 kubectl apply -f dns-resources.yaml
 
@@ -431,6 +446,7 @@ kubectl logs -n cnrm-system -l cnrm.cloud.google.com/component=cnrm-controller-m
 ### Issue: "Project not found" or "Access denied"
 
 **Solution:**
+
 - Verify you're authenticated: `gcloud auth list`
 - Check project ID: `gcloud config get-value project`
 - Ensure you have the required IAM roles

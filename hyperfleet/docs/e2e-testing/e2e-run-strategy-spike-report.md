@@ -208,11 +208,13 @@ Execute Test Suites
 Cleanup
 ```
 
-**Step 1: Create Namespace**
+#### Step 1: Create Namespace
+
 - Create dedicated namespace: `e2e-{TEST_RUN_ID}`
 - Apply isolation labels (see Section 5.4 for labeling strategy details)
 
 **Step 2: Deploy Infrastructure** (via helm)
+
 - Database (PostgreSQL, deployed with API)
 - API and Sentinel
 - Custom Resource Definitions (CRDs)
@@ -220,21 +222,25 @@ Cleanup
 - Pass `test_run_id` to helm deployment for resource tagging
 
 **E2E Configuration Requirements**:
+
 - All messaging resources (topics/subscriptions) must be tagged with `test_run_id` for cleanup
 - Naming pattern: `{resource-name}-{test-run-id}` for resource isolation
 
 **Infrastructure Ready** means:
+
 - All infrastructure components are healthy
 - Broker topics and subscriptions exist
 - Fake adapters are operational and subscribed to topics
 - Test suites can execute independently
 
 **Test Suite Execution**:
+
 - Suites execute sequentially
 - Adapter Suite may hot-plug fake adapters as needed (for negative cases, edge cases)
 - Environment state persists across suites within the same Test Run
 
 **Cleanup**:
+
 - Delete cloud messaging resources (topics/subscriptions) tagged with test_run_id
 - Uninstall infrastructure components via helm
 - Delete namespace
@@ -251,11 +257,13 @@ Cleanup
 Deploy the adapter framework image multiple times (as separate Kubernetes Deployments) with different YAML configurations stored in the E2E repository. These **fake adapters** do not execute real business logic (no DNS creation, no real placement, etc.) but simulate adapter behavior to test the framework.
 
 **Key Distinction**:
+
 - **Not production adapters**: These adapters don't perform real operations (no cloud API calls, no actual cluster/nodepool provisioning)
 - **Framework testing focus**: We test framework behavior (event routing, status aggregation), not adapter business logic
 - **Config-driven simulation**: Different configurations simulate different adapter behaviors (success, failure, timeout, precondition failure, etc.)
 
 **Rationale**:
+
 - **Adapter framework is config-driven**: Adapter behaviors are defined via YAML configuration, not code (architecture design principle)
 - **Configuration capabilities are comprehensive**: Preconditions (API calls, CEL expressions), Resources (K8s Job/Deployment manifests), Postconditions (CEL validation), Retry/Timeout strategies
 - **Simpler than Fixture Adapter**: No custom code implementation needed for error injection - configs handle all scenarios
@@ -275,7 +283,8 @@ Deploy the adapter framework image multiple times (as separate Kubernetes Deploy
 | Complex validation | CEL expressions in postconditions | ❌ No |
 
 **E2E Repository Structure**:
-```
+
+```text
 e2e-testing/
 ├── testdata/
 │   └── adapter-configs/
@@ -289,12 +298,14 @@ e2e-testing/
 ```
 
 **Infrastructure Deployment**:
+
 - Deploy multiple fake adapter instances (same framework image, different configs) using Kubernetes Deployments
 - Each fake adapter instance subscribes to events independently
 - All deployed as infrastructure (before tests execute)
 - Test cases trigger events and verify framework behavior (not adapter business logic)
 
 **Benefits**:
+
 - ✅ No custom Fixture Adapter code needed
 - ✅ Uses adapter framework's config-driven capabilities
 - ✅ Fast iteration (config changes vs. code compilation)
@@ -335,10 +346,12 @@ e2e-{TEST_RUN_ID}
 ```
 
 **Components**:
+
 - `e2e-`: Prefix indicating E2E test resources
 - `{TEST_RUN_ID}`: Unique test run identifier
 
 **Rationale**:
+
 - Test Run ID enables correlation of resources across test runs
 - Operational teams can identify E2E namespaces without inspecting labels
 
@@ -394,10 +407,12 @@ Resources are labeled based on cleanup requirements:
 3. `e2e.hyperfleet.io/managed-by` - Ownership marker (`test-framework`)
 
 **Kubernetes Resources Within Test Run Namespace**:
+
 - API, Sentinel, Fake Adapters (Deployments, Pods, Services, ConfigMaps, Secrets)
 - No labels needed - automatically deleted with namespace
 
 **Rationale**:
+
 - **Efficiency**: Only label resources that need explicit cleanup
 - **Simplicity**: Namespace deletion handles most resources automatically
 - **Cleanup precision**: Labels enable filtering for resources outside namespace
@@ -498,12 +513,14 @@ Validates HyperFleet framework behavior using fake adapters deployed with differ
 **Purpose**: Fast, stable testing of framework logic without external dependencies or real business logic.
 
 **Environment**:
+
 - Core components (API, Sentinel)
 - Messaging infrastructure (topics/subscriptions created by broker library)
 - Fake adapters deployed with test-specific configs (see Section 4.4)
 - No external dependencies or real cloud services
 
 **What We Test** (framework behavior, NOT adapter business logic):
+
 - **Event flow**: API → Sentinel → Messaging → Adapter → API
 - **Async status aggregation**: Framework waits for adapter responses
 - **Status reconciliation**: Framework merges adapter conditions into resource status
@@ -532,6 +549,7 @@ Different fake adapters handle different event types, each with configuration de
 ```
 
 **Characteristics**:
+
 - ✅ Fast execution: No external dependencies, no real business logic
 - ✅ Stable: Infrastructure deployed once, 100% reproducible
 - ✅ Comprehensive: All framework scenarios covered via fake adapter configurations
@@ -546,10 +564,12 @@ Validates adapter framework's advanced features using fake adapters: negative ca
 **Purpose**: Test framework's robustness and hot-plugging capabilities with complex scenarios that require adapter deployment/removal.
 
 **Environment**:
+
 - Core components deployed
 - Fake adapters hot-plugged with **flexible deployment granularity** (managed by test groups or individual test cases)
 
 **Validates** (framework advanced features, NOT business logic):
+
 - **Hot-plugging functionality**: Dynamic adapter deployment and removal without restarting API/Sentinel
 - **Negative cases**: Deployment failures, invalid configurations, error injection
 - **Edge cases**: Timeout scenarios, resource conflicts, concurrent deployments
@@ -565,9 +585,10 @@ We evaluated two deployment granularities for managing adapter lifecycle:
 | **Test Group-level** (Ordered + BeforeAll/AfterAll) | Shared within a test group | Once per test group | After all tests in group | ✅ Faster (deploy once)<br>✅ Good for read-only tests<br>⚠️ Tests in group share adapter state |
 | **Test Case-level** (BeforeEach/AfterEach) | Isolated per individual test | Before each test case | After each test case | ✅ Complete isolation<br>✅ No state pollution<br>✅ Required for negative cases<br>❌ Slower (deploy per test) |
 
-**Decision: Support both granularities within Adapter Suite**
+##### Decision: Support both granularities within Adapter Suite
 
 **Rationale**:
+
 - Different test types have different isolation needs
 - Basic validation tests (e.g., verify adapter registered) benefit from Test Group-level sharing
 - **Negative cases** (e.g., error injection, deployment failures, invalid configs) require Test Case-level isolation
@@ -576,6 +597,7 @@ We evaluated two deployment granularities for managing adapter lifecycle:
 - Mixed approach optimizes for both speed and test quality
 
 **Test Organization**:
+
 - Test groups use scoped `Describe` blocks to control adapter lifecycle
 - Test Group-level: `Describe` + `Ordered` + `BeforeAll`/`AfterAll`
 - Test Case-level: `Describe` + `BeforeEach`/`AfterEach`
@@ -593,11 +615,13 @@ Within a Test Run, suites typically execute in this order:
 2. **Adapter Suite** - Validates framework advanced features (negative cases, edge cases, hot-plugging)
 
 **Rationale**:
+
 - Core Suite runs first to validate basic framework functionality
 - Core Suite provides fast feedback on infrastructure and normal flows
 - Adapter Suite tests complex scenarios and hot-plugging after basic validation
 
 **Flexibility**:
+
 - Suites can run independently if infrastructure is ready
 - Multiple Test Runs can execute in parallel, each isolated in separate namespace (e2e-{TEST_RUN_ID})
 
@@ -665,6 +689,7 @@ Describe("Adapter Suite", func() {
 ```
 
 **Key Principles**:
+
 - **Test Group-level** (Describe + Ordered + BeforeAll/AfterAll): Basic validation tests that share adapter
 - **Test Case-level** (Describe + BeforeEach/AfterEach): Required for negative cases, edge cases, and hot-plugging
 - **All use fake adapters**: No real business logic, focus on framework behavior under complex scenarios
@@ -743,6 +768,7 @@ E2E flow updates namespace retention annotations based on test outcome:
 | **Failed** | `e2e.hyperfleet.io/ci=no` | `e2e.hyperfleet.io/ci=no` | 6 hours |
 
 **Rationale**:
+
 - Passed tests have minimal debugging value → short retention conserves quota
   - 10-minute window prevents race conditions between E2E flow and reconciler deletion
 - Failed tests need retention for post-mortem
@@ -755,6 +781,7 @@ E2E flow updates namespace retention annotations based on test outcome:
 Environment-based configuration allows overriding default retention policy.
 
 **Use Cases**:
+
 - Extended debugging sessions
 - Demonstration environments
 - Manual investigation
@@ -774,6 +801,7 @@ A scheduled reconciler job enforces TTL-based cleanup:
 - Deletes namespaces based on retention annotation expiry
 
 **Simplicity Principle**: Reconciler does not distinguish between:
+
 - Normal vs orphaned namespaces
 - CI vs local runs
 
@@ -786,6 +814,7 @@ All policy decisions are encoded in namespace annotations. Reconciler is statele
 **Definition**: Orphaned resources occur when E2E flow is interrupted before setting final retention.
 
 **Handling**:
+
 - No special orphan detection needed
 - Default 2-hour retention set at creation covers this case
 - Reconciler treats orphans identically to any expired namespace
@@ -799,6 +828,7 @@ All policy decisions are encoded in namespace annotations. Reconciler is statele
 **Scope**: Cloud messaging resources (GCP Pub/Sub Topics and Subscriptions) require explicit cleanup beyond namespace deletion.
 
 **Creation** (during infrastructure deployment):
+
 - Topics/subscriptions auto-created during helm deployment
 - All resources tagged with `test_run_id` for cleanup tracking
 
@@ -813,6 +843,7 @@ All policy decisions are encoded in namespace annotations. Reconciler is statele
 4. **Reconciler**: Periodically scans for orphaned cloud resources (tagged but older than retention TTL) and deletes them
 
 **Why This Order**:
+
 - Cloud resources deleted **before** namespace deletion (cleanup script needs cluster access)
 - Kubernetes namespace deletion does not remove cloud resources
 - Cloud resources incur costs and quota consumption
@@ -838,6 +869,7 @@ Test infrastructure uses two container images with distinct responsibilities:
    - High change frequency (rebuilt on test code or chart changes)
 
 **Rationale**:
+
 - Infrastructure deployment is orchestrated by Test Framework
 - Fake adapter configurations stored in E2E repository enable config-driven testing
 - Separation by change frequency optimizes CI/CD build efficiency
@@ -857,6 +889,7 @@ Debuggability is enabled by:
 **Version Transparency**:
 
 Test framework outputs component versions at Test Run start:
+
 - Core components (API, Sentinel)
 - Fake adapters (framework image version + config checksums)
 - Hot-plugged fake adapters (logged when Adapter Suite deploys/removes them)
@@ -882,17 +915,20 @@ Implementation follows a phased approach to establish e2e testing infrastructure
 
 **Goal**: Establish e2e testing infrastructure with Core Suite validation using fake adapter configurations.
 
-**HYPERFLEET-XXX: Container Image Architecture**
+#### HYPERFLEET-XXX: Container Image Architecture
+
 - [ ] Build Cloud Platform Tools image (gcloud, aws cli, kubeconfig generation)
 - [ ] Build E2E Test Framework image (helm cli, test code, deployment charts)
 - [ ] Set up image build pipeline
 
-**HYPERFLEET-XXX: Fake Adapter Configurations**
+#### HYPERFLEET-XXX: Fake Adapter Configurations
+
 - [ ] Create testdata/adapter-configs directory in E2E repository
 - [ ] Create adapter configs using naming convention: {resource-type}-{workload-type} (e.g., cluster-job/, nodepool-configmap/)
 - [ ] Document configuration patterns for simulating different adapter behaviors
 
-**HYPERFLEET-XXX: Test Run Lifecycle**
+#### HYPERFLEET-XXX: Test Run Lifecycle
+
 - [ ] Implement Test Run ID generation
 - [ ] Implement namespace creation with isolation labels (test-run-id, ci, managed-by)
 - [ ] Implement infrastructure deployment via helm (API, Sentinel, CRDs, fake adapters with configs)
@@ -902,7 +938,8 @@ Implementation follows a phased approach to establish e2e testing infrastructure
 - [ ] Output component versions at Test Run start (API, Sentinel, fake adapters)
 - [ ] Implement cleanup: delete cloud resources (topics/subscriptions filtered by test_run_id) + helm uninstall + namespace deletion
 
-**HYPERFLEET-XXX: Core Suite**
+#### HYPERFLEET-XXX: Core Suite
+
 - [ ] Implement Core Suite test cases (framework behavior validation, NOT business logic)
 - [ ] Test success path with cluster-job fake adapter
 - [ ] Test precondition failure scenarios
@@ -912,7 +949,8 @@ Implementation follows a phased approach to establish e2e testing infrastructure
 - [ ] Validate framework data flow: API → Sentinel → Messaging → Fake Adapter → API
 - [ ] Add infrastructure health validation
 
-**HYPERFLEET-XXX: E2E Test Run Strategy Guide**
+#### HYPERFLEET-XXX: E2E Test Run Strategy Guide
+
 - [ ] Document Test Run lifecycle for developers
 - [ ] Document config-driven testing approach with fake adapters
 - [ ] Clarify Core Suite vs Adapter Suite (normal scenarios vs complex scenarios, both use fake adapters)
@@ -928,13 +966,15 @@ Implementation follows a phased approach to establish e2e testing infrastructure
 
 **Prerequisites**: Requires HyperFleet system to support runtime adapter hot-plugging (dynamic adapter deployment without API/Sentinel restart).
 
-**HYPERFLEET-XXX: Adapter Suite - Fake Adapter Configs for Complex Scenarios**
+#### HYPERFLEET-XXX: Adapter Suite - Fake Adapter Configs for Complex Scenarios
+
 - [ ] Create fake adapter configs for negative cases (invalid config schemas, missing required fields)
 - [ ] Create fake adapter configs for edge cases (timeout scenarios, resource conflicts)
 - [ ] Create fake adapter configs for hot-plugging validation
 - [ ] Document configuration patterns for simulating complex failure scenarios
 
-**HYPERFLEET-XXX: Adapter Suite - Test Implementation**
+#### HYPERFLEET-XXX: Adapter Suite - Test Implementation
+
 - [ ] Implement flexible adapter deployment strategies (Ordered + BeforeAll/AfterAll, BeforeEach/AfterEach)
 - [ ] Write hot-plugging validation tests (deploy and remove fake adapters dynamically without restart)
 - [ ] Write negative case tests (deployment failures, invalid configs, error injection)
@@ -943,7 +983,8 @@ Implementation follows a phased approach to establish e2e testing infrastructure
 - [ ] Add cleanup completeness verification
 - [ ] Implement mixed strategy examples (Test Group-level for basic validation, Test Case-level for negative/edge cases)
 
-**HYPERFLEET-XXX: E2E Test Run Strategy Guide (Phase 2)**
+#### HYPERFLEET-XXX: E2E Test Run Strategy Guide (Phase 2)
+
 - [ ] Write suite organization guide (Core Suite for normal scenarios vs Adapter Suite for complex scenarios)
 - [ ] Document test organization strategies (Ordered + BeforeAll, BeforeEach/AfterEach, mixed approach)
 - [ ] Document when to use Test Group-level vs Test Case-level deployment
@@ -957,13 +998,15 @@ Implementation follows a phased approach to establish e2e testing infrastructure
 
 The following enhancements are deferred to post-MVP:
 
-**HYPERFLEET-XXX: Retention Policy**
+#### HYPERFLEET-XXX: Retention Policy
+
 - [ ] Implement namespace retention annotation logic
 - [ ] Add test result-based retention updates (passed: 10min, failed: 24h/6h)
 - [ ] Configure default 2-hour TTL for orphaned namespaces
 - [ ] Write retention policy unit tests
 
-**HYPERFLEET-XXX: Cleanup Reconciler Job**
+#### HYPERFLEET-XXX: Cleanup Reconciler Job
+
 - [ ] Implement TTL-based namespace reconciler
 - [ ] Add orphaned resource detection and cleanup
 - [ ] Add orphaned cloud resource cleanup (topics/subscriptions filtered by test_run_id tag)

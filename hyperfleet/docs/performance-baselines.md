@@ -35,7 +35,6 @@ Both environments run the same stack: API, Sentinel (clusters + nodepools), 3 ad
 | Database | ~1k seeded clusters | Fresh deploy per run |
 | Date captured | 2026-06-18 | 2026-06-23 |
 
-
 ## Baselines
 
 ### API reads

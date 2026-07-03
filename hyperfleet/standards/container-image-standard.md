@@ -49,6 +49,7 @@ FROM registry.access.redhat.com/ubi9/go-toolset:1.25 AS builder
 ```
 
 **Why UBI9 Go toolset?**
+
 - Red Hat-supported and maintained
 - FIPS-validated cryptographic libraries available
 - Consistent with Red Hat OpenShift ecosystem
@@ -338,7 +339,7 @@ Since the Makefile uses `APP_VERSION` exclusively, the base image's `ENV VERSION
 
 ### Version Flow
 
-```
+```text
 Makefile (APP_VERSION via git describe)
   ├─ go build -ldflags "-X ...Version=$(APP_VERSION)"    → binary version (local builds)
   └─ docker build --build-arg APP_VERSION=$(APP_VERSION)  → Dockerfile

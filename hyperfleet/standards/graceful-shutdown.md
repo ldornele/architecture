@@ -36,7 +36,6 @@ Last Updated: 2026-01-09
 
 This document defines the standard approach for graceful shutdown and drain behavior across all HyperFleet components (API, Sentinel, Adapters).
 
-
 ### Goals
 
 - **Consistency**: All components handle shutdown signals the same way
@@ -169,6 +168,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 **Response Headers:**
 
 During shutdown, respond to new requests with:
+
 - Status: `503 Service Unavailable`
 - Header: `Connection: close`
 
@@ -226,7 +226,6 @@ func (w *Worker) Start(ctx context.Context) {
 ## Kubernetes Integration
 
 Deployments CAN configure `terminationGracePeriodSeconds` to allow time for graceful shutdown. By [default](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination-flow) Kubernetes defines `30` seconds as the termination grace period.
-
 
 ```yaml
 spec:

@@ -106,7 +106,7 @@ maestro-cli build --name=hyperfleet-cluster-west-1-nodepool --consumer=cluster-w
 
 ### ManifestWork ↔ Resource-Bundle Mapping
 
-```
+```text
 Each ManifestWork = One Resource-Bundle
 ├── ManifestWork Name → Resource-Bundle Name (semantic with cluster ID)
 ├── ManifestWork Namespace → Consumer Name (cluster)
@@ -177,6 +177,7 @@ func applyManifestWork(ctx context.Context, workClient workv1client.WorkV1Interf
     return err
 }
 ```
+
 </details>
 
 <details>
@@ -204,6 +205,7 @@ func getCommand(flags *MaestroCLIFlags) error {
     return nil
 }
 ```
+
 </details>
 
 <details>
@@ -240,6 +242,7 @@ func deleteCommand(flags *MaestroCLIFlags) error {
     return nil
 }
 ```
+
 </details>
 
 <details>
@@ -301,6 +304,7 @@ func checkManifestWorkCondition(work *workv1.ManifestWork, condition string) boo
     }
 }
 ```
+
 </details>
 
 ### Alternative Approach: CloudEvents Implementation (Not Recommended)
@@ -360,6 +364,7 @@ func loadCloudEventData(manifestFile string) interface{} {
     }
 }
 ```
+
 </details>
 
 ### Why NOT CloudEvents Implementation
@@ -376,6 +381,7 @@ func loadCloudEventData(manifestFile string) interface{} {
 | **Learning Curve** | ✅ **Kubernetes-native** - familiar to developers | ❌ **CloudEvents protocol** - requires new concepts |
 
 **Key Problems with CloudEvents Approach:**
+
 1. **Resource ID Complexity**: Must track and manage opaque resource-bundle IDs
 2. **Manual Apply Logic**: No built-in create-or-update handling
 3. **Protocol Complexity**: Must understand CloudEvent extensions and types
@@ -383,11 +389,13 @@ func loadCloudEventData(manifestFile string) interface{} {
 5. **Type Safety**: Loses compile-time checking and IDE support
 
 **Why ManifestWork is Better:**
+
 - **Semantic Naming**: Work directly with meaningful ManifestWork names
 - **Kubernetes-Native**: Familiar API patterns for developers
 - **Built-in Operations**: Apply, watch, and status checking included
 - **Type Safety**: Full compile-time validation and IDE autocomplete
 - **Simpler Implementation**: Less code, fewer concepts to learn
+
 ---
 
 ## Command Flags
@@ -410,6 +418,7 @@ func loadCloudEventData(manifestFile string) interface{} {
 ### Flag Validation
 
 Each command validates its required flags before execution:
+
 - **apply**: Requires `--name`, `--manifest-file`, and `--consumer`; optionally `--manifest-name` to merge with existing ManifestWork (fetches current, merges provided manifest)
 - **get**: Requires `--name` and `--consumer`; optionally `--manifest-name` to get specific manifest status within ManifestWork
 - **delete**: Requires `--name` and `--consumer`; optionally `--manifest-name` to delete specific manifest within ManifestWork
@@ -425,6 +434,7 @@ For detailed command implementation patterns, refer to the official Maestro Mani
 **Reference**: [maestro/examples/manifestwork/client.go](https://github.com/openshift-online/maestro/blob/main/examples/manifestwork/client.go)
 
 This example demonstrates:
+
 - **WorkClient creation** using `grpcsource.NewMaestroGRPCSourceWorkClient`
 - **get** - `workClient.ManifestWorks(consumerName).Get(ctx, workName, metav1.GetOptions{})`
 - **list** - `workClient.ManifestWorks(consumerName).List(ctx, metav1.ListOptions{})`
@@ -433,6 +443,7 @@ This example demonstrates:
 - **watch** - `workClient.ManifestWorks(consumerName).Watch(ctx, metav1.ListOptions{})`
 
 **Key packages used:**
+
 ```go
 import (
     "github.com/openshift-online/maestro/pkg/api/openapi"
@@ -451,6 +462,7 @@ import (
 **Decision:** Use HTTP polling instead of gRPC subscription for the `--watch` flag and status monitoring commands.
 
 **HTTP Polling Benefits:**
+
 - **No event consumption conflicts** - Uses read-only HTTP API, no broker interaction
 - **No gRPC connection management** - Avoids stream resource usage and complexity
 - **Simple implementation** - Standard HTTP client patterns
@@ -460,11 +472,13 @@ import (
 - **No state persistence needed** - Subscribe-based approach requires a "database" to record status from CloudEvents, otherwise duplicating what Maestro Server already does; HTTP polling leverages Maestro's existing status storage. We can use RESULT_PATH file to record the status with gRPC, but not enough benefits from the complexity.
 
 **Trade-offs Accepted:**
+
 - **Higher latency** - Polling interval (5-10s) vs real-time events
 - **More HTTP requests** - Regular polling vs event-driven push
 - **Less efficient** - Repeated queries vs push notifications
 
 **Why This Works for maestro-cli:**
+
 - Status polling latency (5-10s) is acceptable for job-based operations
 - Job startup time (~2-5s) already dominates, so polling adds minimal overhead
 - Simplicity and reliability outweigh real-time requirements for adapter job use cases
@@ -532,6 +546,7 @@ func (p *StatusPoller) checkCondition(status *ResourceStatus, condition string) 
     }
 }
 ```
+
 </details>
 
 ### Resource-Specific Status Monitoring
@@ -561,6 +576,7 @@ func (p *StatusPoller) WaitForResourceCondition(bundleID, resourceName, conditio
     }
 }
 ```
+
 </details>
 
 ---
@@ -593,6 +609,7 @@ func executeWithRetry(operation func() error, maxRetries int, backoff time.Durat
     return fmt.Errorf("operation failed after %d attempts: %w", maxRetries+1, lastError)
 }
 ```
+
 </details>
 
 ### Connection Management
@@ -628,6 +645,7 @@ func (c *MaestroClient) Close() error {
     return nil
 }
 ```
+
 </details>
 
 ### Graceful Degradation
@@ -640,11 +658,13 @@ func (c *MaestroClient) Close() error {
 ---
 
 ## Status Output Integration
+
 `--watch` flag can provide status syncing functionality. To well record the status and result, we will provide some configurations to support the result recording.
 
 ### RESULTS_PATH Configuration
 
 **Configuration Priority:**
+
 ```bash
 1. --results-path flag (highest priority)
 2. RESULTS_PATH environment variable
@@ -689,12 +709,14 @@ func getResultsPath(flags *MaestroCLIFlags) string {
     return "" // No default - results won't be recorded if not set
 }
 ```
+
 </details>
 
 ### Status Flow Integration
 
 **Status-reporter integration:**
-```
+
+```text
 maestro-cli (writes RESULTS_PATH) → status-reporter (reads RESULTS_PATH) → HyperFleet status updates
 ```
 
@@ -707,6 +729,7 @@ maestro-cli (writes RESULTS_PATH) → status-reporter (reads RESULTS_PATH) → H
 **Important: maestro-cli always works with complete ManifestWork resources.**
 
 **For all operations with --manifest-name flag set(apply, delete):**
+
 - CLI always fetches the full ManifestWork from Maestro
 - User provides complete desired state in manifest file
 - CLI replaces entire ManifestWork contents with provided manifest
@@ -749,6 +772,7 @@ The `build` command enables merging nodepool configurations with existing Manife
 **Primary Use Case**: Nodepool adapter needs to update nodepool configuration while preserving other resources (namespace, configmaps, services) in the same ManifestWork.
 
 **Problem Solved**:
+
 - Manual fetching and merging of existing ManifestWork
 - Complex resource combination logic
 - Error-prone manifest reconstruction
@@ -803,10 +827,12 @@ type BuildFlags struct {
 ### Merge Strategies
 
 **1. Merge Strategy (default)**: Combines resources intelligently
+
 - **Behavior**: Replaces existing resources with same kind/name/namespace, adds new resources
 - **Use Case**: Standard nodepool updates that preserve other resources
 
 **2. Replace Strategy**: Overwrites all nodepool-related resources
+
 - **Behavior**: Removes old nodepool resources, adds new ones
 - **Use Case**: Complete nodepool reconfiguration
 
@@ -849,6 +875,7 @@ type BuildFlags struct {
   }
 }
 ```
+
 </details>
 
 ### Implementation
@@ -969,6 +996,7 @@ func manifestKey(manifest workv1.Manifest) string {
         obj.GetName())
 }
 ```
+
 </details>
 
 ### Build Command Workflow

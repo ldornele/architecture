@@ -29,7 +29,7 @@ For Hyperfleet E2E CI test, we added these [step and workflow](https://github.co
 ```text
 ci-operator/step-registry/openshift-hyperfleet/e2e/
 ├── openshift-hyperfleet-e2e-workflow.yaml           # Main E2E test workflow definition
-├── openshift-hyperfleet-e2e-workflow.metadata.json  
+├── openshift-hyperfleet-e2e-workflow.metadata.json
 │
 ├── setup/                                            # Hyperfleet platform deployment setup step
 │   ├── openshift-hyperfleet-e2e-setup-ref.yaml
@@ -77,7 +77,7 @@ ref:
   env:
   - name: # environment variable name e.g. HYPERFLEET_E2E_PATH
     default: # (optional) the value assigned if none is provided
-    documentation: # (optional) a textual description of the parameter. Markdown supported. 
+    documentation: # (optional) a textual description of the parameter. Markdown supported.
   credentials:
   - collection: ""
     namespace: test-credentials
@@ -86,16 +86,18 @@ ref:
  ```
 
 **openshift-hyperfleet-e2e-`<folder-name>`-commands.sh**
+
 - Define the shell script for the job. It depends on different business logic.
   - In above step, it mounts the volume for credential. And the hcm-hyperfleet-e2e.json secret has been added in Vault, so it can get the value directly in the shell script
 
 ```bash
 <Other steps>
 # HYPERFLEET_E2E_PATH can be defined in above environment variable
-GCP_CREDENTIALS_FILE="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"  
+GCP_CREDENTIALS_FILE="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"
 ```
 
 **openshift-hyperfleet-e2e-`<folder-name>`-ref.metadata.json**
+
 - Store the owners and path
 
 ```json
@@ -114,7 +116,7 @@ GCP_CREDENTIALS_FILE="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"
 
 #### Adding the Job Configuration
 
-The job can be added in [`openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml`](https://github.com/openshift/release/blob/b968e721d74890587b15db562aa6138709543fa2/ci-operator/config/openshift-hyperfleet/hyperfleet-e2e/openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml#L16) under the `tests` field: 
+The job can be added in [`openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml`](https://github.com/openshift/release/blob/b968e721d74890587b15db562aa6138709543fa2/ci-operator/config/openshift-hyperfleet/hyperfleet-e2e/openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml#L16) under the `tests` field:
 
 ```yaml
 tests:
@@ -134,6 +136,7 @@ tests:
 #### Finding Running Jobs
 
 To find and monitor running jobs on Prow:
+
 1. Navigate to the [Prow dashboard](https://prow.ci.openshift.org/).
 2. Use the filter bar to search for specific jobs:
    - By job name: [`periodic-ci-openshift-hyperfleet-hyperfleet-e2e-main-e2e-hyperfleet-e2e-test-workflow-nightly`](https://prow.ci.openshift.org/?job=periodic-ci-openshift-hyperfleet-hyperfleet-e2e-main-e2e-hyperfleet-e2e-test-workflow-nightly)
@@ -150,6 +153,7 @@ If you want to trigger the job from Prow dashboard, it requires granting GitHub 
 The rerun authorization is configured in [_config.yaml](https://github.com/openshift/release/blob/main/core-services/prow/02_config/_config.yaml) file
 
 **Configuration Example:**
+
 ```yaml
 - repo: openshift-hyperfleet/hyperfleet-e2e
   rerun_auth_configs:
@@ -168,6 +172,7 @@ The rerun authorization is configured in [_config.yaml](https://github.com/opens
 - **github_users**: Lists individual GitHub users who can rerun CI jobs (optional)
   - Use this when specific users need access outside of team membership
   - Example configuration:
+
     ```yaml
     - repo: openshift-hyperfleet/hyperfleet-e2e
       rerun_auth_configs:
@@ -180,13 +185,14 @@ The rerun authorization is configured in [_config.yaml](https://github.com/opens
     ```
 
 **Configured Teams:**
+
 - The `hyperfleet` team from the `openshift-hyperfleet` organization
 - The `test-platform` team from the `openshift` organization (standard for CI support)
 
 **Note:** Currently, no `github_users` section is configured for this repository, meaning only team-based permissions are used. If individual user access is needed outside of team membership, add their GitHub usernames to the `github_users` list.
 
 **How to Verify the Team Slug:**
-Visit the team page on GitHub (e.g., https://github.com/orgs/openshift-hyperfleet/teams/hyperfleet). The last part of the URL (`hyperfleet`) is the team slug.
+Visit the team page on GitHub (e.g., <https://github.com/orgs/openshift-hyperfleet/teams/hyperfleet>). The last part of the URL (`hyperfleet`) is the team slug.
 
 After this configuration is merged, members of these teams will be able to rerun and abort CI jobs under the `openshift-hyperfleet/hyperfleet-e2e` repository directly from the Prow dashboard
 
@@ -209,6 +215,7 @@ If you want to add some new code for the CI workflow, you can prepare a PR and t
 To add another job based on the existing Hyperfleet E2E CI job:
 
 1. **Copy the existing job configuration** to add it in [`openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml`](https://github.com/openshift/release/blob/b968e721d74890587b15db562aa6138709543fa2/ci-operator/config/openshift-hyperfleet/hyperfleet-e2e/openshift-hyperfleet-hyperfleet-e2e-main__e2e.yaml#L16) Update the following:
+
    ```yaml
    - as: hyperfleet-e2e-<specified_name> # Job name
      cron: 30 9 * * * # Job cron time
@@ -229,16 +236,19 @@ To add another job based on the existing Hyperfleet E2E CI job:
 3. **Add the new job**
 
    Run the command to generate and update the job configuration:
+
    ```bash
    make jobs
    ```
 
 4. **Submit a PR with the new job configuration**
    - Prow will trigger some precheck jobs to verify the changed code
-   - It still requiure to trigger the affected job via adding comment.
+   - It still requires triggering the affected job by adding a comment.
+
    ```text
    /pj-rehearse {test-name}
    ```
+
    - In the past, it required adding **/pj-rehearse ack** to meet the tidy job once you get a team member approved
 
 ### Debugging
@@ -250,7 +260,6 @@ To add another job based on the existing Hyperfleet E2E CI job:
 3. Click **Artifacts** to jump to the log page
 4. Navigate to the folder: **artifacts/hyperfleet-e2e-nightly/openshift-hyperfleet-e2e/**
 5. You can find the detailed logs under the **artifacts** folder
-
 
 ## CI Jobs Example PRs
 

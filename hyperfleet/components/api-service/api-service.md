@@ -6,7 +6,7 @@ Last Updated: 2026-03-26
 
 # HyperFleet API Service
 
-The HyperFleet API is the data layer for the HyperFleet platform — a stateless REST service providing CRUD operations for HyperFleet API resources (clusters and node pools, adapter-based status reporting with Kubernetes-style conditions), and generation tracking. 
+The HyperFleet API is the data layer for the HyperFleet platform — a stateless REST service providing CRUD operations for HyperFleet API resources (clusters and node pools, adapter-based status reporting with Kubernetes-style conditions), and generation tracking.
 
 It contains no business logic other than the aggregation logic from adapter statuses to determine the reconciliation state of the resource.
 
@@ -40,7 +40,6 @@ graph TD
     API -->|Expose| Metrics[Metrics :9090\n/metrics]
 ```
 
-
 ### Resources
 
 #### Clusters
@@ -69,6 +68,7 @@ Groups of compute nodes nested under a cluster.
 | `/api/hyperfleet/v1/clusters/{id}/nodepools/{np_id}/statuses` | PUT | Report adapter status |
 
 Both resources support:
+
 - **Pagination**: `page` and `size` query parameters
 - **Label filtering**: `?search=labels.region=us-east` for Sentinel resource selectors
 
@@ -103,7 +103,7 @@ Both resources support:
 
 ### Status Aggregation
 
-The API aggregates adapter status reports into the resource's `status.conditions` array. 
+The API aggregates adapter status reports into the resource's `status.conditions` array.
 
 The `Ready` condition determines if the "state of the world" have been reconciled to match the desired state of the HyperFleet API resource.
 
@@ -113,13 +113,13 @@ This aggregated `Ready` condition is the primary signal consumed by Sentinel's C
 
 ### Generation Tracking
 
-`generation` increments on every change to the API resource that conveys some customer intention. 
+`generation` increments on every change to the API resource that conveys some customer intention.
 This is, changes to the fields:
+
 - `spec`
 - `labels`
 
 Adapters include `observed_generation` in status reports. The API uses this to detect stale reports: if `adapter.observed_generation < resource.generation`, that adapter has not yet reconciled the latest desired state, and `Ready` is set to `False`.
-
 
 ### Technology Stack
 
@@ -132,7 +132,6 @@ Adapters include `observed_generation` in status reports. The API uses this to d
 | ORM | GORM with JSONB fields for `spec`, `conditions`, `labels` |
 | Authentication | OCM JWT (production) / disabled (development) |
 | Deployment | Kubernetes (Helm chart in `charts/`) |
-
 
 ### Ports
 
@@ -164,13 +163,12 @@ Adapters include `observed_generation` in status reports. The API uses this to d
 
 ### Technical Debt Incurred
 
-- **JSONB in DB schema**: The current DB schema contains some JSONB fields 
+- **JSONB in DB schema**: The current DB schema contains some JSONB fields
   - **Impact**: Code is marshalling/unmarshalling from these fields instead of leveraging the ORM directly. Harder to use indexes
   - **Remediation**: Post-MVP, convert status conditions to a table instead of JSONB
 - **`spec` field in clusters/nodepools table**: this is a JSONB that can grow big in size
   - Impact: increased network traffic, as the full API resource payload travels for every API request
   - Remediation: split the `spec` into its own table, or provide a way for Sentinel to fetch API resources without payload, as it is unused in Sentinel
-
 
 ### Acceptable Because
 
@@ -187,7 +185,6 @@ Adapters include `observed_generation` in status reports. The API uses this to d
 What: Instead of polling the API, for every change in the API resource, publish the change to a queue
 
 Why Rejected: the API gets an additional concern (publishing) and needs to guarantee delivery, so some type of transactional outbox pattern has to be implemented. For simplicity we accept polling at the scale the solution will be operating.
-
 
 ### Embed Business Logic in the API (Monolith)
 
@@ -230,7 +227,7 @@ Why Rejected: the API gets an additional concern (publishing) and needs to guara
 
 ### REST API Base Path
 
-```
+```text
 /api/hyperfleet/v1/
 ```
 

@@ -24,6 +24,7 @@ This document defines standard Makefile targets and conventions for all HyperFle
 ### Scope
 
 This standard applies to:
+
 - All HyperFleet service repositories
 - All adapter repositories (adapter-pullsecret, adapter-dns, etc.)
 - Infrastructure and tooling repositories
@@ -31,6 +32,7 @@ This standard applies to:
 ### Problem Statement
 
 Currently, different HyperFleet repositories use different target names for similar operations:
+
 - Some use `make compile`, others use `make build` or `make binary`
 - Binary output locations vary (some use `bin/`, others use project root)
 - CI pipelines have inconsistent invocations across repos
@@ -125,11 +127,11 @@ make image-push                 # Push to registry
 # Good - output to bin/ directory
 # Example: go build -o bin/pull-secret ./cmd/pull-secret
 build:
-	go build -o bin/app-name ./cmd/app-name
+ go build -o bin/app-name ./cmd/app-name
 
 # Bad - DO NOT output to project root
 build:
-	go build -o app-name ./cmd/app-name
+ go build -o app-name ./cmd/app-name
 ```
 
 ### Temporary Files
@@ -315,13 +317,13 @@ Because the shell expansion returns an empty string when neither tool is found, 
 .PHONY: check-container-tool
 check-container-tool:
 ifndef CONTAINER_TOOL
-	@echo "Error: No container tool found (podman or docker)"
-	@echo ""
-	@echo "Please install one of:"
-	@echo "  brew install podman   # macOS"
-	@echo "  brew install docker   # macOS"
-	@echo "  dnf install podman    # Fedora/RHEL"
-	@exit 1
+ @echo "Error: No container tool found (podman or docker)"
+ @echo ""
+ @echo "Please install one of:"
+ @echo "  brew install podman   # macOS"
+ @echo "  brew install docker   # macOS"
+ @echo "  dnf install podman    # Fedora/RHEL"
+ @exit 1
 endif
 ```
 
@@ -389,8 +391,8 @@ BIN_DIR := bin
 BINARY_NAME := $(BIN_DIR)/my-service
 
 build:
-	@mkdir -p $(BIN_DIR)
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) ./cmd/my-service
+ @mkdir -p $(BIN_DIR)
+ $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) ./cmd/my-service
 ```
 
 ---
@@ -409,17 +411,17 @@ IMAGE_TAG      ?= $(APP_VERSION)
 
 .PHONY: image
 image: check-container-tool ## Build container image
-	$(CONTAINER_TOOL) build \
-		--platform $(PLATFORM) \
-		--build-arg GIT_SHA=$(GIT_SHA) \
-		--build-arg GIT_DIRTY=$(GIT_DIRTY) \
-		--build-arg BUILD_DATE=$(BUILD_DATE) \
-		--build-arg APP_VERSION=$(APP_VERSION) \
-		-t $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG) .
+ $(CONTAINER_TOOL) build \
+  --platform $(PLATFORM) \
+  --build-arg GIT_SHA=$(GIT_SHA) \
+  --build-arg GIT_DIRTY=$(GIT_DIRTY) \
+  --build-arg BUILD_DATE=$(BUILD_DATE) \
+  --build-arg APP_VERSION=$(APP_VERSION) \
+  -t $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG) .
 
 .PHONY: image-push
 image-push: check-container-tool image ## Build and push container image
-	$(CONTAINER_TOOL) push $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
+ $(CONTAINER_TOOL) push $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 ```
 
 ### Optional: `image-dev`
@@ -434,18 +436,18 @@ DEV_TAG        ?= dev-$(GIT_SHA)
 .PHONY: image-dev
 image-dev: check-container-tool ## Build and push dev image (requires QUAY_USER)
 ifndef QUAY_USER
-	@echo "Error: QUAY_USER is not set. Usage: QUAY_USER=myuser make image-dev"
-	@exit 1
+ @echo "Error: QUAY_USER is not set. Usage: QUAY_USER=myuser make image-dev"
+ @exit 1
 endif
-	$(CONTAINER_TOOL) build \
-		--platform $(PLATFORM) \
-		--build-arg BASE_IMAGE=$(DEV_BASE_IMAGE) \
-		--build-arg GIT_SHA=$(GIT_SHA) \
-		--build-arg GIT_DIRTY=$(GIT_DIRTY) \
-		--build-arg BUILD_DATE=$(BUILD_DATE) \
-		--build-arg APP_VERSION=$(APP_VERSION) \
-		-t quay.io/$(QUAY_USER)/$(IMAGE_NAME):$(DEV_TAG) .
-	$(CONTAINER_TOOL) push quay.io/$(QUAY_USER)/$(IMAGE_NAME):$(DEV_TAG)
+ $(CONTAINER_TOOL) build \
+  --platform $(PLATFORM) \
+  --build-arg BASE_IMAGE=$(DEV_BASE_IMAGE) \
+  --build-arg GIT_SHA=$(GIT_SHA) \
+  --build-arg GIT_DIRTY=$(GIT_DIRTY) \
+  --build-arg BUILD_DATE=$(BUILD_DATE) \
+  --build-arg APP_VERSION=$(APP_VERSION) \
+  -t quay.io/$(QUAY_USER)/$(IMAGE_NAME):$(DEV_TAG) .
+ $(CONTAINER_TOOL) push quay.io/$(QUAY_USER)/$(IMAGE_NAME):$(DEV_TAG)
 ```
 
 ---
@@ -462,4 +464,3 @@ endif
 - [GNU Make Manual](https://www.gnu.org/software/make/manual/)
 - [Makefile Best Practices](https://tech.davis-hansson.com/p/make/)
 - [Self-Documented Makefiles](https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html)
-

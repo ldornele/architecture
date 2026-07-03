@@ -65,6 +65,7 @@ Use these keywords with their RFC 2119 meanings:
 - **MAY** / **OPTIONAL** - Truly optional
 
 Example:
+
 ```markdown
 Services MUST expose a `/healthz` endpoint.
 Services SHOULD use structured JSON logging.
@@ -113,6 +114,7 @@ fmt.Printf("processed request in %v\n", duration)
 ### Code Blocks
 
 Always specify the language for syntax highlighting:
+
 - `go` for Go code
 - `yaml` for YAML configuration
 - `bash` for shell commands

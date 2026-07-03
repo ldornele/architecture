@@ -9,6 +9,7 @@ Last Updated: 2026-01-27
 ---
 
 ## Overview
+
 Requirements document for the GCP pull secret management adapter. Deprecated since GCP specific adapters will be developed by GCP team and out of scope for the core HyperFleet repositories
 
 ### Purpose
@@ -23,7 +24,6 @@ The Pull Secret Adapter is responsible for securely storing and managing image r
 4. **Secret Retrieval**: Provide secret references for HyperShift adapter
 5. **Status Reporting**: Report adapter status to HyperFleet API
 6. **Lifecycle Management**: Handle secret updates and cleanup
-
 
 ---
 
@@ -46,6 +46,7 @@ The adapter requires access to the following GCP Secret Manager APIs:
 ### GCP Project Configuration
 
 **Requirements**:
+
 - [GCP Project ID must be specified in cluster spec](https://cloud.google.com/secret-manager/docs/creating-and-accessing-secrets#create-a-secret)
 - [Secret Manager API must be enabled in the project](https://cloud.google.com/secret-manager/docs/configuring-secret-manager#enable-api-console)
 - [Project must have sufficient quota for secrets](https://cloud.google.com/secret-manager/quotas)
@@ -80,6 +81,7 @@ labels:
 ```
 
 **Purpose**:
+
 - Discovery and filtering
 - Cost tracking and billing
 - Cleanup and lifecycle management
@@ -96,9 +98,7 @@ labels:
 2. **User-Managed Replication**
    - Specify exact locations for secret replication
 
-
 **MVP Scope**: Store credentials in Secret Manager
-
 
 ### Secret Format
 
@@ -120,6 +120,7 @@ The pull secret data must be stored in **Dockercfg JSON format** (standard for K
 ```
 
 **Validation**:
+
 - Must be valid JSON
 - Must contain `auths` key
 - Each registry entry must have `auth` field (base64-encoded `username:password`)
@@ -129,6 +130,7 @@ The pull secret data must be stored in **Dockercfg JSON format** (standard for K
 The Pull Secret Adapter Job requires a **GCP Service Account** with the following IAM permissions:
 
 **Required Roles**:
+
 - `roles/secretmanager.admin` - Create, update, and delete secrets
 
 **Custom IAM Policy** (Least Privilege):
@@ -145,8 +147,6 @@ Minimal permissions for Pull Secret Adapter to manage secrets:
 - `secretmanager.versions.list`
 - `secretmanager.versions.destroy`  # Only for cleanup
 
-
-
 ### Quotas and Limits
 
 **GCP Secret Manager Quotas**:
@@ -158,8 +158,8 @@ Minimal permissions for Pull Secret Adapter to manage secrets:
 | API requests (Read) | 600 per minute per project | A read request is any non-mutating operation (an operation that does not modify a secret version) except for access requests |
 | API requests (Write)  | 600 per minute per project | A write request is any mutating operation (an operation that modifies or deletes a secret or secret version) |
 
-
 ## References
+
 - [Creating and Accessing Secrets](https://cloud.google.com/secret-manager/docs/creating-and-accessing-secrets)
 - [Configuring Secret Manager](https://cloud.google.com/secret-manager/docs/configuring-secret-manager#enable-api-console)
 - [Required Roles](https://cloud.google.com/secret-manager/docs/creating-and-accessing-secrets#required-roles)

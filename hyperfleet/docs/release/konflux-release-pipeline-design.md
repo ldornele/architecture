@@ -157,11 +157,13 @@ For the full bug triage process including severity assessment and decision frame
 There is no automated gate between E2E and release — the human is the gate. The Release Owner must verify E2E passed before pushing GA tags. This is a deliberate choice: `block-releases` cannot distinguish release Snapshots from nightly ones (see [RPA Design](#releaseplanadmission-design)), and the ITS Prow wrapper that could automate this is a fast-follow item.
 
 **Before pushing GA tags, the Release Owner MUST:**
+
 1. Confirm the RC E2E Prow job passed for the final RC commit SHA (check Prow dashboard)
 2. Confirm all three RC images exist in Quay at the expected tags
 3. Confirm no regressions in nightly E2E since the RC was cut
 
 **GA release steps:**
+
 1. Tag each component with GA version (`v1.5.0`, `v1.4.2`, `v2.0.0`)
 2. Each tag triggers Konflux build with version injection -> auto-release to Quay
 3. Pyxis registration and Slack notification (automatic)
@@ -172,7 +174,7 @@ There is no automated gate between E2E and release — the human is the gate. Th
 
 ### Complete Timeline
 
-```
+```text
 Week 1-2: Development
   main ──PR──PR──PR──PR──► Konflux builds → Quay :dev :latest (continuous)
                                               Prow nightly E2E (daily)
@@ -204,7 +206,7 @@ Hotfixes target 1 working day turnaround for Blocker/Critical issues. Patches sk
 
 **Hotfix flow:**
 
-```
+```text
 Fix on main → cherry-pick to release branch → push patch tag (v1.5.1)
   → PaC tag.yaml triggers → Konflux builds (~10-15 min)
   → Auto-release to Quay → Pyxis + Slack (automatic)
@@ -264,7 +266,7 @@ RC and release tags produce identical pipelines. A separate release-tag pipeline
 
 ### Version Injection Chain
 
-```
+```text
 git tag v1.5.0-rc1
   → PaC extracts {{ target_branch }} = "refs/tags/v1.5.0-rc1"
     → Pipeline task strips prefix and v: TAG_NAME="1.5.0-rc1"
@@ -470,4 +472,3 @@ The Release Owner updates the manifest manually before tagging `hyperfleet-relea
 | Multi-arch builds | Switch to `docker-build-multi-platform-oci-ta` if arm64 deployment target materializes. One-line change per pipeline. |
 
 ---
-

@@ -52,6 +52,7 @@ Last Updated: 2026-02-24
 This document defines the minimum set of metrics that all HyperFleet adapters must expose for observability. These metrics enable baseline measurement and identify areas for post-MVP improvement.
 
 **Related Documentation:**
+
 - [HyperFleet Metrics Standard](../../../standards/metrics.md) - Cross-component metrics conventions
 - [Adapter Framework Design](./adapter-frame-design.md) - Framework architecture
 - `adapter-observability-config-template.yaml` - Observability configuration template
@@ -82,6 +83,7 @@ data:
 ```
 
 **Key Fields for Metrics**:
+
 - `data.kind` - Used as `resource_kind` label in metrics (e.g., "Cluster", "NodePool")
 - `data.id` - Resource identifier (not used in metrics to avoid high cardinality)
 - `data.generation` - Resource generation (not used in metrics to avoid high cardinality)
@@ -111,11 +113,13 @@ For complete health and readiness endpoint standards, see [Health Endpoints Spec
 **Purpose**: Total number of CloudEvents processed by the adapter
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter (e.g., "validation", "dns")
 - `resource_kind` - Kind of resource being processed from event.data.kind (e.g., "Cluster", "NodePool")
 - `status` - Processing outcome: `success`, `error`, `skipped`
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_events_processed_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",resource_kind="Cluster",status="success"} 1523
 hyperfleet_adapter_events_processed_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",resource_kind="Cluster",status="error"} 12
@@ -124,6 +128,7 @@ hyperfleet_adapter_events_processed_total{component="adapter-validation",version
 ```
 
 **Usage**:
+
 - Track overall event throughput
 - Identify error rates
 - Measure skip frequency (preconditions not met)
@@ -136,6 +141,7 @@ hyperfleet_adapter_events_processed_total{component="adapter-validation",version
 **Purpose**: Time taken to process a CloudEvent (end-to-end)
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `resource_kind` - Kind of resource being processed from event.data.kind
 - `status` - Processing outcome: `success`, `error`, `skipped`
@@ -143,6 +149,7 @@ hyperfleet_adapter_events_processed_total{component="adapter-validation",version
 **Buckets**: `0.1, 0.5, 1, 2, 5, 10, 30, 60, 120` (seconds)
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_event_processing_duration_seconds_bucket{component="adapter-validation",version="v1.0.0",adapter_name="validation",resource_kind="Cluster",status="success",le="0.5"} 0
 hyperfleet_adapter_event_processing_duration_seconds_bucket{component="adapter-validation",version="v1.0.0",adapter_name="validation",resource_kind="Cluster",status="success",le="1"} 5
@@ -152,6 +159,7 @@ hyperfleet_adapter_event_processing_duration_seconds_count{component="adapter-va
 ```
 
 **Usage**:
+
 - Identify slow event processing
 - Track p50, p95, p99 latencies
 - Detect performance degradation
@@ -166,11 +174,13 @@ hyperfleet_adapter_event_processing_duration_seconds_count{component="adapter-va
 **Purpose**: Total number of Kubernetes resources created by the adapter
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `resource_type` - Kubernetes resource kind (e.g., "Job", "Deployment", "ConfigMap")
 - `status` - Creation outcome: `success`, `error`
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_resources_created_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",resource_type="Job",status="success"} 45
 hyperfleet_adapter_resources_created_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",resource_type="ConfigMap",status="success"} 45
@@ -178,6 +188,7 @@ hyperfleet_adapter_resources_created_total{component="adapter-validation",versio
 ```
 
 **Usage**:
+
 - Track resource creation activity
 - Identify resource creation failures
 
@@ -189,17 +200,20 @@ hyperfleet_adapter_resources_created_total{component="adapter-validation",versio
 **Purpose**: Total number of Kubernetes resources deleted by the adapter
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `resource_type` - Kubernetes resource kind
 - `status` - Deletion outcome: `success`, `error`
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_resources_deleted_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",resource_type="Job",status="success"} 23
 hyperfleet_adapter_resources_deleted_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",resource_type="Job",status="error"} 1
 ```
 
 **Usage**:
+
 - Track cleanup operations
 - Identify deletion failures
 
@@ -213,6 +227,7 @@ hyperfleet_adapter_resources_deleted_total{component="adapter-validation",versio
 **Purpose**: Total number of API calls made by the adapter
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `api` - API being called: `hyperfleet`, `kubernetes`, `external`
 - `method` - HTTP method: `GET`, `POST`, `PATCH`, `DELETE`, `PUT`
@@ -220,6 +235,7 @@ hyperfleet_adapter_resources_deleted_total{component="adapter-validation",versio
 - `status_code` - HTTP status code: `200`, `404`, `500`, etc.
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_api_requests_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",api="hyperfleet",method="GET",endpoint="/clusters/{id}",status_code="200"} 1523
 hyperfleet_adapter_api_requests_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",api="hyperfleet",method="PUT",endpoint="/statuses",status_code="200"} 1487
@@ -228,6 +244,7 @@ hyperfleet_adapter_api_requests_total{component="adapter-validation",version="v1
 ```
 
 **Usage**:
+
 - Track API call volume
 - Identify failed API calls
 - Monitor API usage patterns
@@ -240,6 +257,7 @@ hyperfleet_adapter_api_requests_total{component="adapter-validation",version="v1
 **Purpose**: Time taken for API requests
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `api` - API being called
 - `method` - HTTP method
@@ -248,6 +266,7 @@ hyperfleet_adapter_api_requests_total{component="adapter-validation",version="v1
 **Buckets**: `0.01, 0.05, 0.1, 0.5, 1, 2, 5` (seconds)
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_api_request_duration_seconds_bucket{component="adapter-validation",version="v1.0.0",adapter_name="validation",api="hyperfleet",method="GET",endpoint="/clusters/{id}",le="0.1"} 1200
 hyperfleet_adapter_api_request_duration_seconds_bucket{component="adapter-validation",version="v1.0.0",adapter_name="validation",api="hyperfleet",method="GET",endpoint="/clusters/{id}",le="0.5"} 1500
@@ -256,6 +275,7 @@ hyperfleet_adapter_api_request_duration_seconds_count{component="adapter-validat
 ```
 
 **Usage**:
+
 - Identify slow API calls
 - Track API latency percentiles
 - Detect API performance issues
@@ -270,11 +290,13 @@ hyperfleet_adapter_api_request_duration_seconds_count{component="adapter-validat
 **Purpose**: Total number of precondition evaluations
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `precondition_name` - Name of the precondition from config (e.g., "clusterStatus", "validationAvailable")
 - `result` - Evaluation result: `pass`, `fail`, `error`
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_preconditions_evaluated_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",precondition_name="clusterStatus",result="pass"} 1523
 hyperfleet_adapter_preconditions_evaluated_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",precondition_name="validationAvailable",result="fail"} 89
@@ -282,6 +304,7 @@ hyperfleet_adapter_preconditions_evaluated_total{component="adapter-validation",
 ```
 
 **Usage**:
+
 - Track precondition success/failure rates
 - Identify problematic preconditions
 - Monitor dependency health
@@ -296,12 +319,14 @@ hyperfleet_adapter_preconditions_evaluated_total{component="adapter-validation",
 **Purpose**: Total number of status reports sent to HyperFleet API
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `status` - Report outcome: `success`, `error`
 - `applied` - Applied condition value: `true`, `false`
 - `available` - Available condition value: `true`, `false`
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_status_reports_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",status="success",applied="true",available="true"} 834
 hyperfleet_adapter_status_reports_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",status="success",applied="true",available="false"} 612
@@ -310,6 +335,7 @@ hyperfleet_adapter_status_reports_total{component="adapter-validation",version="
 ```
 
 **Usage**:
+
 - Track status reporting success rate
 - Monitor condition distribution
 - Identify reporting failures
@@ -324,11 +350,13 @@ hyperfleet_adapter_status_reports_total{component="adapter-validation",version="
 **Purpose**: Total number of errors encountered by the adapter
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `error_type` - Error category: `api_error`, `k8s_error`, `config_error`, `precondition_error`, `processing_error`
 - `error_component` - Internal component where error occurred: `event_processor`, `precondition_evaluator`, `resource_manager`, `status_reporter`
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_errors_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",error_type="api_error",error_component="precondition_evaluator"} 12
 hyperfleet_adapter_errors_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",error_type="k8s_error",error_component="resource_manager"} 5
@@ -336,6 +364,7 @@ hyperfleet_adapter_errors_total{component="adapter-validation",version="v1.0.0",
 ```
 
 **Usage**:
+
 - Track overall error rates
 - Identify error patterns
 - Monitor adapter health
@@ -350,11 +379,13 @@ hyperfleet_adapter_errors_total{component="adapter-validation",version="v1.0.0",
 **Purpose**: Total number of workload status checks performed
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 - `workload_type` - Type of workload: `Job`, `Deployment`, `StatefulSet`
 - `status` - Workload status: `running`, `succeeded`, `failed`, `unknown`
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_workload_status_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",workload_type="Job",status="running"} 412
 hyperfleet_adapter_workload_status_total{component="adapter-validation",version="v1.0.0",adapter_name="validation",workload_type="Job",status="succeeded"} 834
@@ -362,6 +393,7 @@ hyperfleet_adapter_workload_status_total{component="adapter-validation",version=
 ```
 
 **Usage**:
+
 - Track workload success/failure rates
 - Monitor workload execution patterns
 - Identify workload issues
@@ -374,14 +406,17 @@ hyperfleet_adapter_workload_status_total{component="adapter-validation",version=
 **Purpose**: Unix timestamp of the last successfully processed event. Used as a "Dead Man's Switch" to detect if the adapter has silently stopped processing events.
 
 **Labels**:
+
 - `adapter_name` - Name of the adapter
 
 **Example**:
+
 ```prometheus
 hyperfleet_adapter_last_processed_timestamp_seconds{component="adapter-validation",version="v1.0.0",adapter_name="validation"} 1698057600
 ```
 
 **Usage**:
+
 - Detect broken broker connections
 - Identify "zombie" adapters that are running but not processing
 - Alert if timestamp is too old (e.g., > 5 minutes)
@@ -393,6 +428,7 @@ hyperfleet_adapter_last_processed_timestamp_seconds{component="adapter-validatio
 ### 1. Metric Naming Convention
 
 Follow Prometheus naming best practices and HyperFleet standards:
+
 - Use `hyperfleet_adapter_` prefix for all adapter metrics (see [Metrics Standard](../../../standards/metrics.md))
 - Use snake_case for metric names
 - Use descriptive names that indicate what is being measured
@@ -401,18 +437,21 @@ Follow Prometheus naming best practices and HyperFleet standards:
 ### 2. Label Best Practices
 
 **DO**:
+
 - Use labels for dimensions that need to be filtered/aggregated
 - Keep label cardinality low (avoid unique IDs like cluster IDs)
 - Use consistent label names across metrics
 - Sanitize endpoint paths (replace IDs with `{id}`, `{name}`, etc.)
 
 **DON'T**:
+
 - Don't use high-cardinality labels (e.g., timestamp, user ID, cluster ID)
 - Don't include sensitive information in labels
 - Don't use labels for data that changes frequently
 
 **Example of Sanitized Endpoints**:
-```
+
+```text
 ✅ Good: /clusters/{id}
 ❌ Bad:  /clusters/cls-abc123
 
@@ -457,16 +496,19 @@ func (a *Adapter) ProcessEvent(event CloudEvent) error {
 ### 4. Histogram Bucket Configuration
 
 **Event Processing Duration**:
+
 - Buckets: `0.1, 0.5, 1, 2, 5, 10, 30, 60, 120` seconds
 - Rationale: Events can range from quick skips (< 1s) to long workload monitoring (> 60s)
 
 **API Request Duration**:
+
 - Buckets: `0.01, 0.05, 0.1, 0.5, 1, 2, 5` seconds
 - Rationale: API calls should be fast, most completing in < 1s
 
 ### 5. Metric Export
 
 **Prometheus Format**:
+
 ```prometheus
 # HELP hyperfleet_adapter_events_processed_total Total number of CloudEvents processed by the adapter
 # TYPE hyperfleet_adapter_events_processed_total counter
@@ -488,10 +530,12 @@ hyperfleet_adapter_event_processing_duration_seconds_count{component="adapter-va
 ### Health and Metrics Endpoints
 
 **Health Endpoints** (Port `8080`):
+
 - `GET /healthz` - Liveness probe, returns `200 OK` if adapter is alive
 - `GET /readyz` - Readiness probe, returns `200 OK` if adapter is ready to serve traffic
 
 **Metrics Endpoint** (Port `9090`):
+
 - `GET /metrics` - Returns Prometheus-formatted metrics
 
 ### Example Service Configuration
@@ -767,4 +811,3 @@ For each adapter, ensure:
 - [OpenMetrics Specification](https://github.com/OpenObservability/OpenMetrics) - Metrics format specification
 
 ---
-

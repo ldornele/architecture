@@ -241,7 +241,7 @@ Here is a detailed comparison among different alternatives:
 
   Type Style:
 
-```
+```go
   type Cluster struct {
       CreatedTime time.Time `json:"created_time"`
       Name string `json:"name" validate:"regexp=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"`
@@ -276,7 +276,7 @@ Here is a detailed comparison among different alternatives:
 
   Type Style:
 
-```
+```go
   type Cluster struct {
       ID          OptString     `json:"id"`           // Optional type wrapper
       Kind        string        `json:"kind"`
@@ -319,7 +319,7 @@ Here is a detailed comparison among different alternatives:
 
   Type Style:
 
-```
+```go
   type Cluster struct {
       // Preserves allOf composition!
       ClusterBase `yaml:",inline"`

@@ -30,6 +30,7 @@ Last Updated: 2026-05-25
 **Requirements**: Partners need to expose provider-specific conditions (e.g., ROSA control plane readiness, GCP quota status) and cross-adapter aggregations (e.g., cluster health from multiple adapters) in the public API. All adapter conditions are available as input; CEL expressions filter and transform to create resource conditions. See [HYPERFLEET-907](https://redhat.atlassian.net/browse/HYPERFLEET-907) for detailed requirements from GCP and ROSA adapter teams.
 
 **Related Documentation:**
+
 - **Current Status Aggregation**: [ADR-0008 — Dynamic Status Aggregation](../../adrs/0008-dynamic-status-aggregation.md) — aggregation computed on write path; [ADR-0007 — Conditions-Based Status Model](../../adrs/0007-conditions-based-status-model.md) — ResourceCondition and AdapterCondition contracts; [Status Guide](../../docs/status-guide.md) — condition reporting and validation rules
 - [API Service Design](./api-service.md) — API architecture and service layer patterns
 - [Sentinel Message Decision Config](../sentinel/sentinel.md) — Existing CEL usage in Sentinel
@@ -74,7 +75,6 @@ flowchart TD
     N --> O[Return 200 OK]
 ```
 
-
 ### Mapping Execution Flow
 
 Condition mapping runs **during the existing PUT /statuses flow** — no new endpoints or components.
@@ -114,6 +114,7 @@ sequenceDiagram
 ```
 
 **Key Points**:
+
 - Mapping happens **on every PUT /statuses** (during existing aggregation flow)
 - Unknown conditions automatically filtered out (only True/False mapped)
 - Atomic transaction: adapter status + mapped conditions committed together
@@ -191,6 +192,7 @@ Each rule executes **once per PUT /statuses request**, producing **at most one r
 **Output Type**: The `type` field of the generated resource condition is derived from the **map key**. For example, a rule with key `ROSAControlPlaneReady` produces a condition with `type: "ROSAControlPlaneReady"`.
 
 **Generated Fields**: Rules specify three output fields via `output.status.expression`, `output.reason.expression`, and `output.message.expression`. Three additional fields are **automatically generated** by the API:
+
 - `type` — set to the map key (e.g., `ROSAControlPlaneReady`)
 - `observed_generation` — set to `resourceGeneration` (current resource generation)
 - `last_transition_time` — set to current server timestamp when the condition is first created. On subsequent updates, only updated if `status` changes (matches Kubernetes condition semantics)
@@ -208,6 +210,7 @@ Each rule executes **once per PUT /statuses request**, producing **at most one r
 All rule CEL expressions have access to the same context:
 
 **Variables Available**:
+
 - `statuses` — array of all adapter statuses for a resource. Each status includes:
   - `adapter` (string, e.g., `"rosa-adapter"`)
   - `type` (string)
@@ -281,11 +284,13 @@ Condition mapping processes operator-controlled configuration and exposes adapte
 **Compile-Time Checks**: All CEL expressions are **compiled at API server startup** (fail-fast). Invalid syntax, undefined variables, or type mismatches prevent the server from starting.
 
 **Complexity Limits** (CEL library defaults):
+
 - **AST Node Limit**: Maximum **1000 AST nodes** — prevents excessively large expressions
 - **Expression Depth**: Maximum **32 levels of nesting** — prevents stack exhaustion
 - **String Length**: Maximum **100KB per string literal** — prevents memory exhaustion
 
 **Runtime Safeguards**:
+
 - **Memory Limit**: Maximum **10MB allocation per expression** (CEL library enforced)
 - **Recursion Limit**: CEL disallows recursive function calls — prevents stack overflow
 - **Sandboxing**: CEL runtime cannot execute arbitrary code, access filesystem/network, or modify global state
@@ -295,12 +300,14 @@ Condition mapping processes operator-controlled configuration and exposes adapte
 **Data Field Exposure**: The `data` field (adapter-specific JSONB) is exposed to CEL expressions to provide maximum flexibility for partners. This field may contain sensitive information (API tokens, internal IPs, credentials, internal resource IDs).
 
 **Operator Responsibility**: Operators configuring mapping rules are **solely responsible** for ensuring that sensitive data from the `data` field is not exposed to external consumers via mapped conditions. This includes:
+
 - **Testing in non-production environments** — validate mapping rules do not leak sensitive data before deploying to production
 - **Reviewing adapter `data` schemas** — understand what data adapters store in the `data` field
 - **Auditing mapped conditions** — verify mapped conditions only expose customer-visible status, not internal implementation details
 - **Using CEL filtering** — use CEL expressions to selectively extract non-sensitive fields from `data` (e.g., `statuses.filter(...)[0].?data.?publicField.orValue("")` instead of exposing the entire `data` object)
 
 **Adapter Responsibility**: Adapters MUST follow the [Error Model Standard](../../standards/error-model.md) when populating `type`, `reason`, and `message` fields. These fields are exposed to external consumers via mapped conditions and MUST NOT contain:
+
 - Internal service URLs or IP addresses
 - Stack traces or debug information
 - Sensitive configuration values (tokens, credentials, internal resource IDs)
@@ -325,6 +332,7 @@ Condition mapping processes operator-controlled configuration and exposes adapte
 ### Example 1: Copy Single Adapter Condition with Transformation
 
 **Config:**
+
 ```yaml
 ROSAControlPlaneReady:  # Map key is the output condition type
   when:
@@ -339,11 +347,13 @@ ROSAControlPlaneReady:  # Map key is the output condition type
 ```
 
 **Input** (adapter condition from rosa-adapter):
+
 ```json
 {"adapter": "rosa-adapter", "type": "ControlPlaneReady", "status": "True", "reason": "Operational", "message": "Control plane is operational", "observed_generation": 5, "last_transition_time": "2026-05-19T10:30:00Z"}
 ```
 
 **Output** (resource condition - observed_generation and last_transition_time auto-generated):
+
 ```json
 {"type": "ROSAControlPlaneReady", "status": "True", "reason": "Operational", "message": "ROSA: Control plane is operational", "observed_generation": 5, "last_transition_time": "2026-05-19T10:32:00Z"}
 ```
@@ -351,6 +361,7 @@ ROSAControlPlaneReady:  # Map key is the output condition type
 ### Example 2: Cross-Adapter Aggregation
 
 **Config:**
+
 ```yaml
 ClusterHealthy:  # Map key is the output condition type
   when:
@@ -367,6 +378,7 @@ ClusterHealthy:  # Map key is the output condition type
 ```
 
 **Input** (conditions from rosa-adapter and gcp-adapter):
+
 ```json
 [
   {"adapter": "rosa-adapter", "type": "ControlPlaneReady", "status": "True", "reason": "Operational", "message": "Control plane is operational", "observed_generation": 5, "last_transition_time": "2026-05-19T10:30:00Z"},
@@ -375,6 +387,7 @@ ClusterHealthy:  # Map key is the output condition type
 ```
 
 **Output** (cross-adapter aggregated condition - observed_generation and last_transition_time auto-generated):
+
 ```json
 {"type": "ClusterHealthy", "status": "False", "reason": "Degraded", "message": "Cluster health based on ROSA control plane and GCP quota", "observed_generation": 5, "last_transition_time": "2026-05-19T10:32:00Z"}
 ```
@@ -382,6 +395,7 @@ ClusterHealthy:  # Map key is the output condition type
 ### Example 3: Using `data` Field Safely
 
 **Config:**
+
 ```yaml
 GCPQuotaDetails:  # Map key is the output condition type
   when:
@@ -396,11 +410,13 @@ GCPQuotaDetails:  # Map key is the output condition type
 ```
 
 **Input** (adapter condition from gcp-adapter with `data` field):
+
 ```json
 {"adapter": "gcp-adapter", "type": "QuotaAvailable", "status": "True", "reason": "Available", "message": "Quota is available", "observed_generation": 5, "last_transition_time": "2026-05-19T10:30:00Z", "data": {"quotaRemaining": 25, "internalProjectId": "secret-12345"}}
 ```
 
 **Output** (resource condition - only non-sensitive field extracted from `data`):
+
 ```json
 {"type": "GCPQuotaDetails", "status": "True", "reason": "SufficientQuota", "message": "GCP quota remaining: 25", "observed_generation": 5, "last_transition_time": "2026-05-19T10:32:00Z"}
 ```
@@ -461,6 +477,7 @@ GCPQuotaDetails:  # Map key is the output condition type
 ### 2. Static YAML Mapping
 
 **What**: Hardcode simple condition name mappings in YAML without expressions:
+
 ```yaml
 mappings:
   rosa-adapter:

@@ -58,6 +58,7 @@ Last Updated: 2025-12-09
 This document defines the contract between HyperFleet adapters and the HyperFleet API for status reporting. Adapters use this contract to report their progress, state, and outcomes when processing cluster events.
 
 **Related Documentation:**
+
 - [Adapter Framework Design](./adapter-frame-design.md) - Framework architecture and workflow
 - `adapter-config-template-MVP.yaml` - Configuration structure
 - [Status Guide](../../../docs/status-guide.md) - Comprehensive status guide
@@ -71,6 +72,7 @@ This document defines the contract between HyperFleet adapters and the HyperFlee
 **Base URL**: `{hyperfleetApiBaseUrl}/api/hyperfleet/{hyperfleetApiVersion}/clusters/{clusterId}/statuses`
 
 **Method**:
+
 - `PUT` - Upsert ClusterStatus (create or update)
 
 ### Upsert Pattern
@@ -78,12 +80,14 @@ This document defines the contract between HyperFleet adapters and the HyperFlee
 Adapters **always use PUT** for status reporting:
 
 **API Behavior**:
+
 - The HyperFleet API handles the upsert logic server-side
 - If ClusterStatus doesn't exist: API creates it
 - If ClusterStatus exists: API updates the adapter's status within it
 - Idempotent: Same PUT multiple times = same result
 
 **Adapter Implementation**:
+
 - No need to GET first to check if status exists
 - Always PUT to the same endpoint
 - API handles create-or-update logic automatically
@@ -135,6 +139,7 @@ Always PUT the adapter status in this structure:
 ```
 
 **Notes**:
+
 - The API will upsert this adapter status (create or update based on adapter name)
 - Other adapter statuses for this cluster are preserved (not affected by this PUT)
 - API will set `created_time` and `last_report_time` automatically
@@ -179,20 +184,24 @@ Every adapter status update **MUST** include these three conditions:
 **Purpose**: Have resources been successfully applied to Kubernetes?
 
 **Meaning**:
+
 - `True` - Resources exist and are applied (created or already existed)
 - `False` - Resources not applied (preconditions not met, or resources don't exist)
 
 **Status Values**:
+
 - `True` - Resources are applied
 - `False` - Resources are not applied
 
 **Common Reasons**:
+
 - `ResourcesCreated` - Resources were created successfully
 - `ResourcesExist` - Resources already exist
 - `PreconditionsNotMet` - Preconditions failed, resources not created
 - `ResourceCreationFailed` - Failed to create resources
 
 **Example** (in request):
+
 ```json
 {
   "type": "Applied",
@@ -207,14 +216,17 @@ Every adapter status update **MUST** include these three conditions:
 **Purpose**: Has the adapter completed its work successfully?
 
 **Meaning**:
+
 - `True` - Adapter finished successfully, all requirements met, workload completed
 - `False` - Adapter failed, incomplete, or still in progress
 
 **Status Values**:
+
 - `True` - Workload completed successfully
 - `False` - Workload in progress, failed, or not started
 
 **Common Reasons**:
+
 - `JobSucceeded` - Job/workload completed successfully
 - `PostconditionsMet` - All postconditions satisfied
 - `JobRunning` - Job/workload still executing
@@ -223,6 +235,7 @@ Every adapter status update **MUST** include these three conditions:
 - `PreconditionsNotMet` - Cannot start (preconditions not met)
 
 **Example** (in request):
+
 ```json
 {
   "type": "Available",
@@ -237,14 +250,17 @@ Every adapter status update **MUST** include these three conditions:
 **Purpose**: Is the adapter healthy (no errors, no failures)?
 
 **Meaning**:
+
 - `True` - Adapter is healthy, no errors detected
 - `False` - Adapter encountered errors or failures
 
 **Status Values**:
+
 - `True` - No errors, adapter is healthy
 - `False` - Errors detected, adapter is unhealthy
 
 **Common Reasons**:
+
 - `AllChecksPass` - All health checks passed
 - `NoErrors` - No errors detected
 - `AdapterError` - Adapter encountered an internal error
@@ -252,6 +268,7 @@ Every adapter status update **MUST** include these three conditions:
 - `ResourceFailure` - Resource failures detected
 
 **Example** (in request):
+
 ```json
 {
   "type": "Health",
@@ -272,6 +289,7 @@ Based on the adapter workflow state, adapters report status using these patterns
 **When**: Preconditions fail, adapter cannot act
 
 **Request Payload**:
+
 ```json
 {
   "adapter": "dns",
@@ -305,6 +323,7 @@ Based on the adapter workflow state, adapters report status using these patterns
 **When**: Resources didn't exist, adapter created them
 
 **Request Payload**:
+
 ```json
 {
   "adapter": "validation",
@@ -338,6 +357,7 @@ Based on the adapter workflow state, adapters report status using these patterns
 **When**: Resources exist, postconditions not met yet
 
 **Request Payload**:
+
 ```json
 {
   "adapter": "validation",
@@ -371,6 +391,7 @@ Based on the adapter workflow state, adapters report status using these patterns
 **When**: Resources exist, postconditions met, workload succeeded
 
 **Request Payload**:
+
 ```json
 {
   "adapter": "validation",
@@ -404,6 +425,7 @@ Based on the adapter workflow state, adapters report status using these patterns
 **When**: Resources exist, postconditions met, but workload failed
 
 **Request Payload**:
+
 ```json
 {
   "adapter": "validation",
@@ -437,6 +459,7 @@ Based on the adapter workflow state, adapters report status using these patterns
 **When**: Adapter encountered an internal error
 
 **Request Payload**:
+
 ```json
 {
   "adapter": "validation",
@@ -478,6 +501,7 @@ The `data` field allows adapters to report structured, adapter-specific informat
 **Examples**:
 
 **Validation Adapter**:
+
 ```json
 {
   "data": {
@@ -506,6 +530,7 @@ The `data` field allows adapters to report structured, adapter-specific informat
 ```
 
 **DNS Adapter**:
+
 ```json
 {
   "data": {
@@ -529,6 +554,7 @@ The `data` field allows adapters to report structured, adapter-specific informat
 ```
 
 **Infrastructure Adapter**:
+
 ```json
 {
   "data": {
@@ -554,12 +580,14 @@ The `metadata` field allows adapters to report additional metadata:
 **Structure**: Free-form JSON object
 
 **Common Fields**:
+
 - `job_name` - Name of Kubernetes Job/workload
 - `executionTime` - Time taken to execute
 - `resourceNames` - Names of created resources
 - `generation` - Generation of resources
 
 **Example**:
+
 ```json
 {
   "metadata": {
@@ -582,15 +610,18 @@ The `metadata` field allows adapters to report additional metadata:
 The adapter framework builds status payloads from configuration in `post.parameters.build`:
 
 **Conditions** (from `post.parameters.build.conditions`):
+
 - `applied` - Expression evaluating if resources are applied
 - `available` - Expression evaluating if workload is available
 - `health` - Expression evaluating adapter health
 
 **Data** (from `post.parameters.build.data`):
+
 - Custom data expressions evaluated against tracked resources
 - May reference external resources from other namespaces
 
 **Example Configuration**:
+
 ```yaml
 post:
   parameters:
@@ -663,12 +694,14 @@ post:
 ### Required Headers
 
 **Authorization**:
-```
+
+```text
 Authorization: Bearer {hyperfleetApiToken}
 ```
 
 **Content-Type**:
-```
+
+```text
 Content-Type: application/json
 ```
 
@@ -742,6 +775,7 @@ Every status update must include Applied, Available, and Health conditions.
 ### 2. Use Meaningful Reasons
 
 Use consistent reason codes that clearly indicate the state:
+
 - `ResourcesCreated`, `ResourcesExist`, `PreconditionsNotMet`
 - `JobSucceeded`, `JobRunning`, `JobFailed`, `PostconditionsMet`
 - `AllChecksPass`, `AdapterError`, `KubernetesAPIFailure`
@@ -749,6 +783,7 @@ Use consistent reason codes that clearly indicate the state:
 ### 3. Provide Clear Messages
 
 Messages should be human-readable and provide context:
+
 - ✅ "Validation Job completed successfully after 115 seconds"
 - ❌ "Done"
 
@@ -812,4 +847,3 @@ This contract is versioned with the HyperFleet API version. Adapters must use th
 - [Kubernetes Conditions](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions) - Inspiration for condition structure
 - [Status Guide](../../../docs/status-guide.md) - Comprehensive status guide
 - [Adapter Framework Design](./adapter-frame-design.md) - Framework architecture
-

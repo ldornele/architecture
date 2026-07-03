@@ -56,7 +56,6 @@ Last Updated: 2026-06-26
   - [Internal Server Error](#internal-server-error)
 - [References](#references)
 
-
 ## Overview
 
 This document defines the standard error model and error codes for all HyperFleet components (API, Sentinel, Adapters), following [RFC 9457 - Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html).
@@ -80,6 +79,7 @@ A shared Go library implementing this standard will be available at:
 **Repository:** `github.com/openshift-hyperfleet/hyperfleet-errors` *(planned - see [HYPERFLEET-415](https://issues.redhat.com/browse/HYPERFLEET-415))*
 
 The library will provide:
+
 - `ProblemDetails` struct following RFC 9457
 - Pre-defined error constructors for each error category
 - HTTP response writer helpers

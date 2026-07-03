@@ -13,12 +13,14 @@ Last Updated: 2026-06-10
 **What**: Design the recreation workflow for resources that cannot be updated in-place (e.g., Kubernetes Jobs with immutable fields). When certain conditions change, the adapter deletes the old resource and creates a new one.
 
 **Why**: Some resources have immutable fields that cannot be patched. Without a clear recreation mechanism:
+
 - Config authors have no way to express "recreate this resource when X changes"
 - Recreation must be safe across Sentinel's ~10s retry loop (may receive same event multiple times)
 - Deletion may span multiple reconciliation loops due to finalizers or async behavior
 - Creation must never be attempted while deletion is still pending
 
 **Related Documentation:**
+
 - [Adapter Framework Design](./adapter-frame-design.md) — Core executor architecture
 - [Adapter Status Contract](./adapter-status-contract.md) — Status reporting patterns
 
@@ -54,7 +56,7 @@ When a resource is configured with `lifecycle.recreate.when`, the executor:
    - If resource is gone (404/NotFound): proceed to create the new resource
    - If resource still exists (has `deletionTimestamp` or other deletion state): return early with `Operation=Recreate, Reason="deletion pending"` — do NOT attempt creation
    - This flow is safe to retry — multiple attempts converge to the same end state
-   
+
    **Handling pending deletions**: When post-discovery still sees the resource (even with `deletionTimestamp`), we rely on Sentinel's existing retry mechanism (~10s interval) to re-trigger the adapter. This avoids introducing nested polling loops within the adapter, which would increase complexity and cost at scale. The recreation will complete on a subsequent reconciliation once the resource is fully deleted.
 
 ### Configuration Structure
@@ -213,6 +215,7 @@ post:
 **Key detection pattern**: `resources.?resourceName.?metadata.?deletionTimestamp.hasValue()` indicates the resource is pending deletion (finalizers or async deletion in progress).
 
 **After successful recreation** (new resource created, no deletionTimestamp):
+
 - `Applied=True` with `Reason="ResourceApplied"`
 - `Available` depends on postconditions (job completion, etc.)
 - Standard post-apply discovery populates `resources.?resourceName` with the new resource state
@@ -369,6 +372,7 @@ sequenceDiagram
 | Adapter metadata | Execution state | `adapter.executionStatus`, `adapter.errorMessage` |
 
 **Safe access patterns:**
+
 - **Optional chaining**: `resources.?job.hasValue()` — prevents crashes on missing resources
 - **`has()` macro**: `has(resources.job.metadata)` — checks for nested field existence
 
@@ -405,6 +409,7 @@ true
 **What the framework provides:** Declarative recreation via CEL expressions. Works identically for K8s and Maestro. Safe to retry (delete is idempotent). Explicit delete-before-recreate evaluation ordering enforced by the framework.
 
 **What config authors own:**
+
 - Test recreation flow in staging environment before production
 - Validate that stuck deletions are prevented through proper RBAC, finalizers, and cleanup logic in their domain
 

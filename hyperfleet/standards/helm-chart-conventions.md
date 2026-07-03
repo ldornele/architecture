@@ -106,7 +106,7 @@ Generated Kubernetes resource names (ConfigMaps, Services, etc.) MUST use **keba
 
 Helper templates MUST be prefixed with the chart name in kebab-case:
 
-```
+```text
 {{- define "hyperfleet-adapter.fullname" -}}
 {{- define "hyperfleet-sentinel.labels" -}}
 {{- define "hyperfleet-api.selectorLabels" -}}
@@ -291,7 +291,7 @@ When renaming or removing values.yaml keys:
 {{- end }}
 ```
 
-3. SHOULD document the migration in `Chart.yaml` description or a CHANGELOG.
+1. SHOULD document the migration in `Chart.yaml` description or a CHANGELOG.
 
 ## 10. Standard Labels and Annotations
 

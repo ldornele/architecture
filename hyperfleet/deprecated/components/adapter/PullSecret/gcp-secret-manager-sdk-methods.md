@@ -33,6 +33,7 @@ This document provides a comprehensive reference for the **Google Cloud Secret M
 ### Purpose
 
 The Pull Secret Adapter Job uses these SDK methods to:
+
 - Create secrets for OpenShift cluster image pull credentials
 - Store and version pull secret data securely
 - Verify secret accessibility and readiness
@@ -40,7 +41,7 @@ The Pull Secret Adapter Job uses these SDK methods to:
 
 ### SDK Version
 
-```
+```text
 cloud.google.com/go/secretmanager v1.11.5+
 ```
 
@@ -66,6 +67,7 @@ import (
 ### Go Module Dependencies
 
 **go.mod:**
+
 ```go
 module github.com/hyperfleet/pullsecret-job
 
@@ -96,6 +98,7 @@ func NewSecretManagerClient(ctx context.Context) (*secretmanager.Client, error) 
 ### Authentication
 
 The client uses **Workload Identity** when running in Kubernetes:
+
 - Service Account: `pullsecret-adapter-job`
 - GCP Service Account: Bound via Workload Identity
 - Required IAM Role: `roles/secretmanager.admin` or custom role with specific permissions
@@ -471,14 +474,15 @@ func listHyperfleetSecrets(ctx context.Context, client *secretmanager.Client, pr
 
 #### Filter Syntax
 
-```
+```text
 labels.managed-by=hyperfleet
 labels.adapter=pullsecret
 labels.cluster-id=cls-abc123
 ```
 
 Combine with `AND`, `OR`:
-```
+
+```text
 labels.managed-by=hyperfleet AND labels.adapter=pullsecret
 ```
 
@@ -925,6 +929,7 @@ func retryWithBackoff(ctx context.Context, fn func() error, maxRetries int) erro
 ### 2. Labels
 
 Always include these labels for tracking and management:
+
 ```go
 labels := map[string]string{
     "managed-by":         "hyperfleet",
@@ -954,6 +959,7 @@ destroySecretVersion(ctx, client, projectID, secretName, oldVersionID)
 ### 5. Cleanup
 
 Always clean up secrets when clusters are decommissioned:
+
 ```go
 // List secrets for specific cluster
 filter := fmt.Sprintf("labels.cluster-id=%s", clusterID)
@@ -963,6 +969,7 @@ filter := fmt.Sprintf("labels.cluster-id=%s", clusterID)
 ### 6. Quota Management
 
 Monitor API usage to avoid hitting quotas:
+
 - Cache `GetSecret` results
 - Use batch operations when possible
 - Implement exponential backoff for retries
@@ -988,4 +995,3 @@ Monitor API usage to avoid hitting quotas:
 ### Go SDK
 
 - **Package**: `cloud.google.com/go/secretmanager/apiv1`
-

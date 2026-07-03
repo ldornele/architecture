@@ -120,7 +120,7 @@ HyperFleet uses a **condition-based status reporting contract** where adapters r
 
 ### Resource Hierarchy
 
-```
+```text
 /v1/clusters/{clusterId}                    # Cluster resource (with aggregated status)
 /v1/clusters/{clusterId}/statuses           # Adapter statuses (paginated AdapterStatusList)
 ```
@@ -183,6 +183,7 @@ When an adapter needs to report its status, it **always PUTs**. The API handles 
 **Response**: `201 Created` with the persisted `AdapterStatus` object, or `204 No Content` if the report was silently discarded (stale generation or timestamp).
 
 **What Happens (API-side)**:
+
 1. API receives PUT with `adapter` field identifying which adapter is reporting
 2. API validates the request: mandatory conditions (Available, Applied, Health) present, `observed_time` within acceptable range
 3. API finds the existing `AdapterStatus` for this adapter (or creates one if first report)
@@ -214,6 +215,7 @@ function reportStatus(clusterId, adapterStatus) {
 ```
 
 **Why this pattern?**
+
 - **Adapter simplicity**: No GET/POST/PATCH logic needed
 - **Idempotent**: Safe to retry on failures
 - **API encapsulation**: Upsert logic is API's internal implementation detail
@@ -284,7 +286,7 @@ Adapters **always PUT** to report status. The API handles upsert internally (INS
 
 The Sentinel uses `observed_time` (stored as `last_report_time` on the API side) to calculate max age intervals for publishing reconciliation events. If adapters do not report status when they skip work (e.g., preconditions not met), the Sentinel will create an infinite event loop:
 
-```
+```text
 Time 10:00 - DNS adapter receives reconciliation event
 Time 10:00 - DNS checks preconditions: Validation adapter not complete
 Time 10:00 - DNS does NOT update status (skips work)
@@ -330,6 +332,7 @@ When an adapter evaluates a cluster but determines it should not take action (pr
 **Integration Testing Requirement**:
 
 Integration tests for adapters MUST verify:
+
 - ✅ Adapter sets `observed_time` to current time when preconditions are met and work is performed
 - ✅ Adapter sets `observed_time` to current time when preconditions are NOT met and work is skipped
 - ✅ Sentinel correctly calculates max age from adapter report timestamps
@@ -348,7 +351,8 @@ Adapters generate this status payload using declarative configuration that defin
 2. **Payload Templates** - How to construct the JSON payload with dynamic data
 3. **API Reporting Actions** - When and how to PUT to the HyperFleet API
 
-**Example configuration snippet**
+#### Example configuration snippet
+
 ```yaml
 postProcessing:
   statusEvaluation:
@@ -498,6 +502,7 @@ Per-adapter conditions (added as adapters report):
 | `last_report_time` | **YES** | timestamp | When this adapter last reported (API-managed, updated every PUT) |
 
 **Key Points**:
+
 - `GET /clusters/{id}/statuses` returns a paginated `AdapterStatusList`, not a single object
 - `ClusterStatus` is a computed sub-object on the Cluster resource (read-only). It has no `id`, `type`, or `href` of its own.
 - Each `AdapterStatus` is independent. `observed_generation` indicates which resource generation the adapter reconciled.
@@ -515,15 +520,17 @@ Every adapter status update **MUST** include these three conditions. The API ret
 
 ### 1. Available
 
-**Purpose**: Has the adapter completed its work successfully? 
+**Purpose**: Has the adapter completed its work successfully?
 
-**Important**: The adapter aggregates this value based on all its other conditions 
+**Important**: The adapter aggregates this value based on all its other conditions
 
 **Meaning**:
+
 - `True` - Adapter finished successfully, all requirements met
 - `False` - Adapter failed, incomplete, or still in progress
 
 **Examples**:
+
 ```json
 // Success
 {
@@ -555,10 +562,12 @@ Every adapter status update **MUST** include these three conditions. The API ret
 **Purpose**: Has the adapter created/applied the Kubernetes resources it needs?
 
 **Meaning**:
+
 - `True` - Resources created successfully (Job launched, ConfigMap applied, etc.)
 - `False` - Failed to create resources or not yet attempted
 
 **Examples**:
+
 ```json
 // Job Created
 {
@@ -590,12 +599,14 @@ Every adapter status update **MUST** include these three conditions. The API ret
 **Purpose**: Did anything unexpected or concerning happen?
 
 **Meaning**:
+
 - `True` - No unexpected errors, adapter is healthy
 - `False` - Unexpected error occurred (retries exhausted, resource not found, etc.)
 
 **Key Point**: Health is about **unexpected errors**, not business logic failures.
 
 **Examples**:
+
 ```json
 // Healthy (even if validation fails business logic)
 {
@@ -751,6 +762,7 @@ This example shows an adapter status payload (what gets PUT to the API and persi
 ```
 
 **Aggregation Logic**:
+
 - If any sub-condition is `False`, `Available` should be `False`
 - If all sub-conditions are `True`, `Available` should be `True`
 - Default to `False` if no other conditions exist
@@ -771,6 +783,7 @@ The `data` field is a **JSONB object** that adapters can use to send structured 
 ### Examples
 
 **Validation Adapter Data**:
+
 ```json
 {
   "data": {
@@ -799,6 +812,7 @@ The `data` field is a **JSONB object** that adapters can use to send structured 
 ```
 
 **Control plane Adapter Data**:
+
 ```json
 {
   "data": {
@@ -939,6 +953,7 @@ The `phase` field represents the overall cluster state based on adapter statuses
 > **MVP Scope**: For MVP, the system supports **Ready** and **Not Ready** phases only. Additional phases (Pending, Provisioning, Failed, Degraded) are planned for Post-MVP.
 
 #### **Ready** (MVP)
+
 - **When**: All required adapters completed successfully
 - **Condition**: All required adapters have `Available: True` for current generation
 - **Example**: All adapters finished without errors
@@ -958,6 +973,7 @@ The `phase` field represents the overall cluster state based on adapter statuses
 ```
 
 #### **Not Ready** (MVP)
+
 - **When**: One or more adapters have not completed successfully
 - **Condition**: Any required adapter has `Available: False` or hasn't reported yet
 - **Example**: Validation failed, DNS adapter still running, or adapters haven't started
@@ -980,7 +996,7 @@ The `phase` field represents the overall cluster state based on adapter statuses
 
 For MVP, the phase is determined using simple logic:
 
-```
+```text
 1. Get list of required adapters (validation, dns, controlplane, nodepool)
 2. For each adapter:
    - Check if observed_generation === cluster.generation
@@ -996,21 +1012,25 @@ For MVP, the phase is determined using simple logic:
 The following phases are planned for Post-MVP releases:
 
 #### **Pending** (Post-MVP)
+
 - **When**: Cluster created but adapters haven't started processing yet
 - **Condition**: No adapters have reported status or all are waiting for preconditions
 - **Example**: Cluster just created, validation adapter hasn't started
 
 #### **Provisioning** (Post-MVP)
+
 - **When**: One or more adapters are actively working
 - **Condition**: At least one adapter has `Applied: True` but `Available: False`
 - **Example**: Validation completed, DNS adapter running
 
 #### **Failed** (Post-MVP)
+
 - **When**: One or more required adapters failed (business logic failure)
 - **Condition**: Any required adapter has `Available: False` with `Health: True`
 - **Example**: Validation failed due to missing DNS zone
 
 #### **Degraded** (Post-MVP)
+
 - **When**: Cluster operational but has health issues
 - **Condition**: Any adapter has `Health: False` (unexpected errors)
 - **Example**: Control plane completed but monitoring adapter has connection issues
@@ -1023,7 +1043,7 @@ The following phases are planned for Post-MVP releases:
 
 For MVP, phase transitions are simple:
 
-```
+```text
 Not Ready ←→ Ready
 ```
 
@@ -1044,6 +1064,7 @@ Each adapter in the `adapter_statuses` array includes its `observed_generation` 
 ### Check If Adapter Completed
 
 To determine if an adapter has completed successfully:
+
 1. Get the cluster object: `GET /v1/clusters/{clusterId}`
 2. Look in `status.adapters` array for the adapter
 3. Check `observed_generation === cluster.generation` (not stale)
@@ -1052,6 +1073,7 @@ To determine if an adapter has completed successfully:
 ### Check Adapter Health
 
 To check adapter health, you need the detailed ClusterStatus object:
+
 1. Fetch: `GET /v1/clusters/{clusterId}/statuses?generation={generation}`
 2. Find the adapter in the `adapter_statuses` array
 3. Find the `Health` condition in that adapter's conditions
@@ -1067,7 +1089,7 @@ HyperFleet's status aggregation system uses **rule-based evaluation** to determi
 
 ### Aggregation Engine Architecture
 
-```
+```text
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Detailed      │    │   Aggregation    │    │   Aggregated    │
 │   Statuses      │───→│     Engine       │───→│    Status       │
@@ -1088,12 +1110,14 @@ HyperFleet's status aggregation system uses **rule-based evaluation** to determi
 ```
 
 **Data Flow:**
+
 1. **Source**: `GET /v1/clusters/{id}/statuses` - Complete adapter data with all conditions
 2. **Processing**: Aggregation engine extracts key fields and applies expr rules
 3. **Output**: Aggregated `status` included in `GET /v1/clusters/{id}` response
 
 **Field Mapping:**
-```
+
+```text
 /statuses                           →    cluster.status
 ─────────────────────────────────────    ────────────────────────
 adapter_statuses[].adapter           →    status.adapters[].name
@@ -1111,6 +1135,7 @@ phases[phaseName].description       →    status.phaseDescription
 The aggregation engine follows this process:
 
 #### 1. **Data Collection**
+
 ```go
 // Collect all adapter statuses for cluster
 adapter_statuses := getAdapterStatuses(clusterId, generation)
@@ -1118,6 +1143,7 @@ config := getAggregationConfig(clusterType)
 ```
 
 #### 2. **Phase Evaluation (Hardcoded Priority)**
+
 ```go
 // Phase evaluation uses hardcoded priority for robustness
 func evaluateClusterPhase(adapter_statuses []AdapterStatus, config AggregationConfig) PhaseResult {
@@ -1186,6 +1212,7 @@ func evaluatePhaseCondition(phaseName string, adapter_statuses []AdapterStatus, 
 ```
 
 **Why Hardcoded Priority is More Robust:**
+
 - **Consistent behavior** across all environments and configurations
 - **Prevents misconfiguration** that could hide critical states (e.g., degraded)
 - **Business logic enforced** - health issues always visible regardless of config
@@ -1193,6 +1220,7 @@ func evaluatePhaseCondition(phaseName string, adapter_statuses []AdapterStatus, 
 - **Predictable outcomes** - phase transitions follow fixed, well-understood rules
 
 #### 3. **Condition Generation**
+
 ```go
 // Generate cluster conditions based on expr evaluation
 for _, conditionRule := range config.ClusterConditions {
@@ -1284,6 +1312,7 @@ spec:
 ```
 
 **Example Evaluation:**
+
 ```yaml
 # Step 1: Evaluate expr expression
 expr: 'all(requiredAdapters, {.available == "True"})'
@@ -1342,6 +1371,7 @@ spec:
 ```
 
 Apply the updated configuration:
+
 ```bash
 kubectl apply -f aggregation-config.yaml
 ```
@@ -1365,6 +1395,7 @@ The aggregation service will automatically reload and start evaluating the new c
 ```
 
 **Result:** The aggregation engine automatically:
+
 1. Evaluates the expr expression against current adapter statuses
 2. Uses the static reason/message from templates
 3. Includes it in cluster conditions array
@@ -1372,6 +1403,7 @@ The aggregation service will automatically reload and start evaluating the new c
 **No Go code changes required!** The power of expr allows you to express any evaluation logic directly in configuration.
 
 #### 4. **Adapter Status Extraction**
+
 ```go
 // Extract adapter summaries for cluster.status field from detailed /statuses data
 func extractAdapterSummaries(detailedStatus ClusterStatus) []AdapterSummary {
@@ -1402,16 +1434,19 @@ func extractAdapterSummaries(detailedStatus ClusterStatus) []AdapterSummary {
 ```
 
 **Field Extraction Rules:**
+
 - **`name`** - Direct copy from `adapterStatus.adapter`
 - **`available`** - Extracted from `conditions[type="Available"].status`
 - **`observed_generation`** - Direct copy from `adapterStatus.observed_generation`
 
 **Purpose:** The `cluster.status` field provides a **lightweight projection** of the detailed `/statuses` data, extracting only the essential fields needed for:
+
 - Quick phase calculation
 - High-level status overview
 - Polling and dashboard displays
 
 **Performance Benefits:**
+
 - Avoids parsing full condition arrays for basic status checks
 - Enables fast aggregation logic without condition iteration
 - Reduces payload size by including only essential adapter summary
@@ -1419,6 +1454,7 @@ func extractAdapterSummaries(detailedStatus ClusterStatus) []AdapterSummary {
 **Example Extraction:**
 
 **Step 1: Source Data** - GET `/v1/clusters/{id}/statuses`:
+
 ```json
 {
   "adapter_statuses": [
@@ -1436,6 +1472,7 @@ func extractAdapterSummaries(detailedStatus ClusterStatus) []AdapterSummary {
 ```
 
 **Step 2: Aggregation Config** - AggregationConfig Custom Resource:
+
 ```yaml
 apiVersion: hyperfleet.io/v1alpha1
 kind: AggregationConfig
@@ -1449,6 +1486,7 @@ spec:
 ```
 
 **Step 3: Result** - `cluster.status` field in GET `/v1/clusters/{id}`:
+
 ```json
 {
   "phase": "Ready",
@@ -1464,6 +1502,7 @@ spec:
 ```
 
 **Extraction Logic**:
+
 - `phase` → Calculated from adapter statuses using expr
 - `phaseDescription` → From aggregation config
 - `adapters[].name` → `adapter`
@@ -1511,31 +1550,37 @@ type AdapterStatus struct {
 #### Common Expression Patterns
 
 **Check all required adapters are ready:**
+
 ```yaml
 expr: 'all(requiredAdapters, {.available == "True"})'
 ```
 
 **Check if any adapter is unhealthy:**
+
 ```yaml
 expr: 'any(allAdapters, {.health == "False"})'
 ```
 
 **Check specific adapter status:**
+
 ```yaml
 expr: 'adapters["validation"].available == "True"'
 ```
 
 **Check multiple conditions:**
+
 ```yaml
 expr: 'all(requiredAdapters, {.available == "True" && .health == "True"})'
 ```
 
 **Check with generation:**
+
 ```yaml
 expr: 'all(requiredAdapters, {.observed_generation == currentGeneration})'
 ```
 
 **Complex logic:**
+
 ```yaml
 # At least 3 adapters ready
 expr: 'len(filter(requiredAdapters, {.available == "True"})) >= 3'
@@ -1557,7 +1602,7 @@ Commonly used expr functions:
 - **len(array)** - Returns array length
 - **map(array, predicate)** - Returns transformed array
 
-For complete expr documentation, see https://expr-lang.org/docs/language-definition
+For complete expr documentation, see <https://expr-lang.org/docs/language-definition>
 
 ### Generation Handling
 
@@ -1577,6 +1622,7 @@ clusterConditions:
 ```
 
 **Common Generation Checks**:
+
 - `{.observed_generation == currentGeneration}` - Adapter has reconciled current generation
 - `{.observed_generation < currentGeneration}` - Adapter is behind (stale)
 - `{.observed_generation > currentGeneration}` - Should not happen (error condition)
@@ -1679,6 +1725,7 @@ func evaluateExprCondition(adapter_statuses []AdapterStatus, config AggregationC
 ### Advanced Expression Examples
 
 **Percentage-based checks:**
+
 ```yaml
 # At least 75% of adapters ready
 clusterConditions:
@@ -1688,6 +1735,7 @@ clusterConditions:
 ```
 
 **Fallback logic:**
+
 ```yaml
 # Primary adapter OR backup adapter ready
 clusterConditions:
@@ -1697,6 +1745,7 @@ clusterConditions:
 ```
 
 **Multi-step validation:**
+
 ```yaml
 # Validation AND (DNS OR Control plane) ready
 clusterConditions:
@@ -1706,6 +1755,7 @@ clusterConditions:
 ```
 
 **Stale adapter detection:**
+
 ```yaml
 # Check if any adapter hasn't updated in 10 minutes
 clusterConditions:
@@ -1716,6 +1766,7 @@ clusterConditions:
 ```
 
 **Counting specific states:**
+
 ```yaml
 # Exactly 2 adapters in provisioning state
 clusterConditions:
@@ -1729,6 +1780,7 @@ clusterConditions:
 The aggregation engine handles various error scenarios:
 
 #### Missing Adapter Status
+
 ```yaml
 # When required adapter hasn't reported yet
 defaultBehavior:
@@ -1737,12 +1789,12 @@ defaultBehavior:
 ```
 
 #### Stale Status Detection
+
 ```yaml
 policies:
   staleThreshold: "10m"        # Consider status stale after 10 minutes
   staleAction: "degraded"      # Move to degraded if stale
 ```
-
 
 ---
 
@@ -1791,6 +1843,7 @@ The following examples show **individual adapter status payloads** that adapters
 ```
 
 **What This Means**:
+
 - Job created successfully (Applied: True)
 - Job is running (Available: False - not yet complete)
 - No errors (Health: True)
@@ -1847,6 +1900,7 @@ The following examples show **individual adapter status payloads** that adapters
 ```
 
 **What This Means**:
+
 - Job created (Applied: True)
 - Job succeeded (Available: True)
 - No errors (Health: True)
@@ -1902,6 +1956,7 @@ The following examples show **individual adapter status payloads** that adapters
 ```
 
 **What This Means**:
+
 - Job created (Applied: True)
 - Validation failed (Available: False)
 - Adapter is healthy (Health: True) - **validation failure is expected behavior**
@@ -1952,6 +2007,7 @@ The following examples show **individual adapter status payloads** that adapters
 ```
 
 **What This Means**:
+
 - Job NOT created (Applied: False)
 - Work incomplete (Available: False)
 - Adapter unhealthy (Health: False) - **unexpected error prevented normal operation**
@@ -2077,6 +2133,7 @@ Here's what a complete ClusterStatus object looks like with multiple adapters at
 ```
 
 **What This Shows**:
+
 - **validation**: Completed successfully
 - **dns**: Currently running
 - **controlplane**: Waiting for preconditions (dns completion)
@@ -2510,6 +2567,7 @@ This section demonstrates how cluster phases and conditions evolve throughout th
 These examples show how specific cluster conditions are generated based on adapter statuses:
 
 #### AllAdaptersReady Condition
+
 ```yaml
 # Generated when all required adapters have Available: True
 {
@@ -2522,6 +2580,7 @@ These examples show how specific cluster conditions are generated based on adapt
 ```
 
 #### ValidationPassed Condition
+
 ```yaml
 # Generated based on validation adapter status
 {
@@ -2534,6 +2593,7 @@ These examples show how specific cluster conditions are generated based on adapt
 ```
 
 #### ProvisioningInProgress Condition
+
 ```yaml
 # Generated when adapters are actively working
 {
@@ -2552,6 +2612,7 @@ These examples show how specific cluster conditions are generated based on adapt
 ### 1. Wait for Specific Adapter
 
 To poll until an adapter completes:
+
 1. Fetch adapter statuses: `GET /v1/clusters/{clusterId}/statuses`
 2. Find the adapter by `adapter` name in the `items` array
 3. If not found, the adapter has not reported yet. Continue polling.
@@ -2566,6 +2627,7 @@ To poll until an adapter completes:
 ### 2. Check If Cluster is Reconciled
 
 To verify cluster is fully provisioned:
+
 1. Fetch cluster: `GET /v1/clusters/{clusterId}`
 2. Check the `Reconciled` condition in `status.conditions`:
    - `status: "True"` → all required adapters report `Available=True` at the current generation
@@ -2575,6 +2637,7 @@ To verify cluster is fully provisioned:
 ### 3. Get Failed Adapters
 
 To identify which adapters have failed:
+
 1. Fetch cluster: `GET /v1/clusters/{clusterId}`
 2. Check per-adapter conditions in `status.conditions`:
    - `{AdapterName}Successful: "False"` → that adapter has a problem
@@ -2587,6 +2650,7 @@ To identify which adapters have failed:
 ### 4. Display Adapter Progress
 
 To show progress UI:
+
 1. Fetch adapter statuses: `GET /v1/clusters/{clusterId}/statuses`
 2. For each adapter in `items`:
    - Check conditions:
@@ -2599,7 +2663,8 @@ To show progress UI:
 4. Display adapter name, status icon, generation, and message from conditions
 
 **Example Output**:
-```
+
+```text
 validation - completed (gen 1)
    Job completed successfully after 115 seconds
 dns - completed (gen 1)
@@ -2625,6 +2690,7 @@ nodepool - pending (gen 0)
 ### Common Reason Values
 
 **Available**:
+
 - `JobSucceeded` - Job completed successfully
 - `JobFailed` - Job failed
 - `JobRunning` - Job still executing
@@ -2632,11 +2698,13 @@ nodepool - pending (gen 0)
 - `ValidationFailed` - Validation checks failed
 
 **Applied**:
+
 - `JobLaunched` - Job created successfully
 - `ResourceCreationFailed` - Failed to create resource
 - `ResourceQuotaExceeded` - Quota limit reached
 
 **Health**:
+
 - `NoErrors` - Adapter is healthy
 - `AllChecksPassed` - All health checks passed
 - `UnexpectedError` - Unexpected error occurred
@@ -2650,6 +2718,7 @@ nodepool - pending (gen 0)
 ### DO
 
 1. **Always include all three required conditions**
+
    ```json
    {
      "conditions": [
@@ -2669,6 +2738,7 @@ nodepool - pending (gen 0)
    - If all sub-conditions are `True`, set `Available` to `True`
 
 4. **Provide actionable messages**
+
    ```json
    {
      "message": "Route53 zone not found for domain example.com. Create a public hosted zone before provisioning cluster."
@@ -2676,6 +2746,7 @@ nodepool - pending (gen 0)
    ```
 
 5. **Use data field for structured information**
+
    ```json
    {
      "data": {
@@ -2687,6 +2758,7 @@ nodepool - pending (gen 0)
 ### DON'T
 
 1. **Don't omit required conditions**
+
    ```json
    // BAD: Missing Health condition
    {
@@ -2698,6 +2770,7 @@ nodepool - pending (gen 0)
    ```
 
 2. **Don't use negative condition names**
+
    ```json
    // BAD
    {"type": "ValidationFailed", "status": "True"}
@@ -2707,6 +2780,7 @@ nodepool - pending (gen 0)
    ```
 
 3. **Don't set Health: False for business logic failures**
+
    ```json
    // BAD: Validation failure is expected behavior
    {
@@ -2869,6 +2943,7 @@ data:
 ```
 
 This broker-agnostic approach allows the same adapter configuration to work with:
+
 - Google Cloud Pub/Sub
 - AWS SNS/SQS
 - RabbitMQ
@@ -2905,12 +2980,14 @@ For a complete example of an adapter configuration that implements this status c
 ### Architecture Overview
 
 **Adapter Statuses** (detailed, per-adapter):
+
 - Adapters always PUT: `PUT /v1/clusters/{clusterId}/statuses` with `adapter`, `observed_generation`, `observed_time`, and required conditions in payload
 - API handles upsert internally: INSERT on first report, UPDATE on subsequent reports
 - Each `AdapterStatus` contains conditions, data, and metadata for one adapter
 - Retrieved as a paginated list via `GET /v1/clusters/{clusterId}/statuses`
 
 **Cluster Object** (complete resource):
+
 - Contains `id`, `name`, `generation`, `spec`, and lifecycle fields
 - Contains `status` field with aggregated `ClusterStatus`:
   - `conditions`: Array of `ResourceCondition` entries computed by the API
@@ -2932,7 +3009,8 @@ Understanding when and how timestamps are set is critical for Sentinel's max age
 **Why use `min(adapters[].last_updated_time)` for cluster status?**
 
 Example scenario:
-```
+
+```yaml
 status:
   adapters:
     validation:

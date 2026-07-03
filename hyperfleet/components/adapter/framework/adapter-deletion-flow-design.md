@@ -25,12 +25,14 @@ Last Updated: 2026-04-12
 **What**: Design the deletion workflow for resources and subresources, defining how the adapter framework handles resource cleanup when an API resource is marked for deletion (`deleted_time` set).
 
 **Why**: The adapter framework currently supports resource creation but has no mechanism for resource cleanup during deletion. Without a clear deletion flow:
+
 - Adapters don't know when to clean up Kubernetes resources they created
 - Resources could remain orphaned after a resource is deleted from the API
 - No way to track deletion progress or coordinate cleanup across multiple adapters
 - The API cannot safely delete records without confirmation that cleanup is complete
 
 **Related Documentation:**
+
 - [Adapter Framework Design](./adapter-frame-design.md) - Current framework architecture
 - [Adapter Status Contract](./adapter-status-contract.md) - Status reporting patterns
 - [Adapter Flow Diagrams](./adapter-flow-diagrams.md) - Current event flow
@@ -84,6 +86,7 @@ On `DELETE /resources/{id}`, the API sets `deleted_time` on the resource **and a
 #### Step 2: Hard Delete (Hierarchical)
 
 The API hard-deletes records bottom-up:
+
 - **Subresource records**: deleted when `deleted_time` is set and subresource `Reconciled=True`
 - **Resource record**: deleted when `deleted_time` is set, resource `Reconciled=True`, and all subresource records are already gone
 
@@ -160,6 +163,7 @@ capture:
 ```
 
 **Evaluation order in the executor:**
+
 1. Parameter extraction
 2. Preconditions (API calls, captures, `when` evaluation)
 3. Resources phase — for each resource:
@@ -230,7 +234,7 @@ The `when.expression` is evaluated each reconciliation loop. Once a resource is 
 
 The existing 4-phase executor flow remains unchanged:
 
-```
+```text
 Parameter Extraction -> Preconditions -> Resources -> Post-Processing
 ```
 
@@ -286,7 +290,7 @@ flowchart TD
 
 The API increments `generation` on delete. The adapter reports `observed_generation` equal to the current API `generation` — same as during creation/update. Deletion is just another reconciliation of the resource's desired state.
 
-```
+```text
 Before deletion:  resource.generation = 5, adapter.observed_generation = 5
 After DELETE:     resource.generation = 6, adapter.observed_generation = 6
 ```
@@ -616,6 +620,7 @@ Subresources are cleaned up before the resource (hierarchical hard-delete). See 
 Deletion introduces new observable states that should be tracked alongside existing adapter metrics (see [Adapter Metrics](./adapter-metrics.md)).
 
 Key areas to instrument:
+
 - **Adapter-level**: deletion operation counts, duration, and in-progress gauges
 - **API-level**: resources in Finalizing state, time from `deleted_time` to hard delete, stuck deletion gauges
 
@@ -777,6 +782,7 @@ Not required. Each adapter only cleans up its own resources. Unlike creation (wh
 ## Trade-offs
 
 ### What We Gain
+
 - Adapters can clean up Kubernetes resources when API resources are deleted
 - API can safely delete records when objects marked for deletion reach `Reconciled=True`
 - Deletion ordering prevents dependency violations (e.g., Job deleted before ServiceAccount)
@@ -787,6 +793,7 @@ Not required. Each adapter only cleans up its own resources. Unlike creation (wh
 - Edge cases addressed: stale status disambiguation, resource-not-found handling, concurrent event idempotency, stuck deletion timeout
 
 ### What We Lose / What Gets Harder
+
 - Resources phase executor becomes more complex (per-resource lifecycle evaluation)
 - Post-processing CEL expressions become more complex (must handle both creation and deletion states via `is_deleting`)
 - `lifecycle.delete.when` expressions are evaluated each reconciliation loop to determine deletion readiness
@@ -802,6 +809,7 @@ Not required. Each adapter only cleans up its own resources. Unlike creation (wh
 **What**: Deploy a dedicated deletion adapter per adapter type. Both creation and deletion adapters subscribe to the same broker topic via separate subscriptions, each using preconditions to filter by `deleted_time` presence.
 
 **Why Not Chosen**:
+
 - Both approaches require framework changes — the executor doesn't support deletion today either way
 - Doubles operational overhead: every adapter type needs a paired deletion adapter (5 types → 10 deployments)
 - Config drift risk: resource names, labels, and discovery rules must be kept in sync across two configs; a rename in the creation adapter that isn't mirrored in the deletion adapter means cleanup fails silently
@@ -850,6 +858,7 @@ The following field must be added to the adapter framework's `AdapterTaskConfig`
 | `lifecycle.delete` | Per resource | `struct { PropagationPolicy string; When string }` | Deletion behavior: CEL expression for when to delete and Kubernetes propagation policy |
 
 The field is optional with backward-compatible defaults:
+
 - `lifecycle` not set → apply-only behavior (existing adapters unchanged)
 - `lifecycle.delete.when.expression` → **required** when `lifecycle.delete` is configured; the adapter validator rejects configs where it is absent
 - `lifecycle.delete.propagationPolicy` not set → defaults to `Background`
@@ -857,6 +866,7 @@ The field is optional with backward-compatible defaults:
 ### Status Contract Change
 
 The `Finalized` condition is a **new required field** in adapter status reports. This is a contract change:
+
 - All adapters must include `Finalized` in their status conditions
 - When not deleting: `Finalized=False` reason/message is meaningless, you can send empty message or `"NotDeleting"`
 - When deleting: `Finalized=True` after cleanup confirmed, `Finalized=False` while in progress or unhealthy
@@ -866,6 +876,7 @@ The `Finalized` condition is a **new required field** in adapter status reports.
 ### API Changes Required
 
 The `DELETE /resources/{id}` endpoint must be implemented (currently returns `NotImplemented`). Required changes:
+
 1. Pending deletion handler: set `deleted_time`, cascade to subresources, increment `generation`
 2. `Reconciled` status aggregation: compute `Reconciled` from adapter `Finalized` signals when `deleted_time` is set (distinct from normal `Reconciled` which aggregates `Available`)
 3. Hard-delete signal: trigger hard-delete when deletion `Reconciled=True` (all adapters report `Finalized=True`)

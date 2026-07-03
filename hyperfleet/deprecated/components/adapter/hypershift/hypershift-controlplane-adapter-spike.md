@@ -6,7 +6,6 @@ Last Updated: 2026-01-27
 
 # SPIKE REPORT: Define HyperShift Control Plane Adapter Criteria and Implementation Plan for GCP
 
-
 ## 1. Overview
 
 > Spike report exploring the GCP HyperShift control plane adapter implementation. Deprecated — this GCP-specific HyperShift integration approach was superseded by the current adapter framework. See the `adapter/framework/` directory for the active adapter design.
@@ -23,7 +22,7 @@ config-driven adapter framework and integrates with HyperShift's GCP platform su
 - **GCP Platform**: Uses HyperShift's GCPPlatformSpec (Tech Preview since v0.1.49, requires TechPreviewNoUpgrade feature
   set)
 - **Workload Identity Federation**: GCP HostedClusters require WIF configuration (pools, providers, service accounts)
-    - **Note:** This refers to WIF for the **HostedCluster CR** (worker node authentication to GCP). For WIF enabling *
+  - **Note:** This refers to WIF for the **HostedCluster CR** (worker node authentication to GCP). For WIF enabling *
       *CLM adapters** to access customer GCP resources, see [WIF Spike](../../../../docs/wif-spike.md). These are two
       separate WIF configurations.
 - **Network Configuration**: Requires VPC network and Private Service Connect subnet
@@ -697,7 +696,7 @@ Applied/Available/Health semantics - it just copies the conditions array from JS
 
 **Flow Summary**:
 
-```
+```text
 Sentinel Pulse → Framework checks: Does Job exist?
                    ↓
                  NO: Create new Job (no report yet)
@@ -1009,70 +1008,70 @@ are stuck for > 30 minutes, reports `Health=False` with remediation guidance.
 
 Based on this spike's findings, the following implementation stories should be created:
 
-**HYPERFLEET-XXX: Create HyperShift Control Plane Adapter Configuration**
+#### HYPERFLEET-XXX: Create HyperShift Control Plane Adapter Configuration
 
 - **Deliverable**: `hypershift-controlplane-adapter-config.yaml` with preconditions, HostedCluster template, and
   post-processing
 - **Estimate**: 3 story points
 - **Dependencies**: Adapter framework supports Custom Resource creation
 
-**HYPERFLEET-XXX: Setup RBAC for Management Cluster Access**
+#### HYPERFLEET-XXX: Setup RBAC for Management Cluster Access
 
 - **Deliverable**: ServiceAccount, Role, RoleBinding YAML files
 - **Estimate**: 2 story points
 - **Dependencies**: Management cluster with HyperShift operator deployed
 
-**HYPERFLEET-XXX: Implement ManifestWork Feedback Extraction Logic**
+#### HYPERFLEET-XXX: Implement ManifestWork Feedback Extraction Logic
 
 - **Deliverable**: Code to extract HostedCluster status from ManifestWork feedback (
   extractStatusFromManifestWorkFeedback function)
 - **Estimate**: 3 story points
 - **Dependencies**: Maestro SDK integration complete
 
-**HYPERFLEET-XXX: Implement HostedCluster Status Monitoring Logic**
+#### HYPERFLEET-XXX: Implement HostedCluster Status Monitoring Logic
 
 - **Deliverable**: Post-processing configuration to monitor HostedCluster conditions (Available, Progressing, Degraded)
 - **Estimate**: 3 story points
 - **Dependencies**: ManifestWork feedback extraction complete
 
-**HYPERFLEET-XXX: Add Validation for Immutable Field Changes**
+#### HYPERFLEET-XXX: Add Validation for Immutable Field Changes
 
 - **Deliverable**: Validation rules in adapter configuration to reject updates to immutable fields
 - **Estimate**: 2 story points
 - **Dependencies**: HostedCluster status monitoring complete
 
-**HYPERFLEET-XXX: Write Unit Tests for Adapter Configuration**
+#### HYPERFLEET-XXX: Write Unit Tests for Adapter Configuration
 
 - **Deliverable**: Unit tests validating configuration schema and preconditions
 - **Estimate**: 2 story points
 - **Dependencies**: Adapter configuration complete
 
-**HYPERFLEET-XXX: Integration Testing with HostedCluster CRD**
+#### HYPERFLEET-XXX: Integration Testing with HostedCluster CRD
 
 - **Deliverable**: Integration tests with mocked management cluster or test environment
 - **Estimate**: 5 story points
 - **Dependencies**: Adapter configuration and RBAC complete
 
-**HYPERFLEET-XXX: E2E Testing with Real Management Cluster**
+#### HYPERFLEET-XXX: E2E Testing with Real Management Cluster
 
 - **Deliverable**: End-to-end test creating HostedCluster and verifying status reporting
 - **Estimate**: 5 story points
 - **Dependencies**: TechPreviewNoUpgrade feature set enabled, WIF infrastructure created, test management cluster
   available
 
-**HYPERFLEET-XXX: Document Adapter Configuration and Deployment**
+#### HYPERFLEET-XXX: Document Adapter Configuration and Deployment
 
 - **Deliverable**: README with setup instructions, configuration examples, troubleshooting guide
 - **Estimate**: 2 story points
 - **Dependencies**: All implementation complete
 
-**HYPERFLEET-XXX: Create Helm Chart for Adapter Service Deployment**
+#### HYPERFLEET-XXX: Create Helm Chart for Adapter Service Deployment
 
 - **Deliverable**: Helm chart deploying adapter service (follows adapter-landing-zone pattern)
 - **Estimate**: 3 story points
 - **Dependencies**: Adapter configuration complete, RBAC requirements defined
 
-**HYPERFLEET-XXX: Update HYPERFLEET-58 Epic Acceptance Criteria**
+#### HYPERFLEET-XXX: Update HYPERFLEET-58 Epic Acceptance Criteria
 
 - **Deliverable**: Epic acceptance criteria updated with HyperShift control plane adapter findings
 - **Estimate**: 1 story point
@@ -1158,7 +1157,7 @@ Based on this spike's findings, the following implementation stories should be c
 
 - [Adapter Framework Design](../../../../components/adapter/framework/adapter-frame-design.md)
 - [Adapter Status Contract](../../../../components/adapter/framework/adapter-status-contract.md)
-- [GCP Validation Adapter Spike](../deprecated-validation/gcp-validation-adapter-spike-report.md)
+- [GCP Validation Adapter Spike](../validation/gcp-validation-adapter-spike-report.md)
 
 ### Kubernetes Documentation
 

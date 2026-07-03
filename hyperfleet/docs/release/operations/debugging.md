@@ -14,12 +14,12 @@ Each entry: what you see → where to look → what to check → who to ping. Fo
 
 ## I pushed a tag and no PipelineRun started
 
-**Where to look**
+### Where to look
 
 - Konflux UI → Applications → `hyperfleet` → Pipeline runs (filter by component).
 - The component repo's GitHub: **Actions** tab is NOT where PaC reports; check the commit status (green check / yellow dot near the commit).
 
-**What to check**
+### What to check
 
 1. **The tag actually pushed.** `git push origin v0.3.0-rc1` is one tag; `git push --tags` pushes everything. Verify with `git ls-remote --tags origin | grep v0.3.0-rc1`.
 2. **The CEL regex matches your tag.** Open `.tekton/hyperfleet-<svc>-tag.yaml` and look for the `on-cel-expression` annotation. It must match `^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$`. A tag like `v0.3` or `release-0.3-rc1` won't match.
@@ -32,11 +32,11 @@ Each entry: what you see → where to look → what to check → who to ping. Fo
 
 ## A build PipelineRun failed
 
-**Where to look**
+### Where to look
 
 - The failing task in the Konflux UI → **Logs** tab.
 
-**What to check**
+### What to check
 
 1. **Is it advisory or blocking?** See the task table in [Pipeline Anatomy](./pipeline-anatomy.md#the-build-dag). Under `app-interface-standard`, scan tasks (Snyk, Clair, ClamAV, shell/unicode SAST) are advisory — they surface findings but don't block the release. A red badge on `sast-snyk-check` does **not** stop the build pipeline from being marked failed in the UI even when the EC verdict treats it as advisory — read the actual error.
 2. **`build-container` failed → Dockerfile issue.** Local reproduce: `buildah build --build-arg APP_VERSION=0.3.0-rc1 .` from a clean checkout of the tag.
@@ -52,12 +52,12 @@ Each entry: what you see → where to look → what to check → who to ping. Fo
 
 The classic. The build PipelineRun and the release PipelineRun are separate. Build green ≠ image pushed.
 
-**Where to look**
+### Where to look
 
 - Konflux UI → **Releases** tab (NOT pipeline runs). There should be a Release CR created from the Snapshot.
 - If the Release exists but is incomplete, click into it and inspect the managed PipelineRun (`rh-push-to-external-registry`).
 
-**What to check**
+### What to check
 
 1. **Snapshot created.** Build run → Snapshots → the Snapshot for this commit.
 2. **EC verdict.** Snapshot → Enterprise Contract result. Failed EC → release will not auto-fire. Read the violation messages; if they're advisory-tagged, they shouldn't block (`app-interface-standard` excludes most).
@@ -88,12 +88,12 @@ Once the build Snapshot passes EC, `rh-push-to-external-registry` runs. The comm
 
 Symptom: `skopeo inspect …:0.3.0-rc1 | jq -r '.Labels.version'` returns `0.0.0-dev` or empty.
 
-**Where to look**
+### Where to look
 
 - The build run's `extract-version` task → **Logs**.
 - The build run's `build-container` task → **Logs** (look for `--build-arg APP_VERSION=…`).
 
-**What to check**
+### What to check
 
 1. The `extract-version` output is the version string with the `v` stripped. If it printed `0.0.0-dev`, the trigger was a `push` event on main, not a tag — the run name will be `…-on-push-…`. The build did what it was told.
 2. If the trigger was the tag and `extract-version` printed correctly but the LABEL is `0.0.0-dev`: the Dockerfile lost its `ARG APP_VERSION` or its `LABEL version="${APP_VERSION}"`. Re-check the Dockerfile contract — see [Configuration Map: component repos](./configuration-map.md#component-repos-hyperfleet-api-hyperfleet-sentinel-hyperfleet-adapter).
@@ -103,13 +103,13 @@ Symptom: `skopeo inspect …:0.3.0-rc1 | jq -r '.Labels.version'` returns `0.0.0
 
 ## RC E2E didn't trigger after I tagged hyperfleet-release
 
-**Where to look**
+### Where to look
 
 - `hyperfleet-release/scripts/trigger-rc-e2e.sh` — run with `--dry-run` first.
 - The Gangway HTTP response from the script's log output.
 - The Prow dashboard for our job.
 
-**What to check**
+### What to check
 
 1. **Manifest images exist in Quay.** The script verifies each component image at the version pinned in `RELEASE_MANIFEST.yaml`. If any image is missing, the script bails before calling Gangway. `skopeo list-tags` to confirm.
 2. **`oc` token from app.ci is fresh.** The Gangway call needs a token; if it 401s, refresh from <https://oauth-openshift.apps.ci.l2s4.p1.openshiftapps.com/oauth/token/request>.
@@ -122,11 +122,11 @@ For full mechanics see [Trigger HyperFleet E2E Jobs via Gangway API](../test-rel
 
 ## RC E2E ran but pulled the wrong image tags
 
-**Where to look**
+### Where to look
 
 - The Prow job → environment variables → `*_IMAGE_TAG`, `*_IMAGE_REPO`.
 
-**What to check**
+### What to check
 
 1. **`RELEASE_MANIFEST.yaml` was current when the script ran.** The script reads the file at invocation time; if you committed the manifest after pushing the tag, the previous version was used.
 2. **The script strips the `v` prefix.** Quay tags have no `v`; the manifest entries do. The script handles the conversion — if you bypass the script and call Gangway directly, you have to do this yourself.
@@ -138,7 +138,7 @@ For full mechanics see [Trigger HyperFleet E2E Jobs via Gangway API](../test-rel
 
 EC runs in two places: in the build PipelineRun's `verify-enterprise-contract` task, and again in the release pipeline. The build-side verdict gates the Snapshot; the release-side verdict gates the push.
 
-**What to check**
+### What to check
 
 1. **Policy applied.** Container RPA uses `app-interface-standard`; chart RPA uses `registry-hyperfleet-chart-prod`. Mismatch → wrong rules applied → spurious failures.
 2. **RPA `origin` matches the tenant.** `origin: hyperfleet-tenant`. Required for the constraint to bind.

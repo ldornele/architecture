@@ -175,7 +175,7 @@ After configuring CodeRabbit fully, the genuinely exclusive capabilities are:
 
 Rather than choosing one tool over the other, use each for what it does best:
 
-**CodeRabbit = automated filter (always-on)**
+#### CodeRabbit = automated filter (always-on)
 
 Runs automatically on every PR with zero developer effort. Once properly configured, it handles:
 
@@ -199,7 +199,7 @@ Configuration steps (see [CodeRabbit configuration overview](https://docs.codera
 > **Plan note — linked repositories**
 >
 > HyperFleet is on the Enterprise plan with **no linked repository limit**. Cross-repo analysis (step 1 above) can link the architecture repo and all cross-component repos (API, Sentinel, Adapter, Broker) to each other without constraints.
-
+>
 > **Configuration note — auto-review behavior**
 >
 > CodeRabbit does not have to be always-on. Via org-level or repo-level `.coderabbit.yaml`, automatic reviews can be disabled so CodeRabbit only reviews when explicitly requested (e.g., by adding a label or commenting on the PR). This strategy recommends always-on for the initial rollout to maximize learnable rule feedback, but teams can adjust per repo if review noise becomes a concern.
@@ -215,7 +215,7 @@ A developer chooses when to run it and what to do with each finding. The value i
 
 The skill does not need CI automation because its value comes from human interaction — the developer decides what to act on. Automating it would strip the interactivity that makes it useful.
 
-**PR risk scoring = automated triage (always-on)**
+#### PR risk scoring = automated triage (always-on)
 
 A lightweight Prow presubmit job that computes a deterministic risk score for every PR and applies a label (`risk/low`, `risk/medium`, `risk/high`). No LLM — pure shell script running in seconds.
 
@@ -240,7 +240,7 @@ Risk thresholds:
 The risk label enables workflow differentiation: low-risk PRs can follow a fast review path, high-risk PRs require stricter review (e.g., multiple approvers). Branch protection rules can use these labels to enforce review requirements.
 
 > **Implementation:** Tracked in [HYPERFLEET-991](https://redhat.atlassian.net/browse/HYPERFLEET-991). Recommended to run in "observe mode" for 2-3 sprints first — compute and label without gating — to calibrate thresholds against real data before enforcing merge policies.
-
+>
 > **Measurement:** Use the existing [PR Cycle Time dashboard](https://metrics.dprod.io/dashboard.html?team=openshift-hyperfleet&dashboard=prcycletime) to track impact. Baseline (April 2026): median cycle time 14.3h, first review 6.5h, first approval 24.3h. After the observe period, compare these metrics to validate whether risk labels correlate with review speed and cycle time improvement.
 
 ### Human reviewers remain accountable

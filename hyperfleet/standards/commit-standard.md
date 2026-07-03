@@ -40,6 +40,7 @@ This standard is based on the [Conventional Commits](https://www.conventionalcom
 ### Applicability
 
 This standard applies to:
+
 - All HyperFleet service repositories
 - All adapter repositories
 - Infrastructure and tooling repositories
@@ -48,6 +49,7 @@ This standard applies to:
 ### Standard Extensions
 
 HyperFleet extends Conventional Commits with two additional types:
+
 - `style` - Go formatting and linting tool changes (gofmt, goimports)
 - `perf` - Performance-only improvements with no functional changes
 
@@ -88,11 +90,13 @@ The **header** is mandatory.
 **Examples:**
 
 Good - `<type>: <subject>` is less than 72 characters:
+
 ```text
 HYPERFLEET-123 - feat: add comprehensive cluster validation with adapters
 ```
 
 Bad - `<type>: <subject>` exceeds 72 characters:
+
 ```text
 HYPERFLEET-123 - feat: add comprehensive cluster validation logic for all cloud providers globally
 ```
@@ -135,6 +139,7 @@ The body is optional. Use it only when the commit message alone isn't clear enou
 ## Footer
 
 The footer might be used for:
+
 1. **Breaking change notices**
 2. **Co-authored-by credits**
 3. **Additional references** (when commit relates to multiple tickets)
@@ -156,6 +161,7 @@ Refs: HYPERFLEET-456
 Breaking changes must be clearly indicated in the commit message using `BREAKING CHANGE:` in the footer.
 
 The breaking change message must include:
+
 1. **What changed** - the specific API, field, or behavior that changed
 2. **Impact** - what will break for consumers
 3. **Migration** - what consumers need to do to adapt

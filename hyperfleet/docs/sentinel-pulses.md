@@ -6,7 +6,6 @@ Last Updated: 2026-01-22
 
 # Sentinel pulses, adapter behavior and API resource status
 
-
 ---
 
 ## Overview
@@ -72,7 +71,7 @@ Scenarios for adapter receiving a message to process a resource:
     - Is still in progress
     - Finished successful/failure
 
-#### K8s jobs
+### K8s jobs
 
 Our decision is to avoid putting too much orchestration in k8s primitives, therefore some sort of resource lifecycle management is required in the adapter framework.
 
@@ -88,7 +87,7 @@ For the MVP:
   - Since we can not recreate jobs, if we allow it finishing with failure, the adapter will report `Available=False` always
   - With retries, the adapter will report `Available=Unknown` while retrying.
 
-#### CRDs
+### CRDs
 
 Applying a CRD or manifest (like namespace manifest) should be manage by the same lifecycle management as for jobs.
 
@@ -96,7 +95,7 @@ The adapter should detect if the work to be done by the adapter task is still in
 
 For example some k8s objects use `generation` and `status.observedGeneration` to differentiate.
 
-#### API calls
+### API calls
 
 If using an arbitrary API call in the adapter resource phase, the calling service must provide a way to determine work in progress, similar to the CRDs case.
 
@@ -108,7 +107,7 @@ If using an arbitrary API call in the adapter resource phase, the calling servic
     1. Adapter starts a new adapter task, and will report:
       - `Applied=True`
       - `Available=Unknown`
-    - Another alternative would be to make reporting from adapter configurable with some sort of post-condition
+      - Another alternative would be to make reporting from adapter configurable with some sort of post-condition
 
 2. Mixed generation for Available conditions
     1. cluster has `Available=True`, `Ready=True` at `gen=1`
@@ -130,7 +129,7 @@ If using an arbitrary API call in the adapter resource phase, the calling servic
 
 The GCP team proposed also to have the logic behind the `Available/Ready` configurable using some type of expressions, eg something like:
 
-```
+```cel
 available=self.items.all(i, 
   i.observed_generation == self.items[0].observed_generation && 
   i.conditions.exists(c, c.type == 'Available' && c.status == 'True')
@@ -180,16 +179,17 @@ Some other rules for the API:
 
   Details:
 
-    - Remove `status.phase`
-    - Defining `Available` and `Ready` as `status.conditions`
-    - Is it possible to define as an array with these two being mandatory?
-    - Create and publish openapi contracts
-    - Version the release
+- Remove `status.phase`
+- Defining `Available` and `Ready` as `status.conditions`
+- Is it possible to define as an array with these two being mandatory?
+- Create and publish openapi contracts
+- Version the release
 
   Acceptance criteria:
-    - New release with openapi contracts for core and GCP
-    - Examples for cluster and nodepools responses
-    - Examples for statuses
+
+- New release with openapi contracts for core and GCP
+- Examples for cluster and nodepools responses
+- Examples for statuses
 
 </details>
 
@@ -202,36 +202,38 @@ Some other rules for the API:
 
   Details:
 
-    - Compute `Available` and `Ready` conditions with rules:
-        1. API should only accept conditions statuses for same or increased condition.observed_generation
-            - An adapter update can not replace data from a newer generation
-            - e.g. If validation adapter is at gen=2, API only accepts reports of gen>=2
-        1. API should discard conditions with `Available=Unknown`
-            - It can still store in some status log table/file for tracing
-            - We can think of optimizing by having a post-condition that discards adapter report
-            - It also doesn't update `last_updated_time` for the adapter
-        1. Available only transitions to True
-            - If all the adapters are at the same generation report Available=True
-            - Could be that the adapter's reports observed_generation < generation
-              - This can happen when updating quickly a spec
-              - API will be getting "older" adapter statuses first
-              - It can be "Available"" for that generation, but needs reconciliation
-              - Eventually it will get newer responses
-        1. Available transitions to False
-            - If any adapter of the `observed_generation` in the condition reports `Available=False`
-            - But not for adapters reporting `Available=false` at other `observed_generation`
-            - This keeps `Available=true` for `observed_generation` while `Ready=False`
-              - Meaning, that the last known generation is still marked available
-        1. Ready transitions to False for every user spec change
-              - Since it will increase generation
-              - And all adapters being async have observedGeneration<generation
+- Compute `Available` and `Ready` conditions with rules:
+    1. API should only accept conditions statuses for same or increased condition.observed_generation
+        - An adapter update can not replace data from a newer generation
+        - e.g. If validation adapter is at gen=2, API only accepts reports of gen>=2
+    1. API should discard conditions with `Available=Unknown`
+        - It can still store in some status log table/file for tracing
+        - We can think of optimizing by having a post-condition that discards adapter report
+        - It also doesn't update `last_updated_time` for the adapter
+    1. Available only transitions to True
+        - If all the adapters are at the same generation report Available=True
+        - Could be that the adapter's reports observed_generation < generation
+          - This can happen when updating quickly a spec
+          - API will be getting "older" adapter statuses first
+          - It can be "Available"" for that generation, but needs reconciliation
+          - Eventually it will get newer responses
+    1. Available transitions to False
+        - If any adapter of the `observed_generation` in the condition reports `Available=False`
+        - But not for adapters reporting `Available=false` at other `observed_generation`
+        - This keeps `Available=true` for `observed_generation` while `Ready=False`
+          - Meaning, that the last known generation is still marked available
+    1. Ready transitions to False for every user spec change
+          - Since it will increase generation
+          - And all adapters being async have observedGeneration<generation
 
   Acceptance criteria:
-    - API implements the new spec
-    - Create tests for new conditions what will be always present
-    - Code reviewed and merged
-    - Documentation updated
-    - Related architecture repository documentation updated
+
+- API implements the new spec
+- Create tests for new conditions what will be always present
+- Code reviewed and merged
+- Documentation updated
+- Related architecture repository documentation updated
+
 </details>
 
 1. Changes to Sentinel

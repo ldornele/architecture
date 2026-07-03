@@ -36,7 +36,7 @@ HyperFleet publishes Helm charts as OCI artifacts to Quay.io via the Konflux rel
 
 HyperFleet Helm charts are consumed via the `helm-git` plugin, pulling directly from Git repositories:
 
-```
+```text
 git+https://github.com/openshift-hyperfleet/hyperfleet-api@charts?ref=main
 ```
 
@@ -44,7 +44,7 @@ This requires every consumer to install the `helm-git` plugin. Git references ar
 
 ### Target State (OCI on Quay.io)
 
-```
+```text
 oci://quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet-api-chart:1.5.0
 ```
 
@@ -154,6 +154,7 @@ Both produce Snapshots that auto-release through their respective RPAs.
 ### build-helm-chart-oci-ta
 
 The [`build-helm-chart-oci-ta`](https://github.com/konflux-ci/build-definitions/tree/main/task/build-helm-chart-oci-ta) task (v0.3):
+
 - Packages the Helm chart and pushes to OCI registry
 - Computes semver from git tags
 - Outputs `IMAGE_URL` and `IMAGE_DIGEST` for Tekton Chains provenance
@@ -200,6 +201,7 @@ appVersion: "1.5.0"     # Same as the git tag
 Chart version and app version are always the same. When the component is tagged `v1.5.0`, the `build-helm-chart-oci-ta` task strips the `v` prefix and publishes as `hyperfleet-api-chart:1.5.0` with `appVersion: 1.5.0`. One version to track, one tag to reason about.
 
 This works because:
+
 - Chart and application source live in the same repo and are tagged together
 - The `build-helm-chart-oci-ta` task derives the version from the git tag automatically
 - Chart templates rarely change independently of the application code

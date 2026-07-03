@@ -10,7 +10,8 @@ Last Updated: 2025-12-04
 
 ---
 
-### Metadata
+## Metadata
+
 - **Date:** 2025-12-03
 - **Authors:** Rafael Benevides
 - **Related Jira(s):** [HYPERFLEET-283](https://issues.redhat.com/browse/HYPERFLEET-283)
@@ -58,6 +59,7 @@ For container images, without clear naming conventions, developers can accidenta
 ```
 
 Where:
+
 - `namespace`: The Kubernetes namespace where Sentinel is deployed
 - `resourceType`: The resource type being watched (`clusters` or `nodepools`)
 
@@ -90,6 +92,7 @@ The topic name is configured via:
 ```
 
 Where:
+
 - `registry`: Container registry (e.g., `quay.io`)
 - `organization`: Organization name (e.g., `hyperfleet`)
 - `component`: Component name (e.g., `sentinel`, `adapter-validation`)

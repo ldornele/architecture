@@ -11,7 +11,7 @@ This document describes the hyperfleet-broker library purpose and main design de
 
 ## What & Why
 
-`hyperfleet-broker` is a golang library that abstracts the vendor-specific details to interact with a broker system. 
+`hyperfleet-broker` is a golang library that abstracts the vendor-specific details to interact with a broker system.
 
 HyperFleet runs in different cloud providers, offering a different native service for messaging. There is no common protocol for these messaging products nor a widely product that is offered in every cloud (like it is for PostgreSQL as an example).
 
@@ -75,7 +75,6 @@ The broker implementation is selected via the `broker.type` field in `broker.yam
 
 The library uses a YAML configuration file (`broker.yaml`). The path defaults to the executable directory but can be overridden with the `BROKER_CONFIG_FILE` environment variable. All fields support environment variable overrides using dot-notation (e.g., `BROKER_TYPE` overrides `broker.type`).
 
-
 **Sentinel publisher configuration (`broker.yaml`):**
 
 ```yaml
@@ -135,7 +134,6 @@ sequenceDiagram
 
 **Rationale**: To keep the application agnostic of the broker in use, the library has to manage all the details of the connection. Any broker-specific data is in the broker.yaml config file which makes clients of the library (sentinel, adapters) not to have broker vendor specific code nor parameters.
 
-
 **Trade-off**: This adds complexity to the deployment of the application, since it has to deal with an additional `broker.yaml` file besides its own file.
 
 And the same with environment variables since they are used to override settings in the `broker.yaml` file.
@@ -177,7 +175,6 @@ And the same with environment variables since they are used to override settings
 - ⚠️ **Debug complexity**: An extra library is involved when debugging an issue with publish/subscribe messages
 - ⚠️ **External dependency**: If there is any need for an specific broker detail not implemented in Watermill, we need to contribute to an external library.
 
-
 ---
 
 ## Alternatives Considered
@@ -187,6 +184,7 @@ And the same with environment variables since they are used to override settings
 **What**: Instead of factoring out a library, include all broker code in each application
 
 **Why Rejected**:
+
 - Encapsulation of responsibilities
 - The broker library can be tested in isolation
 
@@ -195,6 +193,7 @@ And the same with environment variables since they are used to override settings
 What: Instead of using Watermill as the basis for `hyperfleet-broker`, build a library from scratch
 
 **Why Rejected**:
+
 - Watermill covers HyperFleet needs
 - We implemented a thin wrapper over Watermill to shield from hard dependency, it can be changed in the future
 

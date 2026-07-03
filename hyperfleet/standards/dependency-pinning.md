@@ -77,7 +77,7 @@ All HyperFleet repositories **containing Go code** MUST use [Bingo](https://gith
 
 Every repository using Bingo MUST follow this structure:
 
-```
+```text
 repo-root/
 ├── .bingo/
 │   ├── .gitignore                    # Git ignore rules for binaries
@@ -109,7 +109,6 @@ Pattern: `<tool-name>.mod` and `<tool-name>.sum`
 - **Naming**: Use the tool's canonical binary name
 - **Format**: Lowercase with hyphens (e.g., `golangci-lint`, NOT `golangci_lint`)
 - **Derivation**: Bingo auto-derives from the import path's last component
-
 
 #### Binary Files
 
@@ -148,7 +147,7 @@ include .bingo/Variables.mk
 
 .PHONY: lint
 lint: $(GOLANGCI_LINT)
-	$(GOLANGCI_LINT) run ./...
+ $(GOLANGCI_LINT) run ./...
 EOF
 
 # 5. Test
@@ -187,7 +186,7 @@ ls .bingo/golangci-lint*  # Should show .mod, .sum, binary
 grep -q 'lint.*GOLANGCI_LINT' Makefile || cat >> Makefile <<'EOF'
 .PHONY: lint
 lint: $(GOLANGCI_LINT)
-	$(GOLANGCI_LINT) run ./...
+ $(GOLANGCI_LINT) run ./...
 EOF
 
 # 4. Test
@@ -281,34 +280,34 @@ include .bingo/Variables.mk
 # Install all required tools (for initial setup)
 .PHONY: tools-install
 tools-install:
-	@echo "Installing Bingo tools..."
-	bingo get github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6
-	bingo get go.uber.org/mock/mockgen@v0.5.0
-	bingo get github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.0
-	@echo "Tools installed successfully!"
+ @echo "Installing Bingo tools..."
+ bingo get github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6
+ bingo get go.uber.org/mock/mockgen@v0.5.0
+ bingo get github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.0
+ @echo "Tools installed successfully!"
 
 # List installed tools
 .PHONY: tools-list
 tools-list:
-	@bingo list
+ @bingo list
 
 # Update all tools to latest versions
 .PHONY: tools-update
 tools-update:
-	@echo "Updating tools to latest versions..."
-	bingo get github.com/golangci/golangci-lint/cmd/golangci-lint
-	bingo get go.uber.org/mock/mockgen
-	bingo get github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
-	@echo "Tools updated!"
+ @echo "Updating tools to latest versions..."
+ bingo get github.com/golangci/golangci-lint/cmd/golangci-lint
+ bingo get go.uber.org/mock/mockgen
+ bingo get github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+ @echo "Tools updated!"
 
 # Use tools in standard targets
 .PHONY: lint
 lint: $(GOLANGCI_LINT)
-	$(GOLANGCI_LINT) run ./...
+ $(GOLANGCI_LINT) run ./...
 
 .PHONY: generate
 generate: $(MOCKGEN) $(OAPI_CODEGEN)
-	go generate ./...
+ go generate ./...
 ```
 
 ### Target Descriptions
@@ -329,10 +328,11 @@ $(GOLANGCI_LINT) → .bingo/golangci-lint-v2.1.6
 
 # If binary missing, auto-builds from .mod file
 lint: $(GOLANGCI_LINT)  # Triggers build if needed
-	$(GOLANGCI_LINT) run ./...
+ $(GOLANGCI_LINT) run ./...
 ```
 
 **Key behaviors**:
+
 - Tool binaries auto-build from `.mod` files when missing
 - Exact pinned versions always used (no surprises)
 - `tools-install` useful for new developer onboarding
@@ -415,6 +415,7 @@ jobs:
 ```
 
 **Key points**:
+
 - No Bingo installation needed in CI
 - Tools build automatically from `.mod` files
 - Cache `.bingo/` using hash of `*.mod` files for faster builds
@@ -454,6 +455,7 @@ See [CI Integration Pattern](#ci-integration-pattern) for complete GitHub Action
 ## References
 
 ### Documentation
+
 - [Bingo GitHub](https://github.com/bwplotka/bingo)
 - [Bingo Blog Post](https://www.bwplotka.dev/2020/bingo/)
 - [gomock](https://github.com/golang/mock#gomock)
@@ -462,8 +464,8 @@ See [CI Integration Pattern](#ci-integration-pattern) for complete GitHub Action
 - [oapi-codegen releases](https://github.com/oapi-codegen/oapi-codegen/releases)
 - [controller-tools releases](https://github.com/kubernetes-sigs/controller-tools/releases)
 
-
 ### Related HyperFleet Standards
+
 - [Linting Standard](linting.md) - Uses Bingo for golangci-lint
 - [Generated Code Policy](generated-code-policy.md) - Code generators via Bingo
 - [Makefile Conventions](makefile-conventions.md) - Bingo integration patterns

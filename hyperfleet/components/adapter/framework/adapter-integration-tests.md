@@ -6,7 +6,6 @@ Last Updated: 2025-12-09
 
 # HyperFleet Adapter Framework - Integration Tests
 
-
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -22,6 +21,7 @@ Last Updated: 2025-12-09
 This document defines integration test scenarios and acceptance criteria for the HyperFleet Adapter Framework.
 
 **Related Documentation:**
+
 - [Adapter Framework Design](./adapter-frame-design.md) - Architecture overview
 - [Adapter Status Contract](./adapter-status-contract.md) - Status reporting contract
 - [Test Release MVP](../../../docs/release/test-release/test-release-MVP.md) - Testing strategy
@@ -29,6 +29,7 @@ This document defines integration test scenarios and acceptance criteria for the
 ### Testing Strategy
 
 Integration tests validate the adapter framework's interactions with:
+
 - **Message Broker**: Event consumption and acknowledgment
 - **HyperFleet API**: Cluster fetching and status reporting
 - **Kubernetes API**: Resource creation, discovery, and tracking
@@ -61,6 +62,7 @@ Integration tests validate the adapter framework's interactions with:
 #### 1. Stub Message Broker
 
 **RabbitMQ Test Container**:
+
 ```go
 rabbitmqContainer, err := rabbitmq.RunContainer(ctx,
     testcontainers.WithImage("rabbitmq:3.11-management"),
@@ -70,6 +72,7 @@ rabbitmqContainer, err := rabbitmq.RunContainer(ctx,
 ```
 
 **Pub/Sub Emulator** (for GCP testing):
+
 ```go
 pubsubContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
     ContainerRequest: testcontainers.ContainerRequest{
@@ -83,6 +86,7 @@ pubsubContainer, err := testcontainers.GenericContainer(ctx, testcontainers.Gene
 ```
 
 **Setup Steps**:
+
 1. Start broker container
 2. Create test queue/subscription
 3. Configure adapter to connect to test broker
@@ -91,6 +95,7 @@ pubsubContainer, err := testcontainers.GenericContainer(ctx, testcontainers.Gene
 #### 2. Mock HyperFleet API
 
 **HTTP Test Server**:
+
 ```go
 apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
     // Handle GET /clusters/{id}
@@ -102,12 +107,14 @@ defer apiServer.Close()
 ```
 
 **API Endpoints to Mock**:
+
 - `GET /api/hyperfleet/v1/clusters/{clusterId}` - Return cluster object
 - `GET /api/hyperfleet/v1/clusters/{clusterId}/statuses` - Return existing status or 404
 - `PUT /api/hyperfleet/v1/clusters/{clusterId}/statuses` - Create/upsert status
 - `PATCH /api/hyperfleet/v1/clusters/{clusterId}/statuses/{statusId}` - Update status
 
 **Request/Response Tracking**:
+
 - Track all API calls made by adapter
 - Verify request payloads match expected structure
 - Return configurable responses for different test scenarios
@@ -115,6 +122,7 @@ defer apiServer.Close()
 #### 3. Kubernetes Test Environment
 
 **envtest Setup**:
+
 ```go
 import (
     "sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -131,6 +139,7 @@ k8sClient, err := client.New(cfg, client.Options{})
 ```
 
 **Setup Steps**:
+
 1. Start Kubernetes API server (envtest)
 2. Install CRDs if needed
 3. Create test namespace
@@ -139,6 +148,7 @@ k8sClient, err := client.New(cfg, client.Options{})
 #### 4. Adapter Framework Instance
 
 **Test Adapter Configuration**:
+
 ```yaml
 apiVersion: hyperfleet.redhat.com/v1alpha1
 kind: AdapterConfig
@@ -162,6 +172,7 @@ spec:
 ```
 
 **Setup Steps**:
+
 1. Load test adapter configuration
 2. Initialize framework components
 3. Connect to test broker, API, and Kubernetes
@@ -200,6 +211,7 @@ func AssertStatusMatches(t *testing.T, actual *Status, expected *Status) {
 ### CloudEvent Fixtures
 
 **Basic Event** (`testdata/events/basic-event.json`):
+
 ```json
 {
   "specversion": "1.0",
@@ -217,6 +229,7 @@ func AssertStatusMatches(t *testing.T, actual *Status, expected *Status) {
 ```
 
 **Update Event** (`testdata/events/update-event.json`):
+
 ```json
 {
   "specversion": "1.0",
@@ -237,6 +250,7 @@ func AssertStatusMatches(t *testing.T, actual *Status, expected *Status) {
 ### Cluster Object Fixtures
 
 **Basic Cluster** (`testdata/clusters/basic-cluster.json`):
+
 ```json
 {
   "id": "cls-test-001",
@@ -262,6 +276,7 @@ func AssertStatusMatches(t *testing.T, actual *Status, expected *Status) {
 ```
 
 **Cluster with Dependencies** (`testdata/clusters/cluster-with-deps.json`):
+
 ```json
 {
   "id": "cls-test-002",
@@ -286,6 +301,7 @@ func AssertStatusMatches(t *testing.T, actual *Status, expected *Status) {
 ### Adapter Configuration Fixtures
 
 **Validation Adapter Config** (`testdata/configs/validation-adapter.yaml`):
+
 ```yaml
 apiVersion: hyperfleet.redhat.com/v1alpha1
 kind: AdapterConfig
@@ -405,6 +421,7 @@ spec:
 ### Expected Status Fixtures
 
 **Preconditions Not Met** (`testdata/statuses/preconditions-not-met.json`):
+
 ```json
 {
   "adapter": "validation-adapter",
@@ -434,6 +451,7 @@ spec:
 ```
 
 **Job Created** (`testdata/statuses/job-created.json`):
+
 ```json
 {
   "adapter": "validation-adapter",
@@ -463,6 +481,7 @@ spec:
 ```
 
 **Job Succeeded** (`testdata/statuses/job-succeeded.json`):
+
 ```json
 {
   "adapter": "validation-adapter",
@@ -504,11 +523,13 @@ spec:
 **Objective**: Verify adapter creates Kubernetes Job when preconditions are met.
 
 **Setup**:
+
 1. Start test environment (broker, API, Kubernetes)
 2. Configure adapter with validation adapter config
 3. Mock API to return cluster with `phase: "Provisioning"`
 
 **Steps**:
+
 1. Publish CloudEvent: `{resourceType: "clusters", resourceId: "cls-test-001", clusterId: "cls-test-001", href: "/api/hyperfleet/v1/clusters/cls-test-001"}`
 2. Wait for adapter to process event (max 5 seconds)
 3. Verify API was called: `GET /clusters/cls-test-001`
@@ -516,6 +537,7 @@ spec:
 5. Verify status was reported: `PUT /clusters/cls-test-001/statuses`
 
 **Expected Outcomes**:
+
 - ✅ Event consumed from broker
 - ✅ Cluster fetched from API
 - ✅ Preconditions evaluated: `clusterDetails.status.phase == "Provisioning"` → `True`
@@ -524,6 +546,7 @@ spec:
 - ✅ Event acknowledged to broker
 
 **Assertions**:
+
 ```go
 assert.EventConsumed(t, broker, eventId)
 assert.APICalled(t, mockAPI, "GET", "/api/v1/clusters/cls-test-001")
@@ -539,11 +562,13 @@ assert.EventAcknowledged(t, broker, eventId)
 **Objective**: Verify adapter skips Job creation when preconditions are not met.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter with validation adapter config
 3. Mock API to return cluster with `phase: "Ready"` (not Provisioning)
 
 **Steps**:
+
 1. Publish CloudEvent: `{resourceType: "clusters", resourceId: "cls-test-002", clusterId: "cls-test-002", href: "/api/hyperfleet/v1/clusters/cls-test-002"}`
 2. Wait for adapter to process event (max 5 seconds)
 3. Verify API was called: `GET /clusters/cls-test-002`
@@ -551,6 +576,7 @@ assert.EventAcknowledged(t, broker, eventId)
 5. Verify status was reported: `Applied=False, Available=False, Health=True`
 
 **Expected Outcomes**:
+
 - ✅ Event consumed from broker
 - ✅ Cluster fetched from API
 - ✅ Preconditions evaluated: `clusterDetails.status.phase == "Provisioning"` → `False`
@@ -559,6 +585,7 @@ assert.EventAcknowledged(t, broker, eventId)
 - ✅ Event acknowledged to broker
 
 **Assertions**:
+
 ```go
 assert.EventConsumed(t, broker, eventId)
 assert.APICalled(t, mockAPI, "GET", "/api/v1/clusters/cls-test-002")
@@ -574,11 +601,13 @@ assert.EventAcknowledged(t, broker, eventId)
 **Objective**: Verify adapter reports `Available=True` when Job completes successfully.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter with validation adapter config
 3. Create Job in Kubernetes with `status.succeeded: 1`
 
 **Steps**:
+
 1. Publish CloudEvent: `{resourceType: "clusters", resourceId: "cls-test-003", clusterId: "cls-test-003", href: "/api/hyperfleet/v1/clusters/cls-test-003"}`
 2. Wait for adapter to process event (max 5 seconds)
 3. Verify Job exists (already created in previous event)
@@ -587,6 +616,7 @@ assert.EventAcknowledged(t, broker, eventId)
 6. Verify status was reported: `Available=True`
 
 **Expected Outcomes**:
+
 - ✅ Event consumed from broker
 - ✅ Job discovered (already exists)
 - ✅ Post-processing evaluates conditions: `resources.validationJob.status.succeeded > 0` → `True`
@@ -595,6 +625,7 @@ assert.EventAcknowledged(t, broker, eventId)
 - ✅ Event acknowledged to broker
 
 **Assertions**:
+
 ```go
 assert.EventConsumed(t, broker, eventId)
 assert.JobExists(t, k8sClient, "validation-cls-test-003-gen1")
@@ -612,11 +643,13 @@ assert.EventAcknowledged(t, broker, eventId)
 **Objective**: Verify adapter reports `Available=False` when Job fails.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter with validation adapter config
 3. Create Job in Kubernetes with `status.failed: 1`
 
 **Steps**:
+
 1. Publish CloudEvent: `{resourceType: "clusters", resourceId: "cls-test-004", clusterId: "cls-test-004", href: "/api/hyperfleet/v1/clusters/cls-test-004"}`
 2. Wait for adapter to process event
 3. Verify Job exists
@@ -625,6 +658,7 @@ assert.EventAcknowledged(t, broker, eventId)
 6. Verify status was reported: `Available=False`
 
 **Expected Outcomes**:
+
 - ✅ Event consumed from broker
 - ✅ Job discovered (already exists)
 - ✅ Post-processing evaluates conditions: `resources.validationJob.status.succeeded > 0` → `False`
@@ -633,6 +667,7 @@ assert.EventAcknowledged(t, broker, eventId)
 - ✅ Event acknowledged to broker
 
 **Assertions**:
+
 ```go
 assert.EventConsumed(t, broker, eventId)
 assert.JobExists(t, k8sClient, "validation-cls-test-004-gen1")
@@ -650,12 +685,14 @@ assert.EventAcknowledged(t, broker, eventId)
 **Objective**: Verify adapter handles Job timeout and reports error status.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter with validation adapter config
 3. Create Job with `activeDeadlineSeconds: 60`
 4. Mock time to exceed deadline
 
 **Steps**:
+
 1. Publish CloudEvent: `{resourceType: "clusters", resourceId: "cls-test-005", clusterId: "cls-test-005", href: "/api/hyperfleet/v1/clusters/cls-test-005"}`
 2. Wait for Job creation
 3. Advance time to exceed `activeDeadlineSeconds`
@@ -664,6 +701,7 @@ assert.EventAcknowledged(t, broker, eventId)
 6. Verify status was reported with timeout error
 
 **Expected Outcomes**:
+
 - ✅ Event consumed from broker
 - ✅ Job created with timeout
 - ✅ Job marked as failed after timeout
@@ -672,6 +710,7 @@ assert.EventAcknowledged(t, broker, eventId)
 - ✅ Message indicates timeout occurred
 
 **Assertions**:
+
 ```go
 assert.EventConsumed(t, broker, eventId)
 assert.JobCreated(t, k8sClient, "validation-cls-test-005-gen1")
@@ -688,11 +727,13 @@ assert.EventAcknowledged(t, broker, eventId)
 **Objective**: Verify adapter retries API calls when API is temporarily unavailable.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter with retry logic: `retryAttempts: 3, retryBackoff: exponential`
 3. Mock API to return `500 Internal Server Error` for first 2 calls, then `200 OK`
 
 **Steps**:
+
 1. Publish CloudEvent: `{resourceType: "clusters", resourceId: "cls-test-006", clusterId: "cls-test-006", href: "/api/hyperfleet/v1/clusters/cls-test-006"}`
 2. Mock API to return `500` for first 2 calls
 3. Mock API to return `200` on third call
@@ -701,6 +742,7 @@ assert.EventAcknowledged(t, broker, eventId)
 6. Verify exponential backoff was used
 
 **Expected Outcomes**:
+
 - ✅ Event consumed from broker
 - ✅ API call fails with `500`
 - ✅ Retry logic engaged: exponential backoff
@@ -709,6 +751,7 @@ assert.EventAcknowledged(t, broker, eventId)
 - ✅ Event processing completes successfully
 
 **Assertions**:
+
 ```go
 assert.EventConsumed(t, broker, eventId)
 assert.APICallCount(t, mockAPI, "GET", "/api/v1/clusters/cls-test-006", 3)
@@ -724,11 +767,13 @@ assert.EventAcknowledged(t, broker, eventId)
 **Objective**: Verify adapter handles broker disconnection and reconnection gracefully.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter with broker connection
 3. Establish connection to broker
 
 **Steps**:
+
 1. Publish CloudEvent to broker
 2. Disconnect broker (simulate network failure)
 3. Verify adapter detects disconnection
@@ -738,6 +783,7 @@ assert.EventAcknowledged(t, broker, eventId)
 7. Verify event is processed after reconnection
 
 **Expected Outcomes**:
+
 - ✅ Adapter detects broker disconnection
 - ✅ Adapter attempts reconnection with backoff
 - ✅ Adapter successfully reconnects
@@ -745,6 +791,7 @@ assert.EventAcknowledged(t, broker, eventId)
 - ✅ No events are lost during disconnection
 
 **Assertions**:
+
 ```go
 assert.BrokerConnected(t, adapter, broker)
 assert.PublishEvent(t, broker, event1)
@@ -763,11 +810,13 @@ assert.EventProcessed(t, adapter, event2)
 **Objective**: Verify adapter completes in-flight events before shutting down.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter
 3. Start adapter service
 
 **Steps**:
+
 1. Publish CloudEvent (long-running job)
 2. Send SIGTERM to adapter process
 3. Verify adapter stops accepting new events
@@ -776,6 +825,7 @@ assert.EventProcessed(t, adapter, event2)
 6. Verify no events are lost
 
 **Expected Outcomes**:
+
 - ✅ Adapter receives SIGTERM
 - ✅ Adapter stops accepting new events
 - ✅ In-flight event completes processing
@@ -785,6 +835,7 @@ assert.EventProcessed(t, adapter, event2)
 - ✅ No resource leaks
 
 **Assertions**:
+
 ```go
 assert.PublishEvent(t, broker, event)
 assert.SendSignal(t, adapter, syscall.SIGTERM)
@@ -802,11 +853,13 @@ assert.AdapterShutdown(t, adapter, 5*time.Second)
 **Objective**: Verify adapter handles multiple events for the same cluster idempotently.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter
 3. Mock API to return same cluster
 
 **Steps**:
+
 1. Publish CloudEvent 1: `{resourceType: "clusters", resourceId: "cls-test-009", clusterId: "cls-test-009", href: "/api/hyperfleet/v1/clusters/cls-test-009"}`
 2. Wait for Job creation
 3. Publish CloudEvent 2: `{resourceType: "clusters", resourceId: "cls-test-009", clusterId: "cls-test-009", href: "/api/hyperfleet/v1/clusters/cls-test-009"}` (same cluster)
@@ -816,6 +869,7 @@ assert.AdapterShutdown(t, adapter, 5*time.Second)
 7. Verify idempotent behavior
 
 **Expected Outcomes**:
+
 - ✅ First event creates Job
 - ✅ Second event discovers existing Job (doesn't create duplicate)
 - ✅ Status updated (not duplicated)
@@ -824,6 +878,7 @@ assert.AdapterShutdown(t, adapter, 5*time.Second)
 - ✅ Status reflects latest state
 
 **Assertions**:
+
 ```go
 assert.PublishEvent(t, broker, event1)
 assert.JobCreated(t, k8sClient, "validation-cls-test-009-gen1")
@@ -842,8 +897,10 @@ assert.IdempotentBehavior(t, adapter, event3)
 **Objective**: Verify adapter evaluates and reports custom conditions in addition to required conditions.
 
 **Setup**:
+
 1. Start test environment
 2. Configure adapter with custom conditions:
+
    ```yaml
    post:
      payloads:
@@ -871,6 +928,7 @@ assert.IdempotentBehavior(t, adapter, event3)
    ```
 
 **Steps**:
+
 1. Publish CloudEvent
 2. Create multiple Jobs (validation, DNS)
 3. Wait for Jobs to complete
@@ -878,6 +936,7 @@ assert.IdempotentBehavior(t, adapter, event3)
 5. Verify custom condition is evaluated correctly
 
 **Expected Outcomes**:
+
 - ✅ Event consumed and processed
 - ✅ Multiple Jobs created
 - ✅ Post-processing evaluates custom condition
@@ -885,6 +944,7 @@ assert.IdempotentBehavior(t, adapter, event3)
 - ✅ Custom condition reason and message are correct
 
 **Assertions**:
+
 ```go
 assert.EventConsumed(t, broker, eventId)
 assert.JobCreated(t, k8sClient, "validation-cls-test-010-gen1")
@@ -934,21 +994,25 @@ All test cases should verify:
 ### Test Execution
 
 **Run All Tests**:
+
 ```bash
 make test-integration
 ```
 
 **Run Specific Test**:
+
 ```bash
 go test -v ./test/integration -run TestCase1
 ```
 
 **Run with Verbose Output**:
+
 ```bash
 go test -v ./test/integration -args -verbose
 ```
 
 **Run with Coverage**:
+
 ```bash
 go test -cover ./test/integration
 ```
@@ -956,12 +1020,14 @@ go test -cover ./test/integration
 ### Test Cleanup
 
 All tests should:
+
 1. Clean up created Kubernetes resources
 2. Close broker connections
 3. Stop mock API servers
 4. Clean up test data
 
 **Cleanup Helper**:
+
 ```go
 func CleanupTestEnvironment(t *testing.T, env *TestEnvironment) {
     // Delete Kubernetes resources
@@ -1022,4 +1088,3 @@ func CleanupTestEnvironment(t *testing.T, env *TestEnvironment) {
 3. Check mock API request/response logs
 4. Verify Kubernetes resource state
 5. Check broker message state
-
