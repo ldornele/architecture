@@ -6,7 +6,6 @@ Last Updated: 2026-04-24
 
 # Linting and Static Analysis Standard
 
-
 ## Overview
 
 This document defines the shared linting and static analysis baseline for all HyperFleet Go repositories.

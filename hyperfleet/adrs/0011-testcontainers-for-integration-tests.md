@@ -29,6 +29,7 @@ Containers start in-process via the Docker/Podman daemon — no `docker-compose`
 - **hyperfleet-adapter**: Expensive containers (envtest K8s API server) are shared via `StartSharedContainer` in `TestMain`; cheap or isolated containers use `StartContainer(t)` with automatic `t.Cleanup()` teardown.
 
 Integration tests are isolated from unit tests:
+
 - hyperfleet-api and hyperfleet-adapter separate them by directory (`test/integration/`) and a dedicated Makefile target.
 - hyperfleet-sentinel additionally gates them behind a `//go:build integration` build tag.
 

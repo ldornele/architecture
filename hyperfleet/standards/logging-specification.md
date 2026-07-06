@@ -10,7 +10,6 @@ Last Updated: 2026-01-28
 
 This document defines the standard logging approach for all HyperFleet components (API, Sentinel, Adapters).
 
-
 ### Goals
 
 - **Consistency**: All components configure logging the same way

@@ -16,7 +16,7 @@ make install-hooks    # Install pre-commit hooks (secret scanning, commit messag
 | `./hack/yamllint.sh` | YAML formatting |
 | `./hack/linkcheck.sh` | Internal links |
 
-Many markdownlint rules are disabled — see `.markdownlint-cli2.yaml` for the active set.
+Only MD013 (line length) and MD060 (table column style) are disabled — see `.markdownlint-cli2.yaml` for the full config.
 
 ## Source of Truth
 
@@ -73,7 +73,7 @@ Quantify architectural claims. See `README.md` Writing Guidelines for examples.
 
 ## Gotchas
 
-- Markdownlint is very lenient — 32+ rules disabled in `.markdownlint-cli2.yaml`. Don't assume formatting checks are comprehensive.
+- Markdownlint is strict — only MD013 (line length) and MD060 (table column style) are disabled in `.markdownlint-cli2.yaml`. Linting is enforced in CI.
 - Legacy PNG images exist in the repo despite Mermaid-first policy. Don't flag or delete them.
 - Trade-offs, Alternatives Considered, and metadata header requirements are prompt-only — no mechanical validator exists yet. Easy to miss.
 

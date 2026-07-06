@@ -25,7 +25,6 @@ Last Updated: 2025-12-08
 
 ## Overview
 
-
 **Purpose**: This guide shows adapter developers how to use the Maestro SDK to create and manage resources in management
 clusters.
 
@@ -133,6 +132,7 @@ work := &workv1.ManifestWork{
 **Purpose**: FeedbackRules tell Maestro what information to watch and return from the management cluster. Without feedback rules, you won't get any status information.
 
 **How it works**:
+
 1. You create ManifestWork with feedbackRules specifying JSONPaths to watch
 2. Maestro creates the resource on the management cluster
 3. Maestro watches the resource and extracts fields per your JSONPath specifications
@@ -235,6 +235,7 @@ func main() {
 After creating a ManifestWork with feedbackRules, you can retrieve the resource status from the management cluster. Maestro watches the resource and stores status updates in the ManifestWork.
 
 **How it works**:
+
 1. You create ManifestWork with feedbackRules specifying which fields to watch
 2. Maestro creates the resource on the management cluster
 3. Maestro watches the resource and extracts fields per feedbackRules
@@ -558,6 +559,7 @@ func writeResults(results map[string]interface{}) {
 ```
 
 This example shows:
+
 1. Maestro SDK client setup
 2. Idempotency check (GET before CREATE)
 3. ManifestWork creation with feedbackRules

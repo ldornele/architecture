@@ -77,6 +77,7 @@ Maestro uses an **event-driven architecture** where:
 3. **Event Controllers** → Process gRPC events and update database
 
 **Why this design:**
+
 - **Scalability:** gRPC is more efficient for high-volume ManifestWork operations
 - **Real-time:** CloudEvents provide immediate delivery to agents
 - **Consistency:** Event-driven system ensures proper ordering and delivery
@@ -86,7 +87,7 @@ Maestro uses an **event-driven architecture** where:
 
 #### 1. gRPC Mode (Recommended for HyperFleet)
 
-```
+```text
 Components:
   - Maestro Server (with integrated gRPC broker)
   - Maestro Agents (on target clusters)
@@ -98,6 +99,7 @@ Communication Flow:
 ```
 
 **Advantages:**
+
 - No separate broker infrastructure
 - Lower latency, binary protocol
 - Built-in TLS/mTLS support
@@ -105,7 +107,7 @@ Communication Flow:
 
 #### 2. MQTT Mode
 
-```
+```text
 Components:
   - Maestro Server
   - MQTT Broker (Eclipse Mosquitto)
@@ -117,13 +119,14 @@ Communication Flow:
 ```
 
 **Advantages:**
+
 - Better network isolation
 - Topic-based routing
 - Supports complex network topologies
 
 #### 3. GCP Pub/Sub Mode
 
-```
+```text
 Components:
   - Maestro Server
   - GCP Pub/Sub Topics & Subscriptions
@@ -135,6 +138,7 @@ Communication Flow:
 ```
 
 **Advantages:**
+
 - Native GCP integration
 - Managed infrastructure (no broker to maintain)
 - Global message delivery with low latency
@@ -142,7 +146,7 @@ Communication Flow:
 
 #### 4. AWS IoT Mode
 
-```
+```text
 Components:
   - Maestro Server
   - AWS IoT Core
@@ -154,6 +158,7 @@ Communication Flow:
 ```
 
 **Advantages:**
+
 - Native AWS integration
 - Managed MQTT broker
 - Device certificate authentication
@@ -165,7 +170,7 @@ Communication Flow:
 
 ### CloudEvents Data Flow Architecture
 
-```
+```text
 Maestro Server ←→ gRPC CloudEvents Stream ←→ Client (Watch API)
 ```
 
@@ -174,29 +179,34 @@ Maestro Server ←→ gRPC CloudEvents Stream ←→ Client (Watch API)
 ### Watch Processing Patterns
 
 #### **Watch Implementation Architecture**
-```
+
+```go
 workClient.ManifestWorks(consumerName).Watch(ctx, metav1.ListOptions{})
 ```
 
 **Key Finding**: Watch uses **hybrid approach** - HTTP REST API for initial state + CloudEvents for live updates!
 
 **Watch Processing Flow:**
+
 1. **Initial List**: HTTP REST API call to `/api/maestro/v1/resource-bundles`
 2. **CloudEvents Subscription**: Subscribe for real-time ManifestWork changes
 3. **Event Handler**: Process incoming CloudEvents and forward to watch channel
 
 **Connection & Protocol Details:**
+
 - **Protocol**: gRPC CloudEvents streaming (not HTTP polling)
 - **Authentication**: TLS/mTLS or token-based
 - **Filtering**: By consumerName (target cluster) and sourceID (client identifier)
 - **Performance**: Synchronous initial load + asynchronous live updates
 
 #### **Direct CloudEvents Subscription (Alternative)**
-```
+
+```text
 Client → CloudEventsClient.Subscribe() → CloudEvents Stream (Skip Watch API)
 ```
 
 **Characteristics:**
+
 - **Transport**: Direct CloudEvents subscription (bypass Watch wrapper)
 - **Data Source**: Live CloudEvent stream only (no initial REST API call)
 - **Performance**: Highest throughput, but loses initial state synchronization
@@ -205,6 +215,7 @@ Client → CloudEventsClient.Subscribe() → CloudEvents Stream (Skip Watch API)
 ### Event Processing Volume Analysis
 
 #### **High-Volume Event Scenarios**
+
 Based on our analysis of thousands of events every 10 seconds:
 
 **Processing Approaches:**
@@ -227,23 +238,27 @@ Based on our analysis of thousands of events every 10 seconds:
 ### Connection Management
 
 #### **gRPC Mode (Recommended)**
+
 - **One gRPC connection per client** to Maestro server
 - **SourceID-based filtering**: Each client gets events filtered by its sourceID
 - **No message competition**: Each client receives independent event stream
 - **Authentication**: TLS/mTLS or token-based
 
 #### **MQTT/Pub-Sub Mode**
+
 - See [Deployment Modes](#deployment-modes) section for broker-specific details
 - **Key difference**: Potential message competition depending on topic design
 
 ### Event Deduplication and Filtering
 
 #### **Event Characteristics**
+
 - **Status Updates**: Frequent condition changes generate multiple events
 - **Generation Tracking**: API generation correlation for conflict resolution
 - **Event Ordering**: CloudEvents provide sequencing and delivery guarantees
 
 #### **Filtering Strategies**
+
 - **Label-based**: Filter by cluster ID, resource type, adapter name
 - **Generation-based**: Process only newer generation events
 - **SourceID-based**: Events filtered by client's sourceID parameter
@@ -272,6 +287,7 @@ Based on our analysis of thousands of events every 10 seconds:
 ### Subscription Pre-setup Requirements
 
 **⚠️ Broker-specific setup requirements:**
+
 - **gRPC**: Dynamic subscriptions (no pre-setup needed)
 - **MQTT**: Topic structure must be configured during Maestro deployment
 - **GCP Pub/Sub**: Topics and subscriptions must be created before use
@@ -293,6 +309,7 @@ Based on our analysis of thousands of events every 10 seconds:
 ### Event Consumption Risks
 
 **⚠️ MQTT/AWS IoT Risk:** Queue-based consumption means multiple subscribers compete for messages:
+
 - **Message consumption conflict** - only one subscriber receives each message
 - **Unintended message loss** - if Maestro server and your client both subscribe
 - **Mitigation**: Use separate topics or unique client IDs
@@ -315,12 +332,14 @@ Based on our analysis of thousands of events every 10 seconds:
 ### API Design Rationale
 
 **Why HTTP is Read-Only for Resources:**
+
 - **Performance:** gRPC more efficient for high-volume ManifestWork operations
 - **Real-time:** CloudEvents provide immediate delivery to agents
 - **Scalability:** Event-driven system handles large cluster counts better
 - **Consistency:** gRPC ensures proper ordering and delivery guarantees
 
 **HTTP API Use Cases:**
+
 - Dashboard monitoring and reporting
 - Consumer (cluster) management
 - Status queries and filtering
@@ -353,6 +372,7 @@ spec:
 ```
 
 This becomes a Maestro `resource` with:
+
 - **consumer_name:** Target cluster
 - **manifest:** The ManifestWork YAML
 - **type:** `ManifestWork`

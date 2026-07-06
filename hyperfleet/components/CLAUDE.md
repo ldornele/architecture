@@ -120,6 +120,7 @@ When updating component docs:
 ## Example: Component Document
 
 See `sentinel/sentinel.md` for an example with:
+
 - Clear What & Why section
 - Detailed How section with diagrams
 - Test scenarios documented

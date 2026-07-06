@@ -72,6 +72,7 @@ None of these roles justify duplicating lower-layer assertions in E2E. They're p
 Two tests covering the same behavior at different layers is **not** redundancy when they catch different failure modes.
 
 Take soft-delete as an example (applies to any resource type):
+
 - **Unit** catches: logic bug in cascade ordering, idempotency check, generation increment.
 - **Integration** catches: HTTP 202 response shape, `deleted_by` populated from JWT, DB transaction commits correctly.
 - **E2E** catches: adapters actually finalize, Sentinel triggers hard-delete, downstream resources cleaned up.
@@ -79,6 +80,7 @@ Take soft-delete as an example (applies to any resource type):
 Same behavior, three failure modes. This is the pyramid working.
 
 **Redundancy** is when a higher-layer test catches the exact same failure mode as a lower-layer test. Examples:
+
 - An E2E test that validates GET response fields (id, name, generation) after creation — the creation test already GETs and validates, and integration tests cover the response schema.
 - An E2E test that checks LIST pagination — this is a query concern fully covered by integration tests.
 
@@ -95,6 +97,7 @@ Every HyperFleet service repo owns its own unit and integration tests, testing t
 Runs against mock dependencies. No HTTP server, no database, no external services.
 
 **What belongs here:**
+
 - Input validation (name format, kind, spec, condition status values)
 - Service-layer state machines (condition transitions, stale update policy, timestamp stability)
 - Mutation logic (soft-delete cascade, generation increment, idempotency)
@@ -106,6 +109,7 @@ Runs against mock dependencies. No HTTP server, no database, no external service
 Runs a real HTTP server against a real database. Single component — no other HyperFleet services running. The exact integration surface depends on what each service talks to (e.g., the API tests against a real DB; an adapter might test against a mock broker).
 
 **What belongs here:**
+
 - HTTP response shape (field presence, types, href format, error details)
 - Auth middleware (401/403 for missing or invalid tokens)
 - DB constraints (unique names, foreign keys, `SELECT FOR UPDATE` under concurrency)
@@ -118,6 +122,7 @@ Runs a real HTTP server against a real database. Single component — no other H
 A separate repository from all service repos. Tests run against the full deployed stack — API, Sentinel, adapters, K8s cluster — deployed from the real manifests, running the shipped container images under production-like configuration (identity/TLS, contract validation enabled).
 
 **What belongs here — user journeys across all resource types:**
+
 - Create → adapters execute → downstream resources created → Reconciled
 - Update → adapters re-reconcile at new generation → coalescing
 - Delete → adapters finalize → hard-delete → downstream cleanup

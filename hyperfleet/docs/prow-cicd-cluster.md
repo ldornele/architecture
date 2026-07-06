@@ -6,7 +6,6 @@ Last Updated: 2026-01-26
 
 # Prow CI/CD Cluster Documentation
 
-
 ---
 
 ## Overview
@@ -232,7 +231,6 @@ The namespace cleaner is a CronJob that automatically removes stale E2E test res
 
 1. Deletes Maestro resource bundles older than **3 hours** via the Maestro REST API — this prevents Maestro from recreating the associated namespaces on its next reconciliation cycle
 2. Deletes Kubernetes namespaces carrying the `hyperfleet.io/cluster-id` label older than **3 hours** — this label is present on all resources created by E2E adapters
-
 
 The cleaner is defined in the `helm/namespace-cleaner/` Helm chart in `hyperfleet-infra` ([PR #55](https://github.com/openshift-hyperfleet/hyperfleet-infra/pull/55)).
 

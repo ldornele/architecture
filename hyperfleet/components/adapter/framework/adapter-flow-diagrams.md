@@ -11,6 +11,7 @@ Last Updated: 2026-04-13
 This document provides visual diagrams to help understand the reconciliation flow in HyperFleet v2.
 
 ## Table of Contents
+
 1. [Complete System Overview](#complete-system-overview)
 2. [Adapter Lifecycle Sequence](#adapter-lifecycle-sequence)
 3. [Event Flow Detail](#event-flow-detail)
@@ -241,6 +242,7 @@ flowchart LR
 ## Key Takeaways
 
 ### Anemic Events Pattern
+
 - Events contain **only** minimal fields: `resourceType`, `resourceId`, `clusterId`, `href`, `generation`, `region`
 - Adapters **always** fetch full resource data from API using `href` or constructing endpoint from `resourceType`/`resourceId`
 - Single source of truth: HyperFleet API database
@@ -248,12 +250,14 @@ flowchart LR
 - `clusterId` enables parent-child relationships (e.g., nodepools → cluster)
 
 ### Status Upsert Pattern
+
 - Adapters PUT status updates to HyperFleet API
 - API handles create-or-update logic server-side
 - Idempotent: same PUT multiple times = same result
 - Prevents race conditions between adapters
 
 ### Status Reporting Pattern
+
 - **Preconditions NOT met**: Report `Applied=False, Available=False, Health=True`
   - Adapter cannot act on this cluster yet (dependencies not satisfied)
 - **Resources created**: Report `Applied=True, Available=False, Health=True`
@@ -268,12 +272,14 @@ flowchart LR
   - Adapter encountered an internal error and cannot perform its work (e.g., can't connect to Kubernetes API, configuration error, timeout)
 
 ### Condition Aggregation
+
 - Each adapter reports 3 required conditions: Available, Applied, Health
 - Adapters can add custom conditions (e.g., ValidationPassed, DNSRecordsCreated)
 - Adapter aggregates ALL its conditions to determine Available status
 - API aggregates all adapter statuses to determine cluster `Reconciled` condition
 
 ### Reconciliation Loop
+
 1. Sentinel continuously polls HyperFleet API (every 5 seconds)
 2. For each cluster, Sentinel checks `Reconciled` condition (`Reconciled=True` vs `Reconciled=False`)
 3. Sentinel applies max age interval based on `Reconciled` status (10s for Not Reconciled, 30m for Reconciled)
@@ -283,6 +289,7 @@ flowchart LR
 7. Loop continues - Sentinel keeps polling and publishing events, adapters respond to each event
 
 ### Idempotency Pattern
+
 - Adapters check if resources already exist before creating (GET by name/labels)
 - Resource naming: `{adapter-name}-{clusterId-short}-gen{generation}`
 - If resources exist: check postconditions to determine current state
@@ -291,6 +298,7 @@ flowchart LR
 - Each event triggers a fresh evaluation of resource status
 
 ### Resource Management
+
 - When workload completes (postconditions met, either success or failure), adapter checks resource management settings
 - If cleanup enabled: Delete the created resources from Kubernetes (applies to both success and failure)
 - If cleanup disabled: Keep the resources for debugging/auditing purposes
@@ -298,6 +306,7 @@ flowchart LR
 - This prevents resource accumulation from completed workloads while allowing optional retention for troubleshooting
 
 ### Separation of Concerns
+
 - **Sentinel**: Polling + Event publishing
 - **Adapter Service**: Orchestration (event handling, precondition evaluation, resource management, status reporting)
 - **Workload Pods**: Business logic (validation, DNS creation, cluster provisioning, etc.)

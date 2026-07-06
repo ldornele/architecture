@@ -25,7 +25,7 @@ Do **not** write an ADR for implementation details, config changes, or decisions
 
 ## Naming Convention
 
-```
+```text
 NNNN-short-title.md
 ```
 

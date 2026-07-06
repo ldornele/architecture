@@ -361,11 +361,13 @@ span.SetAttributes(
 ### Attribute Best Practices
 
 **DO:**
+
 - Use semantic conventions where applicable
 - Include resource identifiers for debugging
 - Sanitize paths to avoid high cardinality
 
 **DON'T:**
+
 - Include sensitive data (tokens, passwords, PII)
 - Use high-cardinality values as span names
 - Include large payloads in attributes

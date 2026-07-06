@@ -6,7 +6,7 @@ Last Updated: 2026-01-27
 
 # Pull Secret Service for HyperFleet Architecture
 
-### Overview
+## Overview
 
 Detailed Design Review (DDR) document for the GCP Pull Secret Service adapter. Deprecated since GCP-specific adapters will be developed by GCP team and out of scope for the core HyperFleet repositories
 
@@ -15,6 +15,7 @@ The Pull Secret Service is an event-driven adapter that manages the complete lif
 The Pull Secret Adapter is responsible for securely storing and managing image registry pull secrets in GCP Secret Manager for HyperShift-managed OpenShift clusters. These secrets enable cluster nodes to pull container images from authenticated registries (e.g., Red Hat registries, Quay.io).
 
 The service operates as an event-driven adapter within the HyperFleet architecture, consuming CloudEvents from Sentinel and orchestrating two critical workflows:
+
 1. Storing pull secrets in the Red Hat GCP Secret Manager
 2. Provisioning Kubernetes secrets in the management cluster for HyperShift control plane access
 
@@ -35,7 +36,7 @@ To minimize the risks related to this, rollout will be done in different milesto
 - Add test coverage to validate the pull secret adapter functionalities
 
 > **Note 1:** M1 is purely a task for storing pull secret data in a vault (GCP Secret Manager).
-
+>
 > **Note 2:** The pull secret is stored in the account where the Hyperfleet service runs.
 
 ---
@@ -117,7 +118,7 @@ spec:
         memory: 512Mi
 ```
 
-**Source:** https://github.com/openshift-hyperfleet/architecture/blob/main/hyperfleet/README.md#5-adapter-deployments
+**Source:** <https://github.com/openshift-hyperfleet/architecture/blob/main/hyperfleet/README.md#5-adapter-deployments>
 
 ---
 
@@ -146,9 +147,9 @@ spec:
 
 - Hardcoded Pull Secret to unlock the MVP (see notes: [Hyperfleet MVP Kickoff - 2025/11/07 20:53 CST](https://docs.google.com/document/d/1XKLt1M4kQxMIh4eicdM5Tk092MU9VpUBifXMVnml8xQ))
 - RH Project ID from Regional Cluster will be used to enable the Secret Manager API
-  - https://docs.cloud.google.com/secret-manager/docs/configuring-secret-manager#enable-the-secret-manager-api
+  - <https://docs.cloud.google.com/secret-manager/docs/configuring-secret-manager#enable-the-secret-manager-api>
   - For the staging environment, the following GCP project will be used:
-    - https://console.cloud.google.com/welcome?project=sda-ccs-3
+    - <https://console.cloud.google.com/welcome?project=sda-ccs-3>
 
 ![Architecture with Assumptions](./images/image5.png)
 
@@ -173,59 +174,58 @@ MVP Scope - primarily focused on the Job implementation (see notes: [HyperFleet:
 
 ### Phase 2: Precondition Evaluation (Adapter)
 
-5. Adapter fetches cluster details from API: `GET /clusters/{id}`
-6. Evaluates preconditions using Expr expressions:
+1. Adapter fetches cluster details from API: `GET /clusters/{id}`
+2. Evaluates preconditions using Expr expressions:
    - `spec.provider == "gcp"`
    - `spec.gcp.projectId != nil` (RH project)
    - `spec.pullSecret.data != nil` (pull secret JSON exists - Hardcoded Pull Secret)
    - `status.adapters[validation].available == "True"`
    - `status.adapters[dns].available == "True"`
    - `status.adapters[placement].available == "True"`
-7. If all preconditions pass, proceed; otherwise skip event
+3. If all preconditions pass, proceed; otherwise skip event
 
 ### Phase 3: Resource Creation (Adapter → Kubernetes)
 
-8. Create Kubernetes Secret containing pull secret data
+1. Create Kubernetes Secret containing pull secret data
    - **Namespace:** `hyperfleet-system`
    - **Name:** `cluster-{cluster-id}-pullsecret-data`
    - **Purpose:** Used by Job as input
 
-9. Create Kubernetes Job to execute provisioning
+2. Create Kubernetes Job to execute provisioning
    - **Name:** `pullsecret-{cluster-id}-gen{generation}`
    - **Service Account:** `pullsecret-adapter-job` (provided by RH project)
    - **Environment:** Cluster ID, GCP project ID, pull secret data, namespace
 
 ### Phase 4: GCP Secret Manager Storage (Job)
 
-10. Job authenticates
+1. Job authenticates
     - Kubernetes Service Account token exchanged for GCP access token
 
-11. Job checks if secret exists in GCP Secret Manager
+2. Job checks if secret exists in GCP Secret Manager
     - `GetSecret(projects/{RH-project}/secrets/hyperfleet-{cluster-id}-pull-secret)`
 
-12. If secret doesn't exist, create it:
+3. If secret doesn't exist, create it:
     - `CreateSecret()` with labels: `managed-by=hyperfleet`, `cluster-id={id}`
     - Replication: Automatic (GCP-managed)
 
-13. Add secret version with pull secret data:
+4. Add secret version with pull secret data:
     - `AddSecretVersion(payload: pull-secret-json)`
     - GCP returns version number (e.g., `1`, `2`, etc.)
 
-14. Verify secret accessibility:
+5. Verify secret accessibility:
     - `AccessSecretVersion(latest)` to confirm readability
 
 ---
-
 
 ## References
 
 - [RACI Matrix for Pull Secret Service](https://docs.google.com/spreadsheets/d/1EfsZ0QoUkaf_YOSDA8k2fKHS645l5H3sWfKit1KBu1g/edit?gid=0#gid=0)
 - [Tollbooth v2.0 - Use cases](https://docs.google.com/document/d/17begbwlBjU0UpUUgTkwRc6pIS9qNn51sA3WGkwit1Mo/edit?tab=t.0#heading=h.edf6b1rxiby4)
-- https://github.com/openshift-hyperfleet/architecture
+- <https://github.com/openshift-hyperfleet/architecture>
 - [Miro Board 1](https://miro.com/app/board/uXjVJy-n5k4=/)
 - [Miro Board 2](https://miro.com/app/board/uXjVJNpPkZ0=/)
-- https://hypershift-docs.netlify.app/
-- https://rh-amarin.github.io/hyperfleet-architecture/hyperfleet/architecture/sequence.html
+- <https://hypershift-docs.netlify.app/>
+- <https://rh-amarin.github.io/hyperfleet-architecture/hyperfleet/architecture/sequence.html>
 
 ---
 

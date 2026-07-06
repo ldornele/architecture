@@ -47,7 +47,6 @@ Last Updated: 2025-11-07
 
 ## Overview
 
-
 This repository serves as the **single source of truth** for all architectural documentation related to HyperFleet. All documents are **living documents** that evolve as the design and implementation progress.
 
 **Key Principle**: All significant architectural decisions must be documented here with their trade-offs to track technical debt and enable informed future decisions.
@@ -59,11 +58,13 @@ This repository serves as the **single source of truth** for all architectural d
 **Current Phase**: MVP Development
 
 **Access & Permissions**:
+
 - All developers in the HyperFleet team are granted **write access** to this repository
 - To support quick iteration during MVP, developers have **approve and merge access** if there are no objections from peers
 - This temporary process enables rapid documentation of decisions and scope changes
 
 **Repository Usage**:
+
 - This repository primarily records:
   - Architectural decisions and their rationale
   - Trade-offs we're accepting during MVP
@@ -71,6 +72,7 @@ This repository serves as the **single source of truth** for all architectural d
   - Technical debt we're consciously incurring
 
 **Post-MVP**:
+
 - Once MVP is complete, we will establish official processes for:
   - Repository access management
   - PR review requirements
@@ -83,7 +85,7 @@ This repository serves as the **single source of truth** for all architectural d
 
 ## Repository Structure
 
-```
+```text
 architecture/
 ├── README.md                      # This file - repository guide
 ├── CONTRIBUTING.md                # How to contribute to this repository
@@ -114,6 +116,7 @@ architecture/
 **Purpose**: High-level system architecture (30,000 feet view)
 
 **Contents**:
+
 - System overview and goals
 - Component relationships and interactions
 - Data flows and communication patterns
@@ -131,6 +134,7 @@ architecture/
 **Purpose**: Detailed design for individual components
 
 **Required Sections**:
+
 - **What**: Component purpose and responsibilities
 - **Why**: Problem it solves and context
 - **How**: Technical implementation approach
@@ -180,6 +184,7 @@ architecture/
 **Purpose**: Practical guides for developers and operators
 
 **Contents**:
+
 - Step-by-step instructions
 - Code examples and patterns
 - Configuration examples
@@ -195,6 +200,7 @@ architecture/
 ## Tracking Trade-offs and Technical Debt
 
 **Critical Requirement**: Every component design document MUST include both:
+
 1. **"Trade-offs" section** - What we gain and lose with the chosen approach
 2. **"Alternatives Considered" section** - What other options existed and why we didn't choose them
 
@@ -272,6 +278,7 @@ All documents in this repository are **living documents**:
 **When to update "Last Updated" date:**
 
 Update the date for **meaningful changes only**:
+
 - ✅ Component design changes
 - ✅ New sections added
 - ✅ Trade-offs modified
@@ -282,11 +289,13 @@ Update the date for **meaningful changes only**:
 **Note**: Git commit history tracks all changes. The "Last Updated" date is a quick visual indicator of the last **significant** revision.
 
 **Steps for meaningful updates:**
+
 1. Update the relevant sections
 2. Update "Last Updated" date at the top of the document
 3. If paying down technical debt, ~~strikethrough~~ the debt item and link to PR
 
 Example of paying down technical debt:
+
 ```markdown
 ### Technical Debt Incurred
 - ~~**No retry logic**: Adapters don't retry failed operations~~
@@ -311,6 +320,7 @@ All HyperFleet team developers have approve and merge access. **Goal**: Move fas
 5. **Merge when ready**: Once you have approval from peers and no objections after the 24-hour window, you may merge
 
 **Post-MVP Process** (to be established):
+
 - Formal approval requirements based on change type
 - Required reviewers for different document categories
 - Defined merge timelines and escalation paths
@@ -319,7 +329,8 @@ All HyperFleet team developers have approve and merge access. **Goal**: Move fas
 
 ## Navigation Guide
 
-### I want to...
+<!-- markdownlint-disable-next-line MD026 -->
+### I want to
 
 **Understand HyperFleet architecture**
 → Start with `hyperfleet/README.md`
@@ -352,6 +363,7 @@ All HyperFleet team developers have approve and merge access. **Goal**: Move fas
 ### Trade-offs and Alternatives Are Required
 
 Every component document MUST document both trade-offs AND alternatives considered. These go hand-in-hand:
+
 - **Trade-offs** explain what you gain and lose with your chosen approach
 - **Alternatives** explain what other options you considered and why you rejected them
 
@@ -383,6 +395,7 @@ All architecture and component documents should include Mermaid diagrams.
 ### Use Mermaid for Diagrams
 
 All diagrams should use Mermaid syntax for:
+
 - Maintainability (text-based, version control friendly)
 - GitHub rendering (renders in markdown)
 - Consistency
@@ -440,6 +453,7 @@ grep -r "Status: Deprecated" hyperfleet/
 ### Good Component Document
 
 See: `hyperfleet/components/sentinel/sentinel.md`
+
 - Clear purpose and responsibilities
 - Detailed trade-offs section
 - Alternatives considered
@@ -449,6 +463,7 @@ See: `hyperfleet/components/sentinel/sentinel.md`
 ### Good Guide
 
 See: `hyperfleet/docs/status-guide.md`
+
 - Step-by-step instructions
 - Code examples
 - Clear troubleshooting
@@ -462,6 +477,7 @@ A: No. Focus on architectural decisions and component design. Implementation det
 
 **Q: What if I don't know the trade-offs yet?**
 A: Document what you know and mark unknowns:
+
 - "⚠️ Unknown: Performance impact needs measurement"
 - "⚠️ To investigate: Scalability limits"
 
@@ -469,6 +485,7 @@ Update the document as you learn more.
 
 **Q: How detailed should component docs be?**
 A: Detailed enough that someone unfamiliar with the component can:
+
 - Understand its purpose
 - Understand the trade-offs
 - Start implementing or operating it
@@ -480,12 +497,14 @@ A: Yes! These are living documents. Update freely as design evolves. Use git his
 
 **Q: When should I create a new document vs update existing?**
 A: Update existing documents when:
+
 - Refining the existing design
 - Adding implementation details
 - Paying down technical debt
 - Fixing errors or clarifications
 
 Create new documents when:
+
 - Adding a completely new component
 - Major redesign that deprecates old approach
 - New feature guide or operational procedure
@@ -509,9 +528,9 @@ Install [pre-commit](https://pre-commit.com/#install) and run `make install-hook
 ## Contact
 
 **Questions or suggestions?**
+
 - Slack: [#hcm-hyperfleet-team](https://redhat.enterprise.slack.com/archives/hcm-hyperfleet-team)
 - Architecture Team: Open a PR or post in the Slack channel above
 - Pull requests welcome for documentation updates
 
 ---
-

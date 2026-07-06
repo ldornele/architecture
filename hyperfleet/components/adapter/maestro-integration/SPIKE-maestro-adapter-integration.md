@@ -38,12 +38,14 @@ This SPIKE document outlines the integration of Maestro client capabilities into
 ## Current State
 
 ### Existing Adapter Framework Architecture
+
 - **CloudEvent Processing**: Adapters consume CloudEvents from Sentinel every 30 minutes (this is configurable when deploy Sentinel) when clusters are ready
 - **Direct K8s API**: Current adapters directly manage resources on local/accessible clusters
 - **Status Reporting**: Adapters report status back to HyperFleet API via HTTP REST calls
 - **DSL-Based Configuration**: Declarative YAML configuration drives adapter behavior
 
 ### Resource Reporting Cadence
+
 - **Pre-Ready Polling**: Sentinel posts CloudEvents every 10 seconds before cluster becomes ready
 - **Ready Polling**: Sentinel posts CloudEvents every 30 minutes when cluster is ready
 - **Implications**: Status updates frequency depends on cluster readiness state
@@ -79,16 +81,19 @@ While remote clusters could be accessed via kubeconfig, for ARO-HCP and similar 
 ### Integration Components
 
 #### 1. Maestro Client Integration
+
 - **Maestro gRPC Source Client**: Create/Update/Delete ManifestWorks
 - **Maestro Watch Client**: Monitor resource status changes
 - **Connection Management**: Handle gRPC connections and reconnection logic
 
 #### 2. Transport Abstraction Layer
+
 - **Transport Interface**: Abstract transport (Direct K8s API vs Maestro)
 - **Maestro Transport Implementation**: Wrap Maestro client operations
 - **Resource Conversion**: Transform DSL resources to ManifestWork format
 
 #### 3. Authentication & Configuration
+
 - **Maestro Auth Config**: gRPC endpoints, certificates, authentication tokens
 - **Consumer Identity**: Cluster identity for Maestro subscription targeting
 
@@ -124,6 +129,7 @@ Per-resource transport configuration with `targetCluster` resolved from captured
 ### 2. Authentication Configuration
 
 #### TLS Certificate-Based Authentication (mTLS)
+
 Authentication is handled via TLS client certificates. Configuration includes:
 
 - **CA Certificate**: Server certificate authority for verification
@@ -136,6 +142,7 @@ Connection settings include timeouts, keepalive parameters, and retry configurat
 ### 3. Implementation Components
 
 #### Transport Interface
+
 ```go
 // Transport defines the unified interface for resource operations
 // Implemented by both DirectTransport (K8s API) and MaestroTransport (CloudEvents)
@@ -193,6 +200,7 @@ type MaestroTransport struct {
 ```
 
 #### Maestro Client Wrapper
+
 ```go
 // MaestroClientManager handles Maestro client connections and ManifestWork operations
 type MaestroClientManager struct {
@@ -241,6 +249,7 @@ Status is then accessed via: `resources.?agentNamespaceManifestWork.mgmtNamespac
 > **See full example:** [`hyperfleet-adapter/charts/examples/maestro/adapter-task-config.yaml`](https://github.com/openshift-hyperfleet/hyperfleet-adapter/blob/main/charts/examples/maestro/adapter-task-config.yaml) (post section)
 
 #### Reporting Cycle Considerations (Sentinel timer is configurable via deployment)
+
 - **Pre-Ready (10s polling)**: More frequent status updates during cluster provisioning
 - **Ready (30min polling)**: Standard reporting cadence once cluster is ready
 - **Timeout handling**: Framework manages timeouts per transport type
@@ -248,11 +257,13 @@ Status is then accessed via: `resources.?agentNamespaceManifestWork.mgmtNamespac
 ### 5. Error Handling & Edge Cases
 
 #### Connection Failures
+
 - **Retry with backoff**: Configurable max retries and exponential backoff
 - **Fallback mode**: Optional fallback to direct API if Maestro connection fails
 - **Health checks**: Periodic connection health verification
 
 #### Status Synchronization Issues
+
 - **Partial ManifestWork failures**: Report degraded status with specific failure reasons
 - **Late status updates**: Extend timeout for next cycle if critical resources are pending
 - **Lost CloudEvents**: Implement status reconciliation on next cycle
@@ -262,6 +273,7 @@ Status is then accessed via: `resources.?agentNamespaceManifestWork.mgmtNamespac
 #### Configuration Approach
 
 Maestro transport settings are configured in `AdapterConfig` (see `adapter-deployment-config-template.yaml`), not a separate ConfigMap. This provides:
+
 - Single source of truth for adapter configuration
 - CRD schema validation
 - Helm values override support
@@ -285,6 +297,7 @@ spec:
 ```
 
 #### Secret Structure
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -301,23 +314,27 @@ data:
 ## Implementation Strategy
 
 ### Phase 1: Transport Abstraction
+
 1. **Create Transport Interface**: Define abstraction layer for resource operations (Apply, Get, Delete, List)
 2. **Implement DirectTransport**: Wrap K8s dynamic client to implement Transport interface
 3. **K8s Client Setup**: Configure K8s client with kubeconfig or service account authentication
 
 ### Phase 2: Maestro Transport Implementation
+
 1. **Maestro Client Integration**: Implement MaestroTransport with gRPC client
 2. **Configuration Extension**: Add maestro section to adapter DSL
 3. **Authentication Handling**: Implement TLS-based authentication
 4. **Status Mapping**: Convert ManifestWork status to adapter status
 
 ### Phase 3: Config Loader and Executor Implementation
+
 1. **Config Loader**: Parse and validate AdapterConfig and business logic YAML
 2. **Resource Executor**: Execute resource operations based on business logic config
 3. **Transport Selection**: Route operations to DirectTransport or MaestroTransport based on config
 4. **Status Builder**: Build status payloads from CEL expressions in config
 
 ### Phase 4: Example Implementation & Helm Integration
+
 1. **Example Adapter**: Implement reference adapter using Maestro transport
 2. **Business Logic Example**: Create sample business logic config with maestro resources and nestedDiscoveries
 3. **Helm Charts Update**: Add Maestro configuration options to adapter Helm charts
@@ -346,6 +363,7 @@ data:
 ## Success Criteria
 
 ### Functional Requirements
+
 - ✅ **Remote Resource Management**: Successfully create/update/delete resources on remote clusters
 - ✅ **Status Reporting**: Accurate status reporting within 30-minute windows
 - ✅ **Authentication**: Secure connection to Maestro infrastructure
@@ -353,6 +371,7 @@ data:
 - ✅ **Error Handling**: Graceful failure handling and recovery
 
 ### Operational Requirements
+
 - ✅ **Deployment**: Simple configuration and deployment process
 - ✅ **Monitoring**: Comprehensive metrics and health checks
 - ✅ **Troubleshooting**: Clear error messages and debugging capabilities
@@ -365,9 +384,11 @@ data:
 ### Alternative Approach a) Ultra-High-Volume Watch Processing
 
 #### Purpose
+
 This approach aims to resolve status updating latency by continuously watching ManifestWork status changes for a period of time, providing near real-time status updates instead of waiting for Sentinel polling cycles.
 
 #### How It Works
+
 - Keep a Watch connection open to Maestro for ManifestWork status changes
 - Process status updates as they arrive rather than polling
 - Report status immediately when changes are detected
@@ -384,7 +405,9 @@ This approach aims to resolve status updating latency by continuously watching M
 | **Diminishing Returns** | Pre-ready 10s polling already provides acceptable latency during provisioning |
 
 #### Recommendation
+
 Use the standard polling-based approach with Sentinel timer:
+
 - **Pre-ready (10s polling)**: Acceptable latency during cluster provisioning
 - **Ready (30min polling)**: Sufficient for stable clusters
 - **Simpler architecture**: No goroutine management complexity
@@ -396,9 +419,11 @@ Use the standard polling-based approach with Sentinel timer:
 ### Alternative Approach b) Sentinel-Only Polling - SELECTED
 
 #### Purpose
+
 Only subscribe to Sentinel events for triggering resource operations and status updates. No Maestro broker watching - status updates are fully controlled by Sentinel polling cycles.
 
 #### How It Works
+
 ```text
 Sentinel Event → Adapter → Apply Resources via Maestro → Get Status via Maestro → Report to HyperFleet API
 ```
@@ -436,9 +461,11 @@ This option is the **simplest solution that will work for MVP**. It keeps the sy
 ### Alternative Approach c) Bidirectional Event-Driven Architecture
 
 #### Purpose
+
 Create a fully event-driven system where adapters only process events and publish status back through broker infrastructure, with Sentinel handling all HyperFleet API calls.
 
 #### How It Works
+
 ```text
 Maestro Events → Adapter (Event Processor) → HyperFleet Broker → Sentinel → HyperFleet API
 ```

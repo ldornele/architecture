@@ -24,6 +24,7 @@ Last Updated: 2026-04-23
 **Why**: A cluster can have multiple required adapters. No single adapter can own hard-delete because it only knows about its own resources, not whether sibling adapters have finished. When a cluster with 500+ nodepools is deleted, cluster adapters may finalize instantly while nodepool adapters take minutes per nodepool. Without ordering enforcement, the cluster would be hard-deleted while nodepools remain orphaned with real infrastructure still running.
 
 **Related Documentation:**
+
 - [ADR 0012 — Hard-Delete Ownership and Execution](../../adrs/0012-hard-delete-mechanism-after-adapter-reconciliation.md) — architectural decision and alternatives
 - [Adapter Deletion Flow Design](../adapter/framework/adapter-deletion-flow-design.md) — adapter-side cleanup, status reporting, and DSL changes
 - [API Service Design](./api-service.md) — API service architecture

@@ -5,6 +5,7 @@ Last Updated: 2025-12-30
 ---
 
 # HyperFleet API Versioning Strategy
+
 - **Date:** 2025-10-30
 - **Related Jira(s):** [HYPERFLEET-65](https://issues.redhat.com/browse/HYPERFLEET-65)
 
@@ -13,6 +14,7 @@ Last Updated: 2025-12-30
 ### What
 
 This document defines the versioning strategy for the **HyperFleet API** - the REST API serving external partners and public consumers. This strategy enables:
+
 - Independent API evolution
 - Safe upgrades and rollbacks
 - Clear backwards compatibility guarantees
@@ -21,11 +23,13 @@ This document defines the versioning strategy for the **HyperFleet API** - the R
 ### Semantic Versioning Principles
 
 The HyperFleet API uses semantic versioning (MAJOR.MINOR.PATCH):
+
 - **MAJOR**: Breaking changes that require consumer updates
 - **MINOR**: Backwards-compatible new functionality
 - **PATCH**: Backwards-compatible bug fixes
 
 **What constitutes a breaking change for the API:**
+
 - Removing endpoints
 - Removing fields from responses
 - Adding required fields to requests
@@ -40,15 +44,18 @@ The HyperFleet API uses semantic versioning (MAJOR.MINOR.PATCH):
 
 ### Versioning Scheme
 
+<!-- markdownlint-disable-next-line MD036 -->
 **URI-based versioning with explicit version requirement**
 
 **API Path Structure:**
-```
+
+```text
 /api/hyperfleet/{version}/{resource}
 ```
 
 **Examples:**
-```
+
+```text
 /api/hyperfleet/v1/clusters
 /api/hyperfleet/v1/clusters/{id}
 /api/hyperfleet/v2/clusters
@@ -56,15 +63,18 @@ The HyperFleet API uses semantic versioning (MAJOR.MINOR.PATCH):
 ```
 
 **Version Format:**
+
 - **MAJOR version only in path**: `v1`, `v2`, `v3`
 - **Full semantic version**: MAJOR.MINOR.PATCH (e.g., `1.2.3`)
 
 This component uses semantic versioning with the following criteria:
+
 - **MAJOR**: Breaking changes (removing fields, changing types, adding required fields)
 - **MINOR**: Additive changes (new endpoints, new optional fields)
 - **PATCH**: Bug fixes, no API contract changes
 
 **Rationale for path structure:**
+
 - Follows existing precedent (e.g., `/api/clusters_mgmt/v1/...`, `/api/account_mgmt/v1/...`)
 - Namespaced under `/api/hyperfleet/` to distinguish from other services
 - Version is explicit in path for clarity and routing simplicity
@@ -75,7 +85,8 @@ This component uses semantic versioning with the following criteria:
 **Version is REQUIRED** - All API requests MUST explicitly include the version in the path.
 
 **Valid requests:**
-```
+
+```text
 GET /api/hyperfleet/v1/clusters
 POST /api/hyperfleet/v2/clusters
 GET /api/hyperfleet/v1/clusters/abc-123
@@ -101,12 +112,14 @@ Content-Type: application/problem+json
 ```
 
 **Routing Implementation:**
+
 - Path-based routing at gateway level
 - Each MAJOR version is a separate deployment (e.g., `hyperfleet-api-v1`, `hyperfleet-api-v2`)
 - Gateway/load balancer routes requests based on `/api/hyperfleet/{version}/` prefix
 - Separate deployments enable independent scaling, rollbacks, and fault isolation
 
 **Why require an explicit version?**
+
 - **Clarity:** No ambiguity about which API version is being used
 - **Safety:** Prevents accidental use of wrong version
 - **Logging/Metrics:** Easy to track which versions are in use
@@ -115,21 +128,25 @@ Content-Type: application/problem+json
 ### Backwards Compatibility Rules
 
 **Allowed within a MAJOR version (additive changes):**
+
 - New optional fields
 - New endpoints
 
 **Not allowed within a MAJOR version (breaking changes require MAJOR bump):**
+
 - Making optional fields required
 - Removing fields
 - Changing field types
 
 **Field Addition Strategy:**
+
 - New fields in MINOR versions: Always optional, never required
 - New required fields: Only allowed in MAJOR versions
 - Document defaults clearly for all optional fields
 
 **Example Evolution:**
-```
+
+```text
 v1.0.0: Initial release with core required fields
 v1.1.0: Add optional "metadata" field
 v1.2.0: Add new /health endpoint, add optional "tags" field
@@ -141,16 +158,19 @@ v2.0.0: Remove deprecated field, make "metadata" required, change "status" from 
 **Critical principle:** Service MAJOR version = API MAJOR version it serves
 
 **Version relationship (separate deployments):**
+
 - Service `1.x.x` → deployed as `hyperfleet-api-v1` → serves **API v1 only**
 - Service `2.x.x` → deployed as `hyperfleet-api-v2` → serves **API v2 only**
 - Service `3.x.x` → deployed as `hyperfleet-api-v3` → serves **API v3 only**
 
 **Why couple service MAJOR to API MAJOR?**
+
 - Clear signal: Service `2.0.0` means "this deployment serves API v2"
 - Semantic: Service MAJOR bump = new API version deployment
 - Simple: Service version tells you which API version that deployment serves
 
 **Service MINOR/PATCH bumps:**
+
 - **MINOR**: New features that don't change API contract (e.g., performance improvements, new internal metrics)
 - **PATCH**: Bug fixes, security patches
 
@@ -165,6 +185,7 @@ v2.0.0: Remove deprecated field, make "metadata" required, change "status" from 
 **Metadata Endpoint (`/api/hyperfleet/metadata`):** Comprehensive service information for debugging and operations. Returns service version, supported API versions, git SHA, and build timestamp.
 
 **Example metadata response:**
+
 ```json
 {
   "service": "hyperfleet-api",

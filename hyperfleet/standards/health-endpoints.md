@@ -6,11 +6,9 @@ Last Updated: 2026-03-20
 
 # HyperFleet Health and Readiness Endpoint Standard
 
-
 ## Overview
 
 This document defines the standard contract for health and readiness endpoints across all HyperFleet components (API, Sentinel, Adapters).
-
 
 ### Goals
 
@@ -71,9 +69,10 @@ Or on failure:
 
 ### `/readyz` - Readiness Probe
 
-**Purpose**: 
- - Indicates whether the application is ready to receive traffic.
- - Controls replacement and concurrency during rollout
+**Purpose**:
+
+- Indicates whether the application is ready to receive traffic.
+- Controls replacement and concurrency during rollout
 
 | Status                    | Meaning                  | Kubernetes Action             |
 | ------------------------- | ------------------------ | ----------------------------- |
@@ -91,7 +90,6 @@ For services that do not serve traffic, the readyz probe does not affect the pod
   - allows Kubernetes to scale down old consumers
 
 ➡️ Readiness controls when Kubernetes is allowed to reduce old consumers.
-
 
 **Response Body**:
 

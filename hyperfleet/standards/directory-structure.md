@@ -24,6 +24,7 @@ This document defines the standard directory structure for all HyperFleet reposi
 ### Problem Statement
 
 Currently, HyperFleet repositories have inconsistent directory structures:
+
 - Binaries are output to different locations (some to `bin/`, others to project root)
 - Source code organization varies between repositories
 - Kubernetes manifests and Helm charts are in different locations
@@ -31,6 +32,7 @@ Currently, HyperFleet repositories have inconsistent directory structures:
 - `.gitignore` files have different coverage
 
 This inconsistency creates friction when:
+
 - Developers switch between repositories
 - CI/CD pipelines need to locate artifacts
 - Tooling assumes standard paths
@@ -47,6 +49,7 @@ This inconsistency creates friction when:
 ### Scope
 
 This standard applies to:
+
 - All HyperFleet service repositories
 - All adapter repositories (adapter-pullsecret, adapter-dns, etc.)
 - Infrastructure and tooling repositories
@@ -57,7 +60,7 @@ This standard applies to:
 
 All HyperFleet repositories **MUST** follow this directory structure:
 
-```
+```text
 repo-root/
 ├── bin/                    # Compiled binaries (gitignored)
 │   └── app-name            # Compiled binary (e.g., pull-secret, dns-adapter)
@@ -216,18 +219,18 @@ go.work.sum
 vendor/
 ```
 
-
 ---
 
 ## References
 
 ### Related Documents
+
 - [Makefile Conventions](makefile-conventions.md) - Standard Makefile targets
 - [Container Image Standard](container-image-standard.md) - Dockerfile conventions, base images, and labels
 
 ### External Resources
+
 - [Go Project Layout](https://github.com/golang-standards/project-layout)
 - [Kubernetes Documentation](https://kubernetes.io/docs/concepts/)
 - [Kustomize Documentation](https://kustomize.io/)
 - [Helm Best Practices](https://helm.sh/docs/chart_best_practices/)
-

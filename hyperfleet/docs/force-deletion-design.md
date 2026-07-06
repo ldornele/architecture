@@ -9,6 +9,7 @@ Last Updated: 2026-05-06
 **Jira**: [HYPERFLEET-895](https://redhat.atlassian.net/browse/HYPERFLEET-895)
 
 **Related**:
+
 - [Adapter Deletion Flow Design](../components/adapter/framework/adapter-deletion-flow-design.md)
 - [Hard Delete Design](../components/api-service/hard-delete-design.md)
 - [ADR 0013 — Force Delete Scope: Database-Only](../adrs/0013-force-delete-scope-db-only.md)
@@ -146,18 +147,22 @@ The force-delete endpoint requires a `reason` in the request body. The reason is
 ### DeletionStuck Condition via Sentinel
 
 **What**:
+
 - When a resource exceeds a configurable deletion timeout, Sentinel POSTs a `DeletionStuck=True` condition to the resource's `status.conditions` via the API. Operators search for stuck resources via TSL: `GET /clusters?search=status.conditions.DeletionStuck='True'`.
 
 **Why Rejected**:
+
 - Sentinel is read-only by design. It polls the API and publishes CloudEvents. Adding write capabilities changes Sentinel from observer to actor, violating single-responsibility (see [ADR 0012](../adrs/0012-hard-delete-mechanism-after-adapter-reconciliation.md)).
 - The API-owned deletion observability metrics and TSL filtering on `deleted_time` provide equivalent operator visibility without changing Sentinel's role.
 
 ### Per-Adapter Skip Annotations
 
 **What**:
+
 - An annotation (`hyperfleet.io/skip-cleanup-ADAPTER_NAME`) on a resource tells the system to skip a specific adapter during the normal deletion flow, allowing the remaining adapters to finalize while bypassing the stuck one.
 
 **Why Rejected**:
+
 - Force delete already covers the "adapter is stuck" scenario. The skip flag adds a middle ground (skip one, wait for the rest) that touches API, Sentinel, and the adapter framework for a narrow case.
 - If the healthy adapters are running, they handle 404s gracefully when a force-deleted resource disappears. The practical difference between letting them finish cleanup and force-deleting while they no-op on 404 is minimal.
 - Keeping deletion binary (normal waits for all, force bypasses all) is simpler to reason about and implement.
@@ -165,31 +170,38 @@ The force-delete endpoint requires a `reason` in the request body. The reason is
 ### Separate `/admin/` Endpoint Path
 
 **What**:
+
 - Expose force-delete under a dedicated `/admin/clusters/{id}/force-delete` path, outside the versioned `/api/hyperfleet/{version}/` convention.
 
 **Why Rejected**:
+
 - Introduces a second routing convention to maintain alongside the existing versioned API.
 - Force-delete is still an operation on a HyperFleet resource. Placing it outside `/api/hyperfleet/` implies it is not part of the API.
 
 ### Hybrid `/api/hyperfleet/v1/admin/` Path
 
 **What**:
+
 - Nest an `admin` segment inside the versioned path: `/api/hyperfleet/v1/admin/clusters/{id}/force-delete`.
 
 **Why Rejected**:
+
 - `admin` in the path breaks the convention that path segments represent resources or collections, creating ambiguity about what `admin` refers to.
 
 ### Action-Prefixed Endpoint (`admin-force-delete`)
 
 **What**:
+
 - Embed the access level in the action name: `/api/hyperfleet/v1/clusters/{id}/admin-force-delete`.
 
 **Why Rejected**:
+
 - Mixes access control with the action name. The action should describe what it does, not who can call it.
 
 ### Async Force Delete
 
 **What**:
+
 - Admin calls the delete endpoint with `?force=true`.
 - Instead of immediately hard-deleting, the API sets a `force_delete` signal on the resource in the DB.
 - Sentinel polls, detects the change, publishes an event.
@@ -198,7 +210,7 @@ The force-delete endpoint requires a `reason` in the request body. The reason is
 - A variation adds a timeout: if adapters do not respond, a background job in the API hard-deletes the records anyway.
 
 **Why Rejected**:
+
 - If adapters are reachable, the async path round-trips through Sentinel and adapters only to report `Finalized=True`. The records get hard-deleted either way.
 - If adapters are unreachable, the async path is blocked for the same reason as normal deletion.
 - The timeout variation requires code changes in all three components (API, Sentinel, adapters) instead of just the API, a background job in the API to monitor expired timeouts, and still needs sync hard-delete as a fallback.
-

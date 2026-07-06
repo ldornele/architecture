@@ -120,7 +120,6 @@ This matrix shows which sections of the architecture are most influenced by each
 | [Database](#5-database-schema) | 🔵 High | - | 🟡 Medium | 🔴 High | 🟠 Low | - | - |
 | [Security](#6-security-architecture) | 🔵 Medium | - | - | 🔴 High | 🟠 Low | 🟤 High | ⚫ Low |
 
-
 **Legend**: 🔵 Lift & Shift | 🟢 Cloud Agnostic | 🟡 Flexible Deployment | 🔴 Security First | 🟠 Extensible Registries | 🟤 Dedicated Partner | ⚫ T-Rex Pattern
 
 ---
@@ -159,6 +158,7 @@ graph LR
 <summary><b>Example 1: Advisory Lock Pattern (Section2 Components)</b></summary>
 
 **AMS Pattern:**
+
 ```go
 // uhc-account-manager/pkg/dao/registry_credential.go
 func (d *DAO) AcquireAdvisoryLock(ctx context.Context, clusterID string) {
@@ -168,6 +168,7 @@ func (d *DAO) AcquireAdvisoryLock(ctx context.Context, clusterID string) {
 ```
 
 **HyperFleet Adoption (identical):**
+
 ```go
 // hyperfleet/pull-secret-service/pkg/dao/registry_credential.go
 func (d *DAO) AcquireAdvisoryLock(ctx context.Context, clusterID string) {
@@ -186,6 +187,7 @@ func (d *DAO) AcquireAdvisoryLock(ctx context.Context, clusterID string) {
 <summary><b>Example 2: Database Schema Reuse (Section5 Database)</b></summary>
 
 **AMS Schema:**
+
 ```sql
 -- uhc-account-manager/pkg/db/migrations/20210415_registry_credentials.sql
 CREATE TABLE registry_credentials (
@@ -199,6 +201,7 @@ CREATE TABLE registry_credentials (
 ```
 
 **HyperFleet Adoption (semantic mapping):**
+
 ```sql
 -- hyperfleet/pull-secret-service/pkg/db/migrations/001_registry_credentials.sql
 CREATE TABLE registry_credentials (
@@ -223,6 +226,7 @@ CREATE TABLE registry_credentials (
 **Core Pattern**: When creating credentials for multiple registries (Quay + RHIT), AMS fails the entire operation if ANY registry fails, rather than returning partial success.
 
 **AMS Pattern:**
+
 ```go
 // uhc-account-manager/pkg/services/access_token.go
 func (s *AccessTokenService) Create(ctx context.Context, username string, externalResourceId string) (*AccessTokenCfg, *errors.ServiceError) {
@@ -243,6 +247,7 @@ func (s *AccessTokenService) Create(ctx context.Context, username string, extern
 ```
 
 **HyperFleet Adoption (identical behavior):**
+
 ```go
 // hyperfleet/pull-secret-service/pkg/services/access_token.go
 func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID string) (*PullSecret, error) {
@@ -274,6 +279,7 @@ func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID st
 ```
 
 **Why All-or-Nothing?**
+
 - ✅ **Clear semantics**: Client gets either complete pull secret or error - no ambiguity
 - ✅ **Prevents silent failures**: Partial pull secret would fail at runtime when pulling from missing registry
 - ✅ **Idempotent retries**: Client can safely retry, existing credentials are reused
@@ -320,6 +326,7 @@ sequenceDiagram
    - Retries eventually converge to success
 
 2. **Orphaned Credential Cleanup** (proactive):
+
    ```go
    // Reconciliation job runs daily
    func (j *OrphanedCredentialsCleanup) Run(ctx context.Context) error {
@@ -346,6 +353,7 @@ sequenceDiagram
    - Lock scope: `account_id + external_resource_id`
 
 **Observability:**
+
 ```go
 // Metrics for monitoring partial failures
 registry_credential_failures_total{registry="quay"}     // Track per-registry failures
@@ -355,6 +363,7 @@ pull_secret_retry_success_total                          // Track recovery via r
 ```
 
 **Client Retry Guidance:**
+
 | Error Code | Retry? | Strategy | Reason |
 |------------|--------|----------|--------|
 | 500 Internal Error | ✅ Yes | Exponential backoff (2s, 4s, 8s) | Partial failure or temporary API issue |
@@ -363,14 +372,15 @@ pull_secret_retry_success_total                          // Track recovery via r
 | 409 Conflict | ✅ Yes | Linear backoff (5s) | Rotation in progress |
 
 **Trade-off**: Orphaned credentials exist temporarily (until retry or cleanup job), but this is acceptable because:
+
 - Idempotent retries automatically resolve partial state
 - Cleanup job removes truly orphaned credentials (> 24h old)
 - Clear error semantics prevent silent runtime failures
 
-
 </details>
 
 **Trade-offs Accepted:**
+
 - ✅ **Faster time-to-market**: 70% code reuse → 6 months dev time saved
 - ✅ **Lower risk**: AMS patterns proven at scale (10K+ clusters)
 - ⚠️ **Technical debt**: Some AMS-specific naming (e.g., `AccountID` column) retained
@@ -412,6 +422,7 @@ graph TB
 <summary><b>Example 1: Registry Interface Abstraction (Section2 Components)</b></summary>
 
 **Interface (Cloud-Agnostic):**
+
 ```go
 // pkg/client/registry/interface.go
 type RegistryClient interface {
@@ -421,6 +432,7 @@ type RegistryClient interface {
 ```
 
 **Quay Implementation:**
+
 ```go
 // pkg/client/quay/client.go
 func (c *QuayClient) CreateCredential(ctx context.Context, name string) (*Credential, error) {
@@ -431,6 +443,7 @@ func (c *QuayClient) CreateCredential(ctx context.Context, name string) (*Creden
 ```
 
 **RHIT Implementation:**
+
 ```go
 // pkg/client/rhit/client.go
 func (c *RHITClient) CreateCredential(ctx context.Context, name string) (*Credential, error) {
@@ -441,6 +454,7 @@ func (c *RHITClient) CreateCredential(ctx context.Context, name string) (*Creden
 ```
 
 **Service Layer (No Cloud Logic):**
+
 ```go
 // pkg/services/access_token.go
 func (s *AccessTokenService) GeneratePullSecret(ctx context.Context, clusterID string) {
@@ -467,6 +481,7 @@ func (s *AccessTokenService) GeneratePullSecret(ctx context.Context, clusterID s
 <summary><b>Example 2: Adapter Pattern for Cloud Storage (Section4 Deployment)</b></summary>
 
 **Before (Anti-pattern):**
+
 ```go
 // ❌ BAD: Cloud-specific logic in service
 func (s *Service) StorePullSecret(pullSecret string, clusterID string) {
@@ -479,6 +494,7 @@ func (s *Service) StorePullSecret(pullSecret string, clusterID string) {
 ```
 
 **After (Adapter Pattern):**
+
 ```go
 // ✅ GOOD: Service only returns pull secret
 func (s *Service) GeneratePullSecret(clusterID string) string {
@@ -503,6 +519,7 @@ func (a *AWSAdapter) OnPullSecretGenerated(pullSecret string) {
 </details>
 
 **Trade-offs Accepted:**
+
 - ✅ **Single codebase**: One Docker image for GCP, AWS, Azure
 - ✅ **Faster feature parity**: New feature available on all clouds simultaneously
 - ⚠️ **Lowest common denominator**: Can't use cloud-specific features (e.g., GCP Workload Identity Federation)
@@ -533,6 +550,7 @@ graph LR
 ```
 
 **Architecture Support**: The service design accommodates **both** deployment models through:
+
 - Cloud-agnostic core (Principle 2)
 - Configurable database connection (per-region or global)
 - Optional global load balancer integration
@@ -546,6 +564,7 @@ graph LR
 **Use Case**: Multi-region managed service across GCP, AWS, Azure
 
 **Deployment:**
+
 ```yaml
 # us-east-1 instance
 apiVersion: apps/v1
@@ -581,6 +600,7 @@ spec:
 ```
 
 **Benefits**:
+
 - ✅ us-east-1 outage does NOT affect eu-west-1
 - ✅ In-cluster networking only (simple)
 - ✅ Data stays in region (GDPR compliant)
@@ -595,6 +615,7 @@ spec:
 **Use Case**: Single datacenter OCP deployment, centralized operations
 
 **Deployment:**
+
 ```yaml
 # Global service with multi-region replicas
 apiVersion: apps/v1
@@ -617,6 +638,7 @@ spec:
 ```
 
 **Global Load Balancer:**
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -632,6 +654,7 @@ spec:
 ```
 
 **Benefits**:
+
 - ✅ Single deployment to manage
 - ✅ Shared credential pool (resource efficient)
 - ✅ Centralized audit trail
@@ -698,18 +721,21 @@ graph TB
 Security is not an afterthought—it's the foundation of the architecture. Every API request must traverse **5 defensive layers** before accessing credentials:
 
 **Layer 1: Authentication** - *Who are you?*
+
 - **Purpose**: Validate the identity of the API caller
 - **Implementation**: Kubernetes ServiceAccount tokens validated using TokenReview API
 - **Example**: GCP Adapter presents a valid ServiceAccount token before making any operation
 - **Protection**: Invalid tokens are rejected immediately (401 Unauthorized)
 
 **Layer 2: Authorization** - *What can you do?*
+
 - **Purpose**: Verify the authenticated user has permission for the requested operation
 - **Implementation**: Kubernetes RBAC (Role-Based Access Control) policies
 - **Example**: GCP Adapter can create credentials, but a read-only user cannot
 - **Protection**: Even with valid authentication, unauthorized operations are blocked (403 Forbidden)
 
 **Layer 3: Encryption at Rest** - *Data protected in storage*
+
 - **Purpose**: Encrypt tokens/passwords before saving to database
 - **Implementation**: Application-level encryption using Go's `crypto/aes` with AES-256-GCM mode
   - Encryption happens in application code **before** database insert
@@ -722,6 +748,7 @@ Security is not an afterthought—it's the foundation of the architecture. Every
 - **Compliance**: Required by SOC 2, ISO 27001, GDPR for credential storage
 
 **Layer 4: Encryption in Transit** - *Data protected during transmission*
+
 - **Purpose**: Encrypt data while traveling over the network
 - **Implementation**:
   - TLS for in-cluster communication (Adapter → Service)
@@ -730,6 +757,7 @@ Security is not an afterthought—it's the foundation of the architecture. Every
 - **Protection**: Prevents man-in-the-middle attacks and network eavesdropping
 
 **Layer 5: Audit Logging** - *Who did what, when, and why?*
+
 - **Purpose**: Create immutable audit trail for every credential operation
 - **Implementation**: Dedicated `credential_audit_log` table records all actions
 - **Example**: Every create/rotate/delete operation logs:
@@ -750,8 +778,8 @@ The layered approach ensures that **even if one layer is compromised, the others
 - If Layer 3 fails (database leaked): Tokens are encrypted and useless without the key
 - If Layer 4 fails (network compromised): Tokens in the database remain encrypted
 
-
 **Trade-offs Accepted:**
+
 - ✅ **Defense in depth**: Multiple layers of security (not relying on single control)
 - ✅ **Compliance ready**: Meets SOC 2, ISO 27001, GDPR requirements
 - ⚠️ **Performance overhead**: Encryption/decryption adds ~10-20ms latency per query
@@ -874,6 +902,7 @@ graph TB
 <summary><b>Example 1: RegistryClient Interface (Section2.3 Components)</b></summary>
 
 **Interface definition (cloud and vendor agnostic):**
+
 ```go
 // pkg/client/registry/interface.go
 type RegistryClient interface {
@@ -903,6 +932,7 @@ type Credential struct {
 **Why**: Single interface allows Pull Secret Service to work with any registry without knowing implementation details. Service code uses `RegistryClient` interface, not concrete implementations.
 
 **Service code is registry-agnostic:**
+
 ```go
 // pkg/service/pull_secret_service.go
 func (s *PullSecretService) Create(ctx context.Context, clusterID, registryID string) error {
@@ -926,6 +956,7 @@ func (s *PullSecretService) Create(ctx context.Context, clusterID, registryID st
 <summary><b>Example 2: Harbor Client Implementation (Section2.3 Components)</b></summary>
 
 **Harbor registry client:**
+
 ```go
 // pkg/client/harbor/client.go
 type HarborClient struct {
@@ -979,6 +1010,7 @@ func (c *HarborClient) ValidateCredential(ctx context.Context, cred *Credential)
 ```
 
 **Configuration (Section2 Deployment):**
+
 ```yaml
 # config/registries.yaml
 registries:
@@ -1012,6 +1044,7 @@ registries:
 <summary><b>Example 3: Registry Selection in Service Logic (Section2 Components)</b></summary>
 
 **Flow supports multiple registries:**
+
 ```go
 // Pull Secret generation checks all configured registries
 func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID string) (*PullSecret, error) {
@@ -1053,6 +1086,7 @@ func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID st
 ```
 
 **Resulting pull secret (multi-registry):**
+
 ```json
 {
   "auths": {
@@ -1082,6 +1116,7 @@ func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID st
 | [Section5 Database](#5-database-schema) | `registry_id` column stores arbitrary registry identifiers (not enum) |
 
 **Trade-offs Accepted:**
+
 - ✅ **Zero vendor lock-in**: Can migrate from Quay to Harbor without service code changes
 - ✅ **Customer flexibility**: Enterprise customers can use their own private registries
 - ✅ **Future-proof**: New registry types (OCI Distribution, GitHub Packages) can be added as plugins
@@ -1157,6 +1192,7 @@ quotas:
 ```
 
 **RHIT API Endpoint:**
+
 ```go
 // AMS uses this endpoint
 POST https://api.access.redhat.com/management/v1/partners/ocm-service/service-accounts
@@ -1166,6 +1202,7 @@ POST https://api.access.redhat.com/management/v1/partners/hyperfleet/service-acc
 ```
 
 **Why**: Complete namespace isolation means:
+
 - HyperFleet service account names cannot conflict with AMS names
 - Different rate limits and quotas apply
 - Audit logs clearly distinguish between AMS and HyperFleet operations
@@ -1192,6 +1229,7 @@ $ kubectl create secret tls hyperfleet-rhit-cert \
 ```
 
 **mTLS Configuration:**
+
 ```go
 // pkg/client/rhit/client.go
 func NewRHITClient(config *Config) *RHITClient {
@@ -1214,7 +1252,8 @@ func NewRHITClient(config *Config) *RHITClient {
 ```
 
 **Certificate expiry:**
-```
+
+```text
 AMS cert expires:       2026-12-31 (AMS team manages)
 HyperFleet cert expires: 2027-06-30 (HyperFleet team manages)
 ```
@@ -1251,6 +1290,7 @@ HyperFleet cert expires: 2027-06-30 (HyperFleet team manages)
 ```
 
 **RHIT Query (find all HyperFleet operations):**
+
 ```bash
 # Filter by partner code
 $ rhit-cli audit-logs --partner-code hyperfleet --since 7d
@@ -1275,6 +1315,7 @@ $ rhit-cli audit-logs --partner-code hyperfleet --since 7d
 | [Section6 Security](#6-security-architecture) | Independent certificate rotation schedule |
 
 **Trade-offs Accepted:**
+
 - ✅ **Operational independence**: HyperFleet team controls partner identity lifecycle
 - ✅ **Clear ownership**: No confusion about which service owns which service accounts
 - ✅ **Security isolation**: Certificate compromise in AMS doesn't affect HyperFleet
@@ -1374,6 +1415,7 @@ graph TB
 <summary><b>Example 1: API-Driven Architecture (Section3 API Design)</b></summary>
 
 **Pull Secret Service (T-Rex - Short Arms)**:
+
 ```go
 // pkg/handler/pull_secret_handler.go
 func (h *PullSecretHandler) GeneratePullSecret(w http.ResponseWriter, r *http.Request) {
@@ -1392,6 +1434,7 @@ func (h *PullSecretHandler) GeneratePullSecret(w http.ResponseWriter, r *http.Re
 ```
 
 **Pull Secret Adapter (Extension - Long Arms)**:
+
 ```go
 // GCP Adapter - WRITES to cluster (extends T-Rex arms)
 func (a *GCPAdapter) ProvisionCluster(ctx context.Context, cluster *Cluster) error {
@@ -1427,6 +1470,7 @@ func (a *GCPAdapter) ProvisionCluster(ctx context.Context, cluster *Cluster) err
 <summary><b>Example 2: No Cluster Credentials in Service (Section6 Security)</b></summary>
 
 **Service Environment Variables (MINIMAL)**:
+
 ```yaml
 # Deployment: pull-secret-service
 apiVersion: apps/v1
@@ -1461,6 +1505,7 @@ spec:
 ```
 
 **Adapter Environment Variables (HAS CLUSTER ACCESS)**:
+
 ```yaml
 # Deployment: gcp-adapter
 apiVersion: apps/v1
@@ -1497,6 +1542,7 @@ spec:
 <summary><b>Example 3: API Contract Enforces Separation (Section3 API Design)</b></summary>
 
 **API Response (Service Returns Data, NOT Side Effects)**:
+
 ```json
 // POST /v1/clusters/cls-abc123/pull-secrets
 // Response 200 OK
@@ -1527,6 +1573,7 @@ spec:
 ```
 
 **What if Service wrote directly to cluster? (ANTI-PATTERN - NOT T-Rex)**:
+
 ```go
 // ❌ BAD: Service writing directly to cluster (violates T-Rex pattern)
 func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID string) error {
@@ -1540,12 +1587,14 @@ func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID st
 ```
 
 **Why BAD**:
+
 - ❌ Service needs cluster credentials (security risk)
 - ❌ Service must know Kubernetes API (tight coupling)
 - ❌ Service must handle GKE, EKS, AKS differences (not cloud-agnostic)
 - ❌ Service becomes complex and hard to test
 
 **T-Rex Pattern Benefits**:
+
 - ✅ Service has NO cluster credentials (smaller attack surface)
 - ✅ Service is cloud-agnostic (doesn't know about GKE/EKS/AKS)
 - ✅ Adapters handle cloud-specific logic (separation of concerns)
@@ -1563,6 +1612,7 @@ func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID st
 | [Section6 Security](#6-security-architecture) | Service has NO cloud provider credentials, only registry API credentials |
 
 **Trade-offs Accepted:**
+
 - ✅ **Reduced attack surface**: Service compromise doesn't expose cluster access
 - ✅ **Simpler service logic**: No need to understand GKE/EKS/AKS APIs
 - ✅ **Better separation of concerns**: Service generates credentials, adapters deploy them
@@ -1573,12 +1623,14 @@ func (s *PullSecretService) GeneratePullSecret(ctx context.Context, clusterID st
 **Why "T-Rex Pattern"?**
 
 Like a Tyrannosaurus Rex with famously short arms:
+
 - **Short Arms (Limited Reach)**: Service can only reach its own database and registry APIs
 - **Cannot Reach Far**: Service CANNOT reach clusters, cloud providers, or Kubernetes APIs
 - **Delegates to Extensions**: Adapters act as "extended arms" to write secrets to clusters
 - **Arms-Length Separation**: Service maintains arms-length distance from cluster operations
 
 This pattern is also known as:
+
 - **Arms-Length Pattern**: Keeping service at arms-length from clusters
 - **API Gateway Pattern**: Service exposes API, clients handle side effects
 - **Pull Model**: Adapters PULL data from service (vs service PUSHing to clusters)
@@ -1604,6 +1656,7 @@ This pattern is also known as:
 ## 2. Architecture Components
 
 > **🔗 Design Principles Applied:**
+>
 > - **Principle 1 (Lift and Shift)**: Service layer mirrors AMS structure (`AccessTokenService`, `RegistryCredentialService`)
 > - **Principle 2 (Cloud Agnostic)**: External clients abstracted (QuayClient, RHITClient) - no cloud-specific logic
 > - **Principle 5 (Extensible Registries)**: `CustomRegistryClient` implements `RegistryClient` interface, enabling support for Harbor, Nexus, and any custom registry
@@ -2018,6 +2071,7 @@ To add support for a new registry type:
 ## 3. API Design
 
 > **🔗 Design Principles Applied:**
+>
 > - **Principle 1 (Lift and Shift)**: API structure mirrors AMS endpoints (`/clusters/{id}/pull-secrets`)
 > - **Principle 2 (Cloud Agnostic)**: No cloud-specific parameters in API contract
 
@@ -2081,12 +2135,14 @@ graph LR
 **Purpose**: Generate or retrieve pull secret for a cluster. Idempotent operation - returns existing credentials if already created.
 
 **Request Headers**:
+
 ```http
 Authorization: Bearer <k8s_serviceaccount_token>
 Content-Type: application/json
 ```
 
 **Request Body**:
+
 ```json
 {
   "cluster_id": "cls-abc123def456",
@@ -2097,6 +2153,7 @@ Content-Type: application/json
 ```
 
 **Response 200 OK**:
+
 ```json
 {
   "cluster_id": "cls-abc123def456",
@@ -2132,9 +2189,11 @@ Content-Type: application/json
 ```
 
 **Response 400 Bad Request**:
+
 ```http
 Content-Type: application/problem+json
 ```
+
 ```json
 {
   "type": "https://api.hyperfleet.io/errors/validation-error",
@@ -2157,9 +2216,11 @@ Content-Type: application/problem+json
 ```
 
 **Response 409 Conflict**:
+
 ```http
 Content-Type: application/problem+json
 ```
+
 ```json
 {
   "type": "https://api.hyperfleet.io/errors/resource-conflict",
@@ -2184,14 +2245,17 @@ Content-Type: application/problem+json
 **Purpose**: Retrieve existing pull secret for a cluster.
 
 **Request Headers**:
+
 ```http
 Authorization: Bearer <k8s_serviceaccount_token>
 ```
 
 **Query Parameters**:
+
 - `include_metadata` (optional): Include credential metadata (default: false)
 
 **Response 200 OK**:
+
 ```json
 {
   "cluster_id": "cls-abc123def456",
@@ -2211,9 +2275,11 @@ Authorization: Bearer <k8s_serviceaccount_token>
 ```
 
 **Response 404 Not Found**:
+
 ```http
 Content-Type: application/problem+json
 ```
+
 ```json
 {
   "type": "https://api.hyperfleet.io/errors/resource-not-found",
@@ -2237,6 +2303,7 @@ Content-Type: application/problem+json
 **Purpose**: Initiate credential rotation for a cluster.
 
 **Request Body**:
+
 ```json
 {
   "reason": "scheduled",
@@ -2245,11 +2312,13 @@ Content-Type: application/problem+json
 ```
 
 **Reason Values**:
+
 - `scheduled`: Periodic rotation (every 90 days)
 - `compromise`: Security incident
 - `manual`: Operator-initiated
 
 **Response 201 Created**:
+
 ```json
 {
   "rotation_id": "rot-xyz789",
@@ -2263,9 +2332,11 @@ Content-Type: application/problem+json
 ```
 
 **Response 409 Conflict**:
+
 ```http
 Content-Type: application/problem+json
 ```
+
 ```json
 {
   "type": "https://api.hyperfleet.io/errors/resource-conflict",
@@ -2282,17 +2353,17 @@ Content-Type: application/problem+json
 }
 ```
 
-**Credential Rotation Lifecycle Details**
+#### Credential Rotation Lifecycle Details
 
 The credential rotation process follows the **AMS (Account Management Service) pattern** inherited via Lift & Shift (Principle 1).
-
 
 **What is the Dual Credential Period?**
 
 The **dual credential period** is the overlap window where **both old and new credentials are simultaneously valid**. This ensures clusters can continue pulling images during the transition.
 
 **Timeline**:
-```
+
+```text
 T0: Old credential only (ACTIVE)
 T1: Rotation triggered → Old credentials marked as "rotating"
 T2: New credentials created
@@ -2309,7 +2380,6 @@ T4: Cluster confirms readiness → Old credentials deleted
 | Pre-Rotation | ✅ Active | ❌ Not created | Indefinite |
 | **Dual Period** | ✅ Active (marked "rotating") | ✅ Active | **Until cluster confirms readiness** |
 | Post-Rotation | ❌ Deleted | ✅ Active | Indefinite |
-
 
 **How Does the Service Know New Credentials Are Being Used?**
 
@@ -2337,13 +2407,14 @@ The AMS (uhc-account-manager) uses an elegant approach where **cluster telemetry
 
 #### Complete Rotation Flow
 
-**Phase 1: User Initiates Rotation**
+##### Phase 1: User Initiates Rotation
 
 ```http
 POST /api/accounts_mgmt/v1/accounts/{account_id}/pull_secret_rotation
 ```
 
 **What Happens** (`pull_secret_rotation.go:45-117`):
+
 ```go
 // 1. Create PullSecretRotation record
 rotation := &api.PullSecretRotation{
@@ -2365,6 +2436,7 @@ for _, subscription := range activeSubscriptions {
 ```
 
 **Database State**:
+
 ```sql
 -- pull_secret_rotations table
 INSERT INTO pull_secret_rotations (id, account_id, status)
@@ -2377,7 +2449,7 @@ VALUES ('ct-001', 'cls-abc123', 'user@example.com', 'user@example.com', 'pending
 
 ---
 
-**Phase 2: Reconciler Creates New Credentials**
+##### Phase 2: Reconciler Creates New Credentials
 
 **Job**: `pull_secret_rotations_reconciler.go`
 **Trigger**: Periodic execution (configurable interval)
@@ -2417,6 +2489,7 @@ for _, rotation := range rotations {
 ```
 
 **Database State After Reconciler**:
+
 ```sql
 -- registry_credentials table
 -- OLD credentials (marked for deletion)
@@ -2438,7 +2511,7 @@ WHERE pull_secret_rotation_id = 'rot-789';
 
 ---
 
-**Phase 3: Cluster Updates Pull Secret**
+##### Phase 3: Cluster Updates Pull Secret
 
 **In-Cluster Components**:
 
@@ -2453,7 +2526,7 @@ WHERE pull_secret_rotation_id = 'rot-789';
 
 ---
 
-**Phase 4: Cluster Registration Detects New Credential**
+##### Phase 4: Cluster Registration Detects New Credential
 
 **Code**: `cluster_registration.go:70-131`
 
@@ -2483,7 +2556,7 @@ func (s *clusterRegistrationService) Register(ctx context.Context,
 
 ---
 
-**Phase 5: Transfer Completion Check**
+##### Phase 5: Transfer Completion Check
 
 **Code**: `cluster_transfer.go:459-610`
 
@@ -2532,6 +2605,7 @@ func (s *sqlClusterTransferService) Transfer(ctx context.Context, clusterUUID st
 ```
 
 **Key Lines** (`cluster_transfer.go:493-504`):
+
 ```go
 // Confirm recipient account matches with the account passed in to cluster_registration
 // There can be scenarios where cluster_registration is called from the current owner's
@@ -2547,7 +2621,7 @@ func (s *sqlClusterTransferService) Transfer(ctx context.Context, clusterUUID st
 
 ---
 
-**Phase 6: Reconciler Deletes Old Credentials**
+##### Phase 6: Reconciler Deletes Old Credentials
 
 **Trigger**: Reconciler job runs again, checks if all ClusterTransfers are completed
 
@@ -2707,7 +2781,6 @@ For HyperFleet Pull Secret Service, adopt the same pattern with minor adjustment
 | `cluster_registration` | Cluster heartbeat/telemetry endpoint | Verify credential in use |
 | Reconciler job | Same pattern | Create credentials, check completions, cleanup |
 
-
 ---
 
 #### 3.2.4 Get Rotation Status
@@ -2717,6 +2790,7 @@ For HyperFleet Pull Secret Service, adopt the same pattern with minor adjustment
 **Purpose**: Retrieve status of a specific rotation.
 
 **Response 200 OK**:
+
 ```json
 {
   "rotation_id": "rot-xyz789",
@@ -2736,6 +2810,7 @@ For HyperFleet Pull Secret Service, adopt the same pattern with minor adjustment
 ```
 
 **Rotation Status Values**:
+
 - `pending`: Rotation created, not yet started
 - `in_progress`: New credentials created, waiting for cluster health confirmation
 - `completed`: Old credentials revoked, rotation complete
@@ -2750,18 +2825,21 @@ For HyperFleet Pull Secret Service, adopt the same pattern with minor adjustment
 **Purpose**: Retrieve paginated list of credential rotations for a cluster.
 
 **Query Parameters**:
+
 - `status` (optional): Filter by rotation status (`pending`, `in_progress`, `completed`, `failed`)
 - `limit` (optional): Number of results per page (default: 50, max: 100)
 - `cursor` (optional): Pagination cursor from previous response (cursor-based pagination for consistent results during concurrent writes)
 - `since` (optional): RFC3339 timestamp - only return rotations created after this time
 
 **Request Example**:
+
 ```http
 GET /v1/clusters/cls-abc123/pull-secrets/rotations?status=in_progress&limit=20
 Authorization: Bearer <k8s_serviceaccount_token>
 ```
 
 **Response 200 OK**:
+
 ```json
 {
   "rotations": [
@@ -2793,11 +2871,13 @@ Authorization: Bearer <k8s_serviceaccount_token>
 ```
 
 **Pagination Strategy**: Cursor-based pagination (not offset-based)
+
 - **Why cursor-based**: Prevents missing/duplicate results when new rotations are created during pagination
 - **Cursor format**: Base64-encoded JSON with `{created_at, id}` for stable ordering
 - **Sort order**: Descending by `created_at` (newest first), with `rotation_id` as tiebreaker
 
 **Empty Result (no rotations)**:
+
 ```json
 {
   "rotations": [],
@@ -2810,6 +2890,7 @@ Authorization: Bearer <k8s_serviceaccount_token>
 ```
 
 **Error Responses**:
+
 - **404 Not Found**: Cluster does not exist
 - **400 Bad Request**: Invalid query parameters (e.g., `limit > 100`, invalid cursor, malformed `since` timestamp)
 
@@ -2824,12 +2905,14 @@ Authorization: Bearer <k8s_serviceaccount_token>
 **Purpose**: Delete all credentials for a cluster and revoke access at registry level. Used during cluster deprovisioning.
 
 **Behavior**: **Hard delete with cascade**
+
 - Immediately revokes credentials at registry APIs (Quay robot account deletion, RHIT service account removal)
 - Deletes all credential records from database
 - Cancels any pending rotations (rotations in `pending` or `in_progress` status are marked as `cancelled`)
 - Preserves audit log entries for compliance (records in `credential_audit_log` are **NOT** deleted)
 
 **Request Example**:
+
 ```http
 DELETE /v1/clusters/cls-abc123/pull-secrets
 Authorization: Bearer <k8s_serviceaccount_token>
@@ -2842,6 +2925,7 @@ Authorization: Bearer <k8s_serviceaccount_token>
 **Error Responses**:
 
 **409 Conflict** - Rotation in progress, cannot delete immediately:
+
 ```json
 {
   "type": "https://api.hyperfleet.io/errors/resource-conflict",
@@ -2859,10 +2943,12 @@ Authorization: Bearer <k8s_serviceaccount_token>
 ```
 
 **Conflict Resolution Strategy**:
+
 1. **Automatic cancellation (default)**: Service automatically cancels the rotation and proceeds with deletion (dual-credential period is terminated, old credentials remain active)
 2. **Wait for completion (alternative)**: Client waits for rotation to complete, then retries delete
 
 **500 Internal Server Error** - Partial registry revocation failure:
+
 ```json
 {
   "type": "https://api.hyperfleet.io/errors/internal-error",
@@ -2883,11 +2969,13 @@ Authorization: Bearer <k8s_serviceaccount_token>
 ```
 
 **Partial Failure Behavior**:
+
 - If Quay revocation succeeds but RHIT fails → Database marks credentials as `pending_deletion`, returns `500` with retry guidance
 - Background cleanup job retries registry revocation every 5 minutes
 - Client can safely retry DELETE (idempotent - checks `pending_deletion` state)
 
 **Audit Trail**: Every deletion is logged in `credential_audit_log`:
+
 ```sql
 INSERT INTO credential_audit_log (
     credential_id, action, actor, reason, timestamp
@@ -2934,6 +3022,7 @@ All error responses follow **RFC 9457** (Problem Details for HTTP APIs) with Hyp
 | 503 | `SERVICE_UNAVAILABLE` | Service temporarily unavailable | Yes | Service restarting or overloaded |
 
 **Retry Logic**:
+
 ```go
 // Recommended client retry logic
 func retryWithBackoff(request *http.Request) (*http.Response, error) {
@@ -3066,6 +3155,7 @@ SELECT * FROM registry_credentials WHERE cluster_id = 'cls-abc123';
 3. **Advisory Locking (Prevention)**
 
    Prevents concurrent requests from creating duplicate credentials:
+
    ```go
    lockID := fmt.Sprintf("pull-secret-%s", clusterID)
    lock, _ := db.AcquireAdvisoryLock(ctx, lockID)
@@ -3089,6 +3179,7 @@ pull_secret_retry_success_total
 ```
 
 **Alert Conditions**:
+
 - Any registry with > 5% failure rate over 5 minutes
 - Orphaned credentials accumulating (> 100 unreconciled)
 - Complete registry outage (100% failure rate for 10+ minutes)
@@ -3131,6 +3222,7 @@ func GeneratePullSecretWithRetry(client *Client, clusterID string) (*PullSecret,
 | **No Partial Success** | Client can't use Quay-only credential | Clear error semantics prevent silent runtime failures |
 
 **See Also**:
+
 - [Principle 1: Lift and Shift from AMS](#principle-1-lift-and-shift-from-ams) - Example 3: All-or-Nothing pattern
 
 ---
@@ -3192,6 +3284,7 @@ rules:
 | **Rotation Endpoint** | 10 requests | 1 hour | `/rotations` only |
 
 **Rate Limit Headers** (RFC 6585):
+
 ```http
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 75
@@ -3200,6 +3293,7 @@ Retry-After: 60
 ```
 
 **Response 429 Too Many Requests**:
+
 ```http
 Content-Type: application/problem+json
 X-RateLimit-Limit: 100
@@ -3207,6 +3301,7 @@ X-RateLimit-Remaining: 0
 X-RateLimit-Reset: 1708948920
 Retry-After: 42
 ```
+
 ```json
 {
   "type": "https://api.hyperfleet.io/errors/rate-limit-exceeded",
@@ -3232,6 +3327,7 @@ Retry-After: 42
 **Spec Location**: `/v1/openapi.json` or `/v1/openapi.yaml`
 
 **Example Specification**:
+
 ```yaml
 openapi: 3.1.0
 info:
@@ -3416,10 +3512,12 @@ Choose the deployment model based on your operational context:
 | **Use Cases** | HyperFleet managed service across GCP/AWS/Azure | OCP self-managed in single datacenter/VPC |
 
 **Recommendation**:
+
 - **Choose Option A (Per-Instance)** if you have multiple regions and prioritize failure isolation
 - **Choose Option B (Global Shared)** if you have a single datacenter or prioritize operational simplicity
 
 > **🔗 Design Principles Applied:**
+>
 > - **Principle 3 (Flexible Deployment)**: Two deployment models for different use cases (per-instance vs global shared)
 > - **Principle 2 (Cloud Agnostic)**: Both options work on GCP, AWS, Azure, on-prem
 
@@ -3472,6 +3570,7 @@ graph TB
 ```
 
 **Characteristics**:
+
 - **Deployment**: One Pull Secret Service per HyperFleet instance
 - **Database**: Each service has its own PostgreSQL database (not shared)
 - **Credential Pool**: Each service maintains its own pool
@@ -3480,6 +3579,7 @@ graph TB
 - **RHIT mTLS Certificates** (Principle 6): All instances use same HyperFleet-dedicated mTLS certificate (`CN=hyperfleet`), separate from AMS (`CN=ocm-service`)
 
 **Pros**:
+
 - ✅ **Failure Isolation**: Outage in one region doesn't affect others
 - ✅ **Simple Networking**: No cross-region/cross-cluster network dependencies
 - ✅ **Reduced Latency**: Service co-located with adapters (no cross-region calls)
@@ -3489,18 +3589,21 @@ graph TB
 - ✅ **Standard Kubernetes Pattern**: Deployments, Services, ConfigMaps - standard DevOps playbook
 
 **Cons**:
+
 - ❌ **Duplicated Infrastructure**: N databases, N deployments (higher resource usage)
 - ❌ **Credential Sprawl**: Harder to track which robot accounts belong to which instance
 - ❌ **Pool Inefficiency**: Total pool size = N × high_water_mark (over-provisioning)
 - ❌ **Operational Overhead**: Must manage N instances (upgrades, monitoring, backups)
 
 **Resource Requirements (Example: 3 HyperFleet instances)**:
+
 - **Compute**: 3 independent service deployments × 3 replicas each
 - **Storage**: 3 separate PostgreSQL databases (100 GB each)
 - **Network**: In-cluster communication only (minimal cross-region traffic)
 - **Operations**: 3× deployment pipelines, 3× monitoring dashboards, 3× backup jobs
 
 **Use Cases**:
+
 - ✅ **HyperFleet SaaS**: Multi-region managed service across GCP/AWS/Azure
 - ✅ **Regulatory Compliance**: Data residency requirements (EU clusters → EU database)
 - ✅ **High Availability**: Failure in one region cannot affect others
@@ -3597,6 +3700,7 @@ graph TB
 ```
 
 **Characteristics**:
+
 - **Deployment**: Single Pull Secret Service (multi-region replicated)
 - **Database**: Global PostgreSQL with read replicas in each region
 - **Credential Pool**: Single global pool shared across all instances
@@ -3604,6 +3708,7 @@ graph TB
 - **Credentials**: Quay/RHIT API credentials shared (same as Option A)
 
 **Pros**:
+
 - ✅ **Cost Efficiency**: Single database, smaller total pool size
 - ✅ **Centralized Management**: One deployment to manage, upgrade, monitor
 - ✅ **Pool Efficiency**: Shared pool absorbs variance across regions (smaller total pool)
@@ -3611,6 +3716,7 @@ graph TB
 - ✅ **Simplified Operations**: One backup strategy, one monitoring dashboard
 
 **Cons**:
+
 - ❌ **Blast Radius**: Outage affects all HyperFleet instances globally
 - ❌ **Complex Networking**: Requires cross-cluster networking (service mesh, VPN, or public endpoint)
 - ❌ **Increased Latency**: Cross-region API calls add 50-200ms latency
@@ -3620,6 +3726,7 @@ graph TB
 - ❌ **Difficult Rollout**: Canary deployments affect all regions simultaneously
 
 **Resource Requirements**:
+
 - **Compute**: Single service deployment with higher replica count (5 replicas) for global coverage
 - **Storage**: 1 global PostgreSQL database with multi-region replication
 - **Network**: Global load balancer + cross-region traffic (higher network overhead)
@@ -3627,6 +3734,7 @@ graph TB
 - **Trade-off**: Lower total infrastructure vs. increased network complexity
 
 **Use Cases**:
+
 - ✅ **OCP Self-Managed**: Single datacenter or VPC deployment
 - ✅ **Private Cloud**: On-premises OpenShift with centralized management
 - ✅ **Resource Efficiency**: When minimizing infrastructure footprint is a priority
@@ -3672,9 +3780,9 @@ graph LR
 ### 4.4 Kubernetes Deployment Topology (Both Options)
 
 The following Kubernetes deployment topology applies to both options:
+
 - **Option A**: Deployed once per HyperFleet instance
 - **Option B**: Deployed once globally with multi-region replicas
-
 
 ```mermaid
 graph TB
@@ -3717,7 +3825,6 @@ graph TB
     style Quay fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     style RHIT fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
 ```
-
 
 ```mermaid
 graph TB
@@ -3821,6 +3928,7 @@ flowchart LR
 ```
 
 **Network Characteristics**:
+
 - ✅ All communication within single Kubernetes cluster
 - ✅ No cross-region network dependencies
 - ✅ Simple DNS-based service discovery
@@ -3860,6 +3968,7 @@ flowchart TB
 ```
 
 **Network Characteristics**:
+
 - ⚠️ Requires VPN, service mesh, or public endpoint
 - ⚠️ Cross-region latency (50-200ms)
 - ⚠️ Complex load balancing and failover
@@ -3918,6 +4027,7 @@ graph LR
 ## 5. Database Schema
 
 > **🔗 Design Principles Applied:**
+>
 > - **Principle 1 (Lift and Shift)**: Database schema reused from AMS (`registry_credentials`, `pull_secret_rotations`)
 > - **Principle 5 (Extensible Registries)**: `registry_id` column stores arbitrary registry identifiers (VARCHAR, not ENUM) - supports "quay", "rhit", "harbor-customer-a", "acr-prod", etc.
 
@@ -3996,6 +4106,7 @@ graph LR
 ## 6. Security Architecture
 
 > **🔗 Design Principles Applied:**
+>
 > - **Principle 4 (Security First)**: Multi-layer security (authentication, encryption, audit)
 > - **Principle 4 (Security First)**: Application-level AES-256-GCM encryption (keeps keys out of SQL queries)
 > - **Principle 6 (Dedicated Partner)**: Independent mTLS certificates for RHIT API (`CN=hyperfleet`), rotated independently from AMS
@@ -4335,6 +4446,7 @@ Following HyperFleet standards, the Pull Secret Service exposes two standard hea
 **Purpose**: Determines if the service process is **alive** and should be restarted if failing.
 
 **Response 200 OK**:
+
 ```json
 {
   "status": "ok"
@@ -4342,6 +4454,7 @@ Following HyperFleet standards, the Pull Secret Service exposes two standard hea
 ```
 
 **Response 503 Service Unavailable** (triggers pod restart):
+
 ```json
 {
   "status": "error",
@@ -4358,6 +4471,7 @@ Following HyperFleet standards, the Pull Secret Service exposes two standard hea
 | **No deadlocks** | Request handler is not blocked | ✅ Yes |
 
 **What `/healthz` Does NOT Check**:
+
 - ❌ Database connectivity
 - ❌ External API availability (Quay, RHIT)
 - ❌ Disk space or memory limits
@@ -4365,6 +4479,7 @@ Following HyperFleet standards, the Pull Secret Service exposes two standard hea
 **Rationale**: Liveness probes detect **unrecoverable** errors (deadlocks, panics). Checking external dependencies would cause unnecessary restarts during transient failures.
 
 **Kubernetes Configuration**:
+
 ```yaml
 livenessProbe:
   httpGet:
@@ -4385,6 +4500,7 @@ livenessProbe:
 **Purpose**: Determines if the service is **ready** to accept traffic. Failed readiness removes the pod from load balancer rotation **without** restarting it.
 
 **Response 200 OK** (ready to receive traffic):
+
 ```json
 {
   "status": "ready",
@@ -4397,6 +4513,7 @@ livenessProbe:
 ```
 
 **Response 503 Service Unavailable** (not ready, remove from load balancer):
+
 ```json
 {
   "status": "not_ready",
@@ -4421,6 +4538,7 @@ livenessProbe:
 **Rationale**: If the service cannot connect to its database or registries, it should not receive traffic. However, it should **not** be restarted, as the issue is likely transient (network partition, database maintenance).
 
 **Kubernetes Configuration**:
+
 ```yaml
 readinessProbe:
   httpGet:
@@ -4474,11 +4592,12 @@ The service follows the [HyperFleet Metrics Standard](https://github.com/openshi
 
 All metrics follow the HyperFleet standard format:
 
-```
+```text
 hyperfleet_<component>_<metric_name>_<unit>
 ```
 
 Where:
+
 - `hyperfleet_` - Global prefix (required)
 - `<component>` - Component name: `pull_secret_service`
 - `<metric_name>` - Descriptive name in snake_case
@@ -4510,16 +4629,19 @@ Example: `http_requests_total{status="200"}` (metric) → `99.5% availability` (
 Key metrics for SLI calculations:
 
 #### 8.2.1 Standard Metrics
+
 - `hyperfleet_pull_secret_service_build_info` - Component build information
 - `hyperfleet_pull_secret_service_up` - Health status (1 = healthy, 0 = unhealthy)
 - Go runtime metrics (automatic): `go_goroutines`, `go_memstats_alloc_bytes`, `process_cpu_seconds_total`
 
 #### 8.2.2 HTTP Request Metrics
+
 - `hyperfleet_pull_secret_service_http_requests_total{method, path, status_code}` - Request count (Counter)
 - `hyperfleet_pull_secret_service_http_request_duration_seconds{method, path, status_code}` - Request latency (Histogram)
 - `hyperfleet_pull_secret_service_http_requests_in_flight{method, path}` - Active requests (Gauge)
 
 #### 8.2.3 Credential Operation Metrics
+
 - `hyperfleet_pull_secret_service_credential_operations_total{registry, operation, status}` - Operations (Counter)
   - operation: create, retrieve, rotate, delete
   - status: success, failure
@@ -4527,12 +4649,14 @@ Key metrics for SLI calculations:
 - `hyperfleet_pull_secret_service_rotation_pending_count` - Pending rotations (Gauge)
 
 #### 8.2.4 Database Metrics
+
 - `hyperfleet_pull_secret_service_db_connections{state}` - Connection pool (Gauge)
   - state: idle, in_use, max
 - `hyperfleet_pull_secret_service_db_query_duration_seconds{operation}` - Query latency (Histogram)
 - `hyperfleet_pull_secret_service_db_errors_total{operation, error_type}` - Query errors (Counter)
 
 #### 8.2.5 External API Metrics
+
 - `hyperfleet_pull_secret_service_quay_api_calls_total{operation, status}` - Quay API calls (Counter)
 - `hyperfleet_pull_secret_service_quay_api_duration_seconds{operation}` - Quay API latency (Histogram)
 - `hyperfleet_pull_secret_service_rhit_api_calls_total{operation, status}` - RHIT API calls (Counter)
@@ -4553,6 +4677,7 @@ This section defines the **calculated SLIs** derived from the base metrics (sect
 Following the AMS Lift-and-Shift principle, the HyperFleet pull secret operation maintains the following SLI and SLO:
 
 **SLI Definition**:
+
 - **Name**: PullSecretAvailability
 - **Calculation**: `(successful_requests / total_requests) * 100`
 - **Source Metrics**:
@@ -4560,12 +4685,12 @@ Following the AMS Lift-and-Shift principle, the HyperFleet pull secret operation
   - `hyperfleet_pull_secret_service_http_requests_total`  ← Total
 
 **SLO Target**:
+
 - **Target Value**: 99.5% availability
 - **Measurement Window**: 28-day rolling window
 - **Upstream Service**: UHC Account Manager (`uhc-account-manager`)
 - **Scope**: `/api/accounts_mgmt/v1/access_token` and `/api/accounts_mgmt/v1/pull_secrets`
 - **Success Criteria**: Non-5xx HTTP response codes
-
 
 **Multi-Burn-Rate Alerting**:
 
@@ -4705,6 +4830,7 @@ When logging errors, include:
 #### Log Format Examples
 
 **Successful API Request (info level)**:
+
 ```json
 {
   "timestamp": "2026-02-27T14:30:00.123Z",
@@ -4727,6 +4853,7 @@ When logging errors, include:
 ```
 
 **Rotation Started (info level)**:
+
 ```json
 {
   "timestamp": "2026-02-27T14:30:00.123Z",
@@ -4748,6 +4875,7 @@ When logging errors, include:
 ```
 
 **External API Failure (warn level)**:
+
 ```json
 {
   "timestamp": "2026-02-27T14:30:05.456Z",
@@ -4767,6 +4895,7 @@ When logging errors, include:
 ```
 
 **Database Connection Failure (error level with stack trace)**:
+
 ```json
 {
   "timestamp": "2026-02-27T14:30:10.789Z",
@@ -4809,6 +4938,7 @@ The following MUST be redacted or omitted from logs:
 - ❌ ServiceAccount tokens (from Authorization header)
 
 **Example - Sanitized Debug Log**:
+
 ```json
 {
   "timestamp": "2026-02-27T14:30:00.123Z",
@@ -4848,6 +4978,7 @@ To prevent truncation by log aggregators:
 | Total entry | Keep under 64 KB |
 
 **Best practices**:
+
 - Log resource IDs (`cluster_id`), not full payloads
 - Truncate long strings with `...` indicator
 - Log full payloads at `debug` level only (with sensitive data redacted)
@@ -4866,7 +4997,7 @@ To prevent truncation by log aggregators:
 
 This section provides a simplified rollout strategy showing total timeline and key milestones for each deployment scenario.
 
-#### Deployment Scenarios & Timeline
+### Deployment Scenarios & Timeline
 
 ```mermaid
 gantt
@@ -4897,7 +5028,7 @@ gantt
 
 This foundational phase includes both **software development** and **infrastructure provisioning**, running in parallel where possible.
 
-**Week 1-2: Development & Coding**
+##### Week 1-2: Development & Coding
 
 | Task | Deliverable |
 |------|-------------|
@@ -4908,7 +5039,7 @@ This foundational phase includes both **software development** and **infrastruct
 | **Unit Tests** | 80%+ code coverage, mocked external dependencies |
 | **Database Schema** | DDL scripts (registry_credentials, pull_secret_rotations, credential_audit_log) |
 
-**Week 2-3: Infrastructure Provisioning**
+##### Week 2-3: Infrastructure Provisioning
 
 | Task | Deliverable |
 |------|-------------|
@@ -4917,7 +5048,7 @@ This foundational phase includes both **software development** and **infrastruct
 | **Secret Management** | Encryption keys in K8s Secrets, secret rotation policy |
 | **Network Policies** | Ingress/egress rules, service mesh configuration |
 
-**Week 3-4: Integration & Automation**
+##### Week 3-4: Integration & Automation
 
 | Task | Deliverable |
 |------|-------------|
@@ -4928,6 +5059,7 @@ This foundational phase includes both **software development** and **infrastruct
 | **Helm Charts** | Deployment manifests, ConfigMaps, resource limits, HPA configuration |
 
 **Success Criteria**:
+
 - ✅ All unit tests passing (80%+ coverage)
 - ✅ Integration tests passing against staging APIs
 - ✅ Docker image built and pushed to registry
@@ -4954,6 +5086,7 @@ This foundational phase includes both **software development** and **infrastruct
 | **Week 8-9** | Production Rollout | 100% of clusters migrated, service GA |
 
 **Success Criteria**:
+
 - ✅ All clusters provision with Pull Secret Service
 - ✅ p99 latency < 500ms
 - ✅ Zero failed cluster provisions due to credentials
@@ -4974,7 +5107,7 @@ This foundational phase includes both **software development** and **infrastruct
 | **Week 5-9** | Cloud Deployment | Initial production rollout (single region) |
 | **Week 10-12** | Global Shared Setup | Multi-region database replication, global load balancer configuration, cross-region failover testing |
 
-**Week 10-12: Global Shared Setup Details**
+##### Week 10-12: Global Shared Setup Details
 
 > **Note**: This phase is **NOT** a migration from legacy systems. Clients already exist in the global shared deployment. This phase focuses on configuring the global infrastructure to serve all regions from a single instance.
 
@@ -4988,22 +5121,26 @@ This foundational phase includes both **software development** and **infrastruct
 | **Monitoring & Alerts** | Week 12 | Grafana dashboards for multi-region metrics; PagerDuty alerts for replication lag > 200ms |
 
 **Infrastructure Components Added**:
+
 - Geographic load balancer (Cloud Load Balancer or similar)
 - PostgreSQL read replicas in 2+ additional regions
 - Cross-region VPC peering (or equivalent connectivity)
 - Regional health check endpoints for failover
 
 **Resource Comparison**:
+
 - **Per-Instance**: 3× databases, 9× pods (3 instances × 3 replicas each)
 - **Global Shared**: 1× database (replicated), 6× pods (higher replica count per instance)
 - **Efficiency Gain**: ~60% reduction in total infrastructure footprint
 
 **Trade-offs**:
+
 - ⚠️ Higher latency: p99 < 800ms (vs. 500ms per-instance)
 - ⚠️ Single point of failure (mitigated by multi-region HA)
 - ✅ Reduced operational overhead (single deployment to manage)
 
 **Success Criteria**:
+
 - ✅ Global load balancer routing traffic to all regions
 - ✅ Multi-region database replication operational (lag < 100ms)
 - ✅ Automatic failover tested and validated
@@ -5028,6 +5165,7 @@ This foundational phase includes both **software development** and **infrastruct
 | **Week 13-15** | Cloud-Native Registries | Implement cloud-provider native registry clients, multi-registry testing |
 
 **Success Criteria**:
+
 - ✅ Customers can configure private registries via Helm
 - ✅ Pull secrets support 5+ registries simultaneously
 - ✅ No performance degradation (p99 < 500ms per-instance)
@@ -5047,7 +5185,6 @@ Choose your rollout scenario based on requirements:
 ---
 
 ## Appendix
-
 
 ### A. Glossary
 
@@ -5140,7 +5277,6 @@ In general, pull secret rotation is required in the following scenarios:
 
 - **90 days** – Industry standard  
 - **60 days** – Enhanced security for regulated environments (e.g., financial or healthcare sectors)
-
 
 ---
 

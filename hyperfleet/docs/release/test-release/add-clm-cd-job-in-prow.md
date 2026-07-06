@@ -6,7 +6,6 @@ Last Updated: 2026-01-19
 
 # Add CLM CD Job in Prow
 
-
 ## Overview
 
 This document provides a comprehensive guide for adding and managing CLM (Cluster Lifecycle Management) Continuous Deployment (CD) jobs in Prow. It covers job configuration, step registry setup, monitoring, triggering, and debugging procedures specific to HyperFleet deployment workflows.
@@ -24,6 +23,7 @@ For detailed instructions on initializing job configuration in Prow, please refe
 According to the description in the [Test Step Registry](add-job-configuration-in-prow.md#test-step-registry) section, you need to add the following files.
 
 For the CLM deployment, create a new folder **chart-deployment** under [openshift-hyperfleet](https://github.com/openshift/release/tree/master/ci-operator/step-registry/openshift-hyperfleet). The step files should be:
+
 ```text
 openshift-hyperfleet-chart-deployment-commands.sh
 openshift-hyperfleet-chart-deployment-ref.yaml
@@ -33,10 +33,12 @@ OWNERS
 
 #### Step Parameters Configuration
 
+<!-- markdownlint-disable-next-line MD036 -->
 **openshift-hyperfleet-chart-deployment-ref.yaml**
+
 - Declaring step parameters: More detailed usage can refer to the [official doc](https://docs.ci.openshift.org/docs/architecture/step-registry/#declaring-step-parameters)
   - Credentials  config: The secret has been added according to the [doc](prow-vault-access-management.md). For CD job, it requires gcloud credential to get the GKE cluster credential to deploy. We prepared a SA **hyperfleet-e2e** for it and store the credential under hyperfleet-e2e folder in Vault, so please don't delete it.
-  - Image: hyperfleet-chart-src that is defined in file [openshift-hyperfleet-hyperfleet-chart-main__deployment.yaml](https://github.com/openshift/release/blob/543d4cfe083987b8ff711de3b6f870c7326f6dd9/ci-operator/config/openshift-hyperfleet/hyperfleet-chart/openshift-hyperfleet-hyperfleet-chart-main__deployment.yaml#L22) 
+  - Image: hyperfleet-chart-src that is defined in file [openshift-hyperfleet-hyperfleet-chart-main__deployment.yaml](https://github.com/openshift/release/blob/543d4cfe083987b8ff711de3b6f870c7326f6dd9/ci-operator/config/openshift-hyperfleet/hyperfleet-chart/openshift-hyperfleet-hyperfleet-chart-main__deployment.yaml#L22)
 
  ```yaml
 ref:
@@ -60,7 +62,9 @@ ref:
     mount_path: /var/run/hyperfleet-e2e
  ```
 
+<!-- markdownlint-disable-next-line MD036 -->
 **openshift-hyperfleet-chart-deployment-commands.sh**
+
 - Define the shell script for the job. It depends on different business logic.
   - In above step, it mounts the volume for credential.And the hcm-hyperfleet-e2e.json secret has been added in Vault, so it can get the value directly in the shell script
 
@@ -71,7 +75,9 @@ GCP_CREDENTIALS_FILE="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"
 
 ```
 
+<!-- markdownlint-disable-next-line MD036 -->
 **openshift-hyperfleet-chart-deployment-ref.metadata.json**
+
 - Store the owners and path
 
 ```json
@@ -93,7 +99,8 @@ GCP_CREDENTIALS_FILE="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"
 #### Finding Running Jobs
 
 To find and monitor running jobs on Prow:
-1. Navigate to the Prow dashboard: https://prow.ci.openshift.org/
+
+1. Navigate to the Prow dashboard: <https://prow.ci.openshift.org/>
 2. Use the filter bar to search for specific jobs:
    - By job name: `periodic-ci-openshift-hyperfleet-hyperfleet-chart-main-deployment-hyperfleet-chart-deployment-nightly`
    - By status: Add `&state=pending` or `&state=success` or `&state=failure` to the URL
@@ -118,6 +125,7 @@ If you want to add some new code for the CD workflow, you can prepare a PR and t
 To add another job based on the existing CLM CD job:
 
 1. **Copy the existing job configuration**: Update the following:
+
    ```yaml
    - as: hyperfleet-chart-deployment-nightly # job name
      cron: 30 8 * * * # cron time
@@ -137,6 +145,7 @@ To add another job based on the existing CLM CD job:
 3. **Add the new job**
 
    Run the command to generate and update the job configuration:
+
    ```bash
    make jobs
    ```
@@ -153,6 +162,7 @@ To add another job based on the existing CLM CD job:
 4. Navigate to the folder: **artifacts/hyperfleet-chart-deployment-nightly/openshift-hyperfleet-chart-deployment/**
 5. You can find the detailed resource logs under the **artifacts** folder
 6. **The HyperFleet API external URL** is at the end of the build-log.txt:
+
 ```text
 [1m19-01-2026T10:06:50  EXTERNAL-IP assigned: 34.28.116.174[0m
 [1m19-01-2026T10:06:50  You can access hyperfleet-api via http://34.28.116.174:8000/api/hyperfleet/v1/clusters[0m

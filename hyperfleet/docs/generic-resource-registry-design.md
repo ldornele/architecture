@@ -170,7 +170,7 @@ Existing types `ResourceCondition`, `ObjectReference`, `AdapterStatus`, and `Ada
 
 The API contract defines the routes for the `Resource` entity and methods:
 
-```
+```text
 # Top-level (all entity types)
 GET                /api/hyperfleet/v1/resources
 POST               /api/hyperfleet/v1/resources      # resources without parent
@@ -182,7 +182,7 @@ GET PUT            /api/hyperfleet/v1/resources/{id}/statuses
 
 Additionally, for each registered entity type, the following routes are generated:
 
-```
+```text
 # Top-level (all entity types)
 GET POST           /api/hyperfleet/v1/{plural}
 GET PATCH,DELETE   /api/hyperfleet/v1/{plural}/{id}
@@ -200,7 +200,7 @@ The `[ ...]` denotes the full hierarchy of parent resources.
 
 Example with Cluster (top-level) and NodePool (parent: Cluster):
 
-```
+```text
 GET POST         /api/hyperfleet/v1/clusters
 GET PATCH DELETE /api/hyperfleet/v1/clusters/{id}
 POST             /api/hyperfleet/v1/clusters/{id}/force-delete
@@ -469,7 +469,6 @@ type ResourceDao interface {
 - `Create` — inserts the resource row first (omitting associations), then bulk-inserts labels and references. Conditions are not inserted by the DAO; `ResourceService.Create` calls `UpdateStatusFromAdapters` immediately after to initialize them.
 - `Replace` — fetches the existing row with its labels preloaded, increments `Generation` if either `Spec` or `Labels` changed, updates the resource row, then replaces labels with a delete + bulk-insert. When `references` is present in the PATCH body, calls `ReplaceReferences` for that resource. Conditions are intentionally excluded; they are written only by `UpdateConditions`.
 
-
 `UpdateConditions` — called exclusively by the status aggregation path. Replaces all condition rows for the resource atomically.
 
 `Replace` and `UpdateConditions` are on separate code paths deliberately: `Replace` is called by user-initiated spec/label updates; `UpdateConditions` is called only by the status aggregation pipeline. This separation keeps user-writable and system-computed state from interfering.
@@ -643,7 +642,7 @@ Each resource carries a relative `href` field that uniquely identifies it within
 
 **Format:**
 
-```
+```text
 # Top-level entity
 /api/hyperfleet/v1/{plural}/{id}
 
@@ -653,17 +652,17 @@ Each resource carries a relative `href` field that uniquely identifies it within
 
 Examples for a NodePool (parent: Cluster):
 
-```
+```text
 /api/hyperfleet/v1/clusters/c-abc123/nodepools/np-xyz789
 ```
 
 The href is relative (no scheme or host). Clients that need an absolute URL prepend the base URL from their configuration. This avoids storing environment-specific hostnames in the database and prevents href staleness across environment promotions.
 
-**Constraint: child entity creation requires parent context in the URL**
+#### Constraint: child entity creation requires parent context in the URL
 
 Because the child href embeds the parent ID, it can only be constructed correctly when the parent ID is known at the moment of creation. The parent ID is available in the URL path variable (`{parent_id}`) on the nested generated routes, but is absent from the generic root endpoint:
 
-```
+```text
 # Parent ID is in the URL — href can be constructed
 POST /api/hyperfleet/v1/clusters/{parent_id}/nodepools   ✓
 
@@ -962,7 +961,7 @@ Different child types of the same parent can have different policies. For exampl
 
 There is no caller-supplied query parameter. The API surface is simply:
 
-```
+```text
 DELETE /clusters/{id} → 202 Accepted  (NodePools cascade)
                       → 409 Conflict    (if a restrict-policy child exists)
 ```
@@ -1021,7 +1020,6 @@ Resource references model non-ownership associations between entities. Unlike th
 - Mutable: a PATCH replaces the full `references` map.
 - Required references enforced at Create and Patch time.
 - Deleting a referenced resource is **blocked** (`409 Conflict`) if any resource holds a reference to it.
-
 
 ---
 
@@ -1084,11 +1082,11 @@ func (s *sqlResourceService) Delete(ctx context.Context, resourceType, id string
 
 `FindReferencers` replaces the coarse `CountByTarget` — it returns the first referencing resource (kind + name) so the error message names exactly what is blocking the deletion and what the caller must remove.
 
-**Interaction with cascade deletes**
+#### Interaction with cascade deletes
 
 Because `Delete` is called recursively during cascade, the reference check applies at every level of the ownership tree. Consider:
 
-```
+```text
 Cluster "prod"
   └── NodePool "workers"    (OnParentDelete: cascade)
 
@@ -1101,7 +1099,7 @@ UpgradePolicy "nightly"     (references NodePool "workers" via ref_type: target_
 2. Cascade: `Delete(NodePool, "workers")` is called
 3. Reference check on `workers` → `UpgradePolicy "nightly"` references it → **409 Conflict**
 
-```
+```text
 409 Conflict: cannot delete NodePool "workers": referenced by UpgradePolicy "nightly"
               — remove the reference before deleting
 ```
@@ -1123,7 +1121,7 @@ Callers can find all resources of a given type that reference a specific resourc
 
 **Example — all Clusters using WifConfig `wc-xyz`:**
 
-```
+```text
 GET /api/hyperfleet/v1/clusters?ref_type=wif_config&ref_target_id=wc-xyz
 ```
 
@@ -1146,7 +1144,7 @@ The database is initialized from scratch. There is no existing data to migrate a
 
 **Database migrations:**
 
-```
+```text
 202604080001_add_resources.go           — CREATE TABLE resources + indexes
 202604080002_add_resource_labels.go     — CREATE TABLE resource_labels
 202604080003_add_resource_conditions.go — CREATE TABLE resource_conditions
@@ -1211,7 +1209,7 @@ Deleting a parent immediately soft-deletes all descendants recursively, with no 
 
 Default behavior is Restrict. The caller passes `?cascade=true` to opt into recursive soft-delete. `EntityDescriptor.AllowCascadeDelete` controls whether the flag is accepted.
 
-```
+```text
 DELETE /clusters/{id}              → 409 Conflict (has active children)
 DELETE /clusters/{id}?cascade=true → 202 Accepted
 ```
@@ -1464,7 +1462,7 @@ Used by Kubernetes for all API objects (`metav1.Object`, object store, etc.).
 
 **Chosen:** Conditions are computed by `AggregateResourceStatus` when adapter statuses change and persisted to the `resource_conditions` table. Reads serve stored rows directly.
 
-**Alternative — Compute conditions on every read**
+#### Alternative — Compute conditions on every read
 
 The new design changed the Status Conditions from JSON to its own table. One additional change could be simplifying it or even eliminating and computing the values on request.
 
@@ -1576,7 +1574,7 @@ Generate routes like `GET /wifconfigs/{id}/clusters` that list all resources ref
 
 **Why chosen:** The `resource_references` join table gives the infrastructure visibility into all relationships without scanning JSONB, enables indexed reverse lookups, and supports deletion restriction with a targeted query. `min`/`max` on the descriptor unifies required/optional and single/multiple into one expressive field while keeping cardinality enforcement in one place. Blocking deletion (rather than cascading) is the safe default for shared resources that have no ownership semantics. Query parameters for reverse lookup avoid adding new routes and compose naturally with existing pagination and filtering.
 
-**Cascade delete interaction (explicitly chosen: always restrict)**
+#### Cascade delete interaction (explicitly chosen: always restrict)
 
 The reference restriction applies at every level of an owned-children cascade, not just at the root. When `Delete` is called recursively on a cascade-deleted child, the child's inbound references are checked before it is removed. Two alternatives were rejected:
 
@@ -1604,7 +1602,6 @@ The generic `EntityDescriptor` captures configuration (name constraints, adapter
 **Remediation:** The Go `Register()` path is the intended escape hatch: an entity that needs custom logic registers its descriptor in code rather than config, and the relevant service methods can be overridden by wrapping `ResourceService` with a type-specific decorator. The pattern should be documented so teams know how to extend without forking the shared infrastructure. If multiple entities accumulate custom logic, introduce a `Hooks` field on `EntityDescriptor` with well-defined `BeforeCreate`, `BeforeDelete`, and `AfterStatusUpdate` callbacks.
 
 **Remediation 2:** If business logic required is not too complex, a CEL expression engine can be added to perform certain checks on entities and customizable through the registry.
-
 
 ---
 

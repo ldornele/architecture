@@ -6,7 +6,7 @@ Last Updated: 2026-01-27
 
 # SPIKE REPORT: Define Validation Adapter Criteria and Implementation Plan for GCP
 
-**JIRA Story**: HYPERFLEET-59   
+**JIRA Story**: HYPERFLEET-59
 
 ## 1. Overview
 
@@ -15,6 +15,7 @@ Last Updated: 2026-01-27
 This spike defines a **phased implementation approach** for a GCP validation adapter that runs as a Kubernetes Job to validate GCP prerequisites before cluster provisioning. The solution is based on proven patterns from the existing uhc-clusters-service (CS) [GCP preflight logic](https://gitlab.cee.redhat.com/service/uhc-clusters-service/-/blob/master/cmd/clusters-service/service/gcp_preflight/preflight_service.go), adapted for the adapter framework context.
 
 ### Key Decisions
+
 - **Deployment**: Validation adapter runs as a Kubernetes Job in a GKE cluster
 - **Implementation Vehicle**: Two-container sidecar pattern (validator + status reporter)
 - **Architecture**: GCP validator container + reusable status reporter sidecar
@@ -27,6 +28,7 @@ This spike defines a **phased implementation approach** for a GCP validation ada
 - **Status Reporting**: Sidecar container reads results from shared volume (e.g., EmptyDir), updates Job status
 
 ### Primary Risk
+
 Ensuring proper IAM permission configuration for Workload Identity integration within the Job context, especially for GCP cross-project validation scenarios.
 
 ---
@@ -37,10 +39,12 @@ Two implementation approaches were evaluated. The decision can be updated based 
 
 ### Kubernetes Job
 
-**Pros**
+#### Pros
+
 - A native Kubernetes resource with minimal external dependencies.
 
-**Cons**
+#### Cons
+
 - Requires a sidecar container to collect validation details and update the Job status.
 - Limited support for multi-step validation: dependencies, parallelism, and orchestration must be implemented within the Job logic by yourself.
 
@@ -48,11 +52,13 @@ More details refer to [update-job-status](https://gitlab.cee.redhat.com/amarin/u
 
 ### Tekton Pipeline
 
-**Pros**
+#### Pros
+
 - Designed for multi-stage workflows with built-in support for task dependencies, parallel execution, and easy extension by adding new validation tasks.
 - Can write validation results directly into the PipelineRun CR, with flexible mechanisms to aggregate results from multiple tasks.
 
-**Cons**
+#### Cons
+
 - Requires installing and maintaining the Tekton operator, requires more resources to run Tekton.
 - Each validation task runs in its own Pod; workflows with many tasks will create multiple Pods during execution.
 
@@ -69,28 +75,34 @@ The validation requirements are derived from the production GCP preflight implem
 The validation adapter focuses on the Workload Identity Federation (WIF) flow. The following preflight checks are performed in this mode:
 
 **Authentication:**
+
 - `createGcpClient`: Before executing specific checks, the service attempts to create a GCP client using the provided configuration. This serves as an initial connectivity and authentication check to ensure a valid GCP client can be instantiated.
 
 **Identity & Access:**
+
 - `ValidateWifResources`: Validates WIF configuration resources.
 - `APIsEnabled`: Verifies that required GCP APIs are enabled.
 
 **Project & Constraints:**
+
 - `ValidProjectID`: Validates the project ID.
 - `ValidProjectConstraints`: Checks for conflicting organizational policies.
 
 **Network Configuration:**
+
 - `ValidNetwork`: General VPC network validation.
 - `validatePscSubnet`: Checks Private Service Connect subnets.
 - `validateMachineCidr`: Ensures Machine CIDR is valid.
 - `validateVpcSubnets`: Verifies existence and configuration of VPC subnets.
 
 **Resource Availability & Quotas:**
+
 - `ValidateAvailabilityZones`: Checks validity and status of requested zones.
 - `InstanceTypeSupported`: Verifies machine types are available in the target zones.
 - `ServiceUsageQuota`: Checks for sufficient resource quotas (e.g., vCPUs).
 
 **Security:**
+
 - `ValidKeyRings`: Validates KMS Key Ring configuration if encryption is enabled.
 
 ### 3.2 Credential Validation (MVP)
@@ -98,7 +110,8 @@ The validation adapter focuses on the Workload Identity Federation (WIF) flow. T
 **Purpose**: Verify that Workload Identity Federation (WIF) is configured for the validation Job.
 
 **Validation Flow**:
-```
+
+```text
 Kubernetes Job Pod
 ├── Step 1: Check if WIF is configured
 │
@@ -130,10 +143,12 @@ The following APIs **must be enabled** before cluster provisioning:
 | `container.googleapis.com` | GKE features |
 
 ### 3.4 GCP Quota Validation (Post-MVP)
+
 **Implementation Reference**: [CS quota preflight logic](https://gitlab.cee.redhat.com/service/uhc-clusters-service/-/blob/master/cmd/clusters-service/service/gcp_preflight/preflight_service.go#L190-L191)  
 
 **Regional vCPU Quota Validation Flow**:
-```
+
+```text
 1. Get project number from project ID
 2. Query current vCPU usage (Monitoring API MQL query)
 3. Get regional quota limit (Service Usage API - use EffectiveLimit)
@@ -142,6 +157,7 @@ The following APIs **must be enabled** before cluster provisioning:
 ```
 
 **Required SDK Methods**:
+
 ```go
 // Step 1: Get project number
 import resourcemanager "google.golang.org/api/cloudresourcemanager/v1"
@@ -167,13 +183,15 @@ metrics, _ := serviceUsageService.Services.ConsumerQuotaMetrics.Get(metricPath).
 ```
 
 **Required IAM Permissions**:
+
 - `monitoring.timeSeries.list` - Query vCPU usage
 - `serviceusage.services.get` - Retrieve service info
 - `serviceusage.quotas.get` - Get quota limits
 - `resourcemanager.projects.get` - Get project metadata
 
 **Quota Calculation Example**:
-```
+
+```text
 Required vCPUs = Σ (node_count × vCPUs_per_machine_type)
 Example:
   - default-pool: 3 nodes × 4 vCPUs (n1-standard-4) = 12 vCPUs
@@ -186,6 +204,7 @@ If Regional Limit = 100, Current Usage = 80:
 ```
 
 **Extended Quota Validation**:
+
 - Service Account quota (`iam.googleapis.com/quota/service_account_count`)
 - Regional external IP addresses
 - Persistent disk quota (pd-standard, pd-ssd)
@@ -200,6 +219,7 @@ If Regional Limit = 100, Current Usage = 80:
 **Skip Condition**: Empty VPC name (default VPC scenario)
 
 **Validation Logic**:
+
 ```go
 // 1. Resolve VPC Project ID (support shared VPC)
 vpcProjectId := gcp.ProjectID
@@ -234,6 +254,7 @@ req.Pages(ctx, func(page *compute.SubnetworkList) error {
 ```
 
 **Required IAM Permissions**:
+
 - `compute.networks.get` - Retrieve VPC details
 - `compute.subnetworks.list` - List subnets
 - `compute.subnetworks.get` - Get subnet details
@@ -244,6 +265,7 @@ req.Pages(ctx, func(page *compute.SubnetworkList) error {
 **Skip Condition**: Non-BYO VPC deployments
 
 **Validation Logic**:
+
 ```go
 // Validate Machine CIDR contains subnet CIDRs
 import "net"
@@ -270,6 +292,7 @@ for _, subnetCIDR := range subnetCidrs {
 ### 3.6 Region and Zone Availability (Post-MVP)
 
 #### Region Existence
+
 ```go
 import compute "google.golang.org/api/compute/v1"
 
@@ -286,6 +309,7 @@ if regions.Status != "UP" {
 ```
 
 #### Machine Type Availability (Post-MVP)
+
 ```go
 // Validate machine types exist in target zones
 for _, zone := range requestedZones {
@@ -433,10 +457,12 @@ We use Environment Variables to simplify management.
 
 **Cluster-Specific Configuration**:
 The adapter framework extracts relevant fields from the cluster definition and passes them directly to the container:
+
 - `GCP_PROJECT_ID`: Target project for validation.
 - `GCP_REGION`: Target region for resource checks.
 
 **Shared Validation Rules**:
+
 - **Integrated Configuration**: Static validation rules (e.g., list of required APIs, quota limits, IAM roles, error messages) are built directly into the validator image. This ensures consistency and simplifies updates (via image tags).
 - **Runtime Control**: The `VALIDATION_CHECKS` environment variable controls which validators are active. This allows flexible execution without changing the image or mounting files.
 
@@ -444,8 +470,8 @@ The adapter framework extracts relevant fields from the cluster definition and p
 
 The `gcp-validator-sa` Service Account acts as the central identity, requiring two distinct sets of permissions:
 
-1.  **Kubernetes Permissions (RBAC)**: Allows the `status-reporter` sidecar to update the Job status.
-2.  **GCP Permissions (Workload Identity)**: Allows the `validator` container to impersonate the customer's Deployer Service Account.
+1. **Kubernetes Permissions (RBAC)**: Allows the `status-reporter` sidecar to update the Job status.
+2. **GCP Permissions (Workload Identity)**: Allows the `validator` container to impersonate the customer's Deployer Service Account.
 
 #### 4.3.1 Kubernetes RBAC (Status Reporter)
 
@@ -498,7 +524,6 @@ roleRef:
 
 This section will define how the platform service account is authorized to access customer projects (e.g., via impersonation or direct access).
 
-
 ### 4.4 GCP Validation Adapter Configuration
 
 After the Kubernetes Job for GCP validation completes, configure the GCP Validation Adapter according to the [latest adapter configuration specification](https://github.com/openshift-hyperfleet/architecture/tree/main/hyperfleet/components/adapter/framework). This ensures the configuration is properly recognized and processed by the adapter framework.
@@ -519,11 +544,12 @@ The **Status Reporter Sidecar** is a **cloud-agnostic**, reusable container that
 ### 5.2 Communication Pattern
 
 **Shared Volume (emptyDir)**:
+
 - Validator writes `validation-report.json` to `/results/`
 - Reporter polls for file existence
 - Reporter reads JSON, updates Job, exits
 
-```
+```text
 ┌─────────────────────┐         ┌──────────────────────┐
 │  Validator Container│         │ Reporter Sidecar     │
 │                     │         │                      │
@@ -537,8 +563,10 @@ The **Status Reporter Sidecar** is a **cloud-agnostic**, reusable container that
 ```
 
 ### 5.3 Example to Update Job Status
+
 Here's an k8s yaml example to define a status-updater container using kubectl to update the job status.
-```
+
+```yaml
 - name: status-updater
         image: bitnami/kubectl:latest
         command:
@@ -623,6 +651,7 @@ An alternative to updating Job status directly is to use a **Custom Resource Def
 **MVP Decision**: **Use Job Status Approach** ✅
 
 **Rationale**:
+
 1. **Simplicity**: MVP goal is to prove the adapter framework architecture works end-to-end. Job status is sufficient for basic pass/fail reporting.
 2. **Lower Risk**: No additional dependencies or CRD management complexity.
 3. **Faster Implementation**: Team can focus on validation logic rather than infrastructure.
@@ -631,12 +660,14 @@ An alternative to updating Job status directly is to use a **Custom Resource Def
 **Post-MVP Consideration**: **Evaluate CRD Approach** 🚀
 
 The `AdapterResult` CRD approach should be reconsidered when:
+
 - ✅ **Need Richer Data**: Operation reports require detailed metadata beyond Job conditions (per-validator metrics, DNS records, remediation hints, structured errors)
 - ✅ **Multiple Adapter Types**: As more adapters are implemented (DNS, pull secret, etc.), a unified status interface becomes valuable
 - ✅ **Multiple Execution Methods**: Adapters may run as Job, Tekton Pipeline, DaemonSet, or other resources
 - ✅ **UX Improvements**: Users frequently query adapter results and need better query experience across adapter types
 
 **Benefits of Generic CRD Design**:
+
 - **Single CRD for all adapters**: Validation, DNS, pull secret, and future adapters use the same `AdapterResult` CRD
 - **Consistent interface**: Same query patterns work for all adapter types (`kubectl get adapterresults -l adapter-type=<type>`)
 - **Easier framework evolution**: Adding new adapter types doesn't require new CRDs
@@ -648,13 +679,15 @@ The `AdapterResult` CRD approach should be reconsidered when:
 **Goal**: Prove the adapter framework architecture works end-to-end with GCP validation adapter - minimal validation logic (credentials + 3-4 API checks).
 
 **Scope**: Absolute minimum to validate the solution architecture:
+
 - Status reporter sidecar (basic version)
 - GCP validation logic with TWO validators only:
-    - **Credential validation** - Verify GCP credentials exist and are valid
-    - **API enablement check** - Check if required APIs are enabled
+  - **Credential validation** - Verify GCP credentials exist and are valid
+  - **API enablement check** - Check if required APIs are enabled
 - Basic integration testing
 
 #### Tasks
+
 - Implement status reporter logic
 - Implement GCP validation logic
 - Write unit tests for smoke tests
@@ -665,12 +698,13 @@ The `AdapterResult` CRD approach should be reconsidered when:
 - Write README with setup instructions, deployment instructions
 
 **Success Criteria**:
+
 - The status reporter sidecar runs successfully
 - The GCP validation logic runs successfully
 - The k8s job (including GCP validation and status reporter containers) runs successfully
-    - Results written to shared volume (EmptyDir)
-    - Reporter sidecar updates Job status
-    - Job status reflects validation result (pass/fail)
+  - Results written to shared volume (EmptyDir)
+  - Reporter sidecar updates Job status
+  - Job status reflects validation result (pass/fail)
 - GCP validation adapter (configuration, logic, etc.) works well with the Adapter framework
 
 ---
@@ -682,6 +716,7 @@ After MVP is approved and working, implement additional features iteratively.
 **Goal**: Make the solution production-ready and add comprehensive validation coverage.
 
 **Production Readiness**:
+
 - ✅ Add Workload Identity authentication support
 - ✅ Proper error handling and structured logging
 - ✅ Retry logic with exponential backoff
@@ -693,6 +728,7 @@ After MVP is approved and working, implement additional features iteratively.
 - ✅ Complete API enablement checks (all required APIs)
 
 **Additional Validators** (All Post-MVP):
+
 - ✅ VPC/Subnet existence validator
 - ✅ Service Account existence validator
 - ✅ Region availability validator
@@ -708,6 +744,7 @@ After MVP is approved and working, implement additional features iteratively.
 - ✅ Secondary IP ranges validation (GKE)
 
 **Enhanced Features**:
+
 - Enhanced error messages with remediation guidance (gcloud commands)
 - Parallel validator execution for performance
 - Prometheus metrics export, including validation_job_failures_total, validation_requests_total, validation_duration, etc.
@@ -716,6 +753,7 @@ After MVP is approved and working, implement additional features iteratively.
 - Security scanning
 
 **Alternative Status Reporting**:
+
 - ✅ Evaluate CRD-based status reporting (see Section 6) if richer validation data or execution flexibility is needed
 
 ---
@@ -726,11 +764,12 @@ Based on this spike, implementation tickets should have the following acceptance
 
 ### MVP Acceptance Criteria
 
-**Ticket: GCP Validation MVP - Architecture Proof of Concept**
+#### Ticket: GCP Validation MVP - Architecture Proof of Concept
 
 **Goal**: Prove the adapter framework architecture works end-to-end with GCP validation adapter - minimal validation logic (credentials + 3-4 API checks).
 
 **Status Reporter Sidecar** (Basic):
+
 - [ ] Polls for `/results/validation-report.json` on shared emptyDir volume
 - [ ] Reads and parses JSON validation report
 - [ ] Updates Job status with validation status
@@ -739,8 +778,9 @@ Based on this spike, implementation tickets should have the following acceptance
 - [ ] Container image runs in K8s
 
 **GCP Validator** (Minimal validation logic):  
+
 - [ ] **Workload Identity Federation** (WIF) for GCP authentication
-  - How to setup WIF to access customer's GCP project 
+  - How to setup WIF to access customer's GCP project
   - How to pass WIF to validator container
 - [ ] Implements **Validator 1: WIF Configuration Check**
   - Checks if K8s Service Account has `iam.gke.io/gcp-service-account` annotation
@@ -754,7 +794,6 @@ Based on this spike, implementation tickets should have the following acceptance
     - `cloudresourcemanager.googleapis.com`
   - Returns Success if can authenticate AND APIs are enabled
   - Returns Failure if WIF doesn't work OR APIs are disabled
-    
 
 - [ ] Writes results to `/results/validation-report.json` (valid JSON schema)
 - [ ] Exits with code 0 (success) or 1 (failure)
@@ -762,6 +801,7 @@ Based on this spike, implementation tickets should have the following acceptance
 - [ ] Container image runs in K8s
 
 **Integration**:
+
 - [ ] Job manifest with two containers (validator + reporter)
 - [ ] Shared emptyDir volume mounted at `/results/` in both containers
 - [ ] Minimal ConfigMap with project ID and API list
@@ -770,6 +810,7 @@ Based on this spike, implementation tickets should have the following acceptance
 - [ ] GCP validation YAML file for adapter framework
 
 **Deliverables**:
+
 - [ ] Two working containers (reporter + validator)
 - [ ] Job manifest YAML
 - [ ] GCP validation YAML file for adapter framework
@@ -781,6 +822,7 @@ Based on this spike, implementation tickets should have the following acceptance
 ## References
 
 ### GCP Documentation
+
 - [GCP Go SDK](https://pkg.go.dev/google.golang.org/api)
 - [Compute Engine API](https://cloud.google.com/compute/docs/reference/rest/v1)
 - [Service Usage API](https://cloud.google.com/service-usage/docs/reference/rest)
@@ -788,10 +830,12 @@ Based on this spike, implementation tickets should have the following acceptance
 - [IAM Permissions Reference](https://cloud.google.com/iam/docs/permissions-reference)
 
 ### Internal References
+
 - [uhc-clusters-service GCP Preflight](https://gitlab.cee.redhat.com/service/uhc-clusters-service/-/blob/master/cmd/clusters-service/service/gcp_preflight/preflight_service.go)
 - [Adapter Framework Documentation](https://github.com/openshift-hyperfleet/architecture/tree/main/hyperfleet/components/adapter/framework)
 
 ### Kubernetes Documentation
+
 - [Kubernetes Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/)
 - [Job Status and Conditions](https://kubernetes.io/docs/concepts/workloads/controllers/job/#job-status)
 

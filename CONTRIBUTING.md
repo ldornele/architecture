@@ -80,6 +80,7 @@ Use the scripts in `hack/` to run linting locally before pushing:
 ```
 
 **Notes:**
+
 - `linkcheck.sh` only checks **internal links** — external URLs (http/https) are skipped by design
 - `linkcheck.sh` always exits 0 (informational only); broken internal links are surfaced as warnings, not failures
 - The CI pipeline enforces markdownlint and yamllint on all PRs — fix any errors before requesting review
@@ -103,7 +104,7 @@ Use the scripts in `hack/` to run linting locally before pushing:
 
 4. **Commit** following the [commit standard](hyperfleet/standards/commit-standard.md):
 
-   ```
+   ```text
    HYPERFLEET-XXX - docs: brief description of change
    ```
 

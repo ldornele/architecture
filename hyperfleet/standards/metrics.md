@@ -79,12 +79,14 @@ hyperfleet_api_requests_total{component="api", version="v2.1.0", method="GET", s
 ### Label Best Practices
 
 **DO:**
+
 - Use labels for dimensions that need filtering/aggregation
 - Keep label cardinality low (< 100 unique values per label)
 - Use consistent label names across metrics
 - Sanitize dynamic values (replace IDs with placeholders)
 
 **DON'T:**
+
 - Use high-cardinality labels (cluster IDs, user IDs, timestamps)
 - Include sensitive information in labels
 - Use labels for data that changes frequently

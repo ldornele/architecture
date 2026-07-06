@@ -78,30 +78,35 @@ repository-name/
 ### Directory Descriptions
 
 #### `/docs/development/`
+
 - Local development setup instructions
 - Development workflows and best practices
 - Coding standards and contribution guidelines
 - Build and test procedures
 
 #### `/docs/deployment/`
+
 - Production deployment procedures
 - Environment setup and configuration
 - Infrastructure requirements
 - Monitoring and operational guides
 
 #### `/docs/troubleshooting/`
+
 - In-depth debugging guides beyond `runbook.md` scope
 - Performance troubleshooting and profiling
 - Log analysis and error resolution
 - For service repos, operational troubleshooting (symptom → cause → fix) belongs in `runbook.md`; use this directory for deeper investigations, development-time debugging, or guides that don't fit the runbook format
 
 #### `/docs/examples/`
+
 - Usage examples and tutorials
 - Integration examples
 - Configuration examples
 - Common use case walkthroughs
 
 ### Notes on Structure
+
 - **docs/ directory is required for services** (repos that expose metrics, health endpoints, or run as long-lived processes) — see [Operational Documentation Structure](#operational-documentation-structure). For non-service repos, only create it if you have substantial documentation beyond README and CONTRIBUTING
 - **Keep it simple** - don't create directories unless you have multiple files to organize
 
@@ -159,6 +164,7 @@ Operational documentation belongs in the **component repository** (`docs/`), not
 Every repository README.md MUST include these sections in order:
 
 ### 1. Title & Description
+
 ```markdown
 # Repository Name
 
@@ -166,6 +172,7 @@ Every repository README.md MUST include these sections in order:
 ```
 
 ### 2. Quick Start
+
 ```markdown
 ## Quick Start
 
@@ -173,6 +180,7 @@ Every repository README.md MUST include these sections in order:
 ```
 
 ### 3. Prerequisites
+
 ```markdown
 ## Prerequisites
 
@@ -180,6 +188,7 @@ Every repository README.md MUST include these sections in order:
 ```
 
 ### 4. Installation
+
 ```markdown
 ## Installation
 
@@ -187,6 +196,7 @@ Every repository README.md MUST include these sections in order:
 ```
 
 ### 5. Usage/Core Features
+
 ```markdown
 ## Usage
 # OR
@@ -198,6 +208,7 @@ Every repository README.md MUST include these sections in order:
 ```
 
 ### 6. Architecture Repository Link
+
 ```markdown
 ## Documentation
 
@@ -236,6 +247,7 @@ After the required sections, repositories MAY add additional sections specific t
 Every repository MUST include a CONTRIBUTING.md file with these sections:
 
 ### 1. Development Setup
+
 ```markdown
 ## Development Setup
 
@@ -243,6 +255,7 @@ Every repository MUST include a CONTRIBUTING.md file with these sections:
 ```
 
 ### 2. Repository Structure
+
 ```markdown
 ## Repository Structure
 
@@ -250,6 +263,7 @@ Every repository MUST include a CONTRIBUTING.md file with these sections:
 ```
 
 ### 3. Testing
+
 ```markdown
 ## Testing
 
@@ -257,6 +271,7 @@ Every repository MUST include a CONTRIBUTING.md file with these sections:
 ```
 
 ### 4. Common Development Tasks
+
 ```markdown
 ## Common Development Tasks
 
@@ -264,6 +279,7 @@ Every repository MUST include a CONTRIBUTING.md file with these sections:
 ```
 
 ### 5. Commit Standards
+
 ```markdown
 ## Commit Standards
 
@@ -271,6 +287,7 @@ This project follows [HyperFleet commit standards](../standards/commit-standard.
 ```
 
 ### 6. Release Process (if applicable)
+
 ```markdown
 ## Release Process
 
@@ -284,6 +301,7 @@ This project follows [HyperFleet commit standards](../standards/commit-standard.
 All repositories MUST maintain a `CHANGELOG.md` file following the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ### Template Structure
+
 ```markdown
 # Changelog
 
@@ -322,17 +340,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## API Documentation Approach
 
 ### REST APIs
+
 - **MUST** use OpenAPI 3.0 specifications
 - **MUST** embed specifications using `//go:embed` for Go services (following hyperfleet-api pattern)
 - **SHOULD** provide Swagger UI endpoints for interactive exploration
 - **MUST** include API examples in documentation
 
 ### Go Packages
+
 - **MUST** use standard `godoc` conventions
 - **SHOULD** include package-level documentation
 - **MUST** document public functions, types, and methods
 
 ### API Documentation Location
+
 - API and architecture documentation are captured in the [architecture repository](https://github.com/openshift-hyperfleet/architecture)
 - Service-specific examples: `docs/examples/` or main README.md if simple
 
@@ -343,11 +364,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ADRs are **optional** but recommended for complex components that require architectural decisions to be documented.
 
 ### ADR Location (if used)
+
 - **Location**: [`hyperfleet/adrs/`](../adrs/README.md) in this repository
 - **Naming**: `NNNN-title-of-decision.md` (e.g., `0001-use-openapi-for-api-specs.md`)
 - **Format**: Follow the template in [`hyperfleet/adrs/README.md`](../adrs/README.md)
 
 ### When to Use ADRs
+
 - Significant architectural decisions that affect multiple components
 - Technology choices with trade-offs that should be documented
 - Design patterns that need rationale for future reference
@@ -377,6 +400,7 @@ When creating a new repository:
 ## Related Standards
 
 This documentation standard builds upon and references other HyperFleet standards:
+
 - [Commit Standard](../standards/commit-standard.md) - Commit message formatting
 - [Generated Code Policy](../standards/generated-code-policy.md) - Handling generated documentation
 - [Linting Standard](../standards/linting.md) - Code quality that affects inline documentation
@@ -386,6 +410,7 @@ This documentation standard builds upon and references other HyperFleet standard
 ## Changelog
 
 ### 2026-03-12 - Operational Documentation Standard
+
 - Added standard operational docs structure for service repositories (metrics.md, alerts.md, runbook.md, configuration.md)
 - Defined content ownership rules to prevent duplication across docs
 - Added audience header requirement for operational docs
@@ -393,6 +418,7 @@ This documentation standard builds upon and references other HyperFleet standard
 - Updated Additional Documentation section with operational doc links
 
 ### 2026-01-08 - Initial Version
+
 - Created standard for HyperFleet documentation structure
 - Defined required README.md and CONTRIBUTING.md sections
 - Created template structure for new repositories

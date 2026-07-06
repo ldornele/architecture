@@ -101,12 +101,13 @@ The Go tooling hooks use `language: system` and delegate to existing Make target
 | `leaktk.git.pre-commit` | `pre-commit` | `golang` | LeakTK: Scans staged files for secrets using Gitleaks engine with Red Hat-specific patterns |
 
 **Key features**:
+
 - ✅ **Open-source** — no VPN requirement, works for all contributors
 - ✅ **Developed by Red Hat InfoSec** — same team that created rh-pre-commit
 - ✅ **Gitleaks-powered** — uses proven secret detection patterns
 - ⏱️ **First-time compilation** — takes 3-5 minutes on first commit, then cached
 
-See the [Secret Scanning Migration](#secret-scanning-migration-rh-pre-commit-leaktk) section for migration details.
+See the [Secret Scanning Migration](#secret-scanning-migration-rh-pre-commit--leaktk) section for migration details.
 
 ---
 
@@ -152,9 +153,9 @@ The file hygiene hooks (`trailing-whitespace`, `end-of-file-fixer`, `check-added
 > ```bash
 > git ls-remote --tags https://github.com/leaktk/leaktk.git v0.3.3
 > ```
-
+>
 > **Note:** `default_install_hook_types: [pre-commit, commit-msg]` means a single `pre-commit install` command installs hooks for **both** the `pre-commit` and `commit-msg` stages. Without this setting, you would need to run `pre-commit install --hook-type commit-msg` separately to enable commit message validation.
-
+>
 > **Important:** On the **first commit** after running `make install-hooks`, LeakTK will compile from source (3-5 minutes). Subsequent commits use the cached binary and run instantly.
 
 ---
@@ -162,6 +163,7 @@ The file hygiene hooks (`trailing-whitespace`, `end-of-file-fixer`, `check-added
 ## Migration Guide
 
 This section covers two migration scenarios:
+
 1. **Adding Pre-commit Hooks** — adding hooks to an existing HyperFleet repository
 2. **Secret Scanning Migration** — migrating from rh-pre-commit to LeakTK
 
@@ -182,7 +184,7 @@ Add the target to your Makefile (see [Makefile Conventions — Optional Targets]
 ```makefile
 .PHONY: install-hooks
 install-hooks: ## Install pre-commit hooks
-	pre-commit install
+ pre-commit install
 ```
 
 #### Step 3: Add Make aliases for Go tooling hooks (Go repos only)
@@ -271,6 +273,7 @@ git commit -m "HYPERFLEET-XXX - chore: add pre-commit hooks"
 [**LeakTK**](https://github.com/leaktk/leaktk) is an open-source secret scanning toolkit developed by Red Hat's Information Security team — the same team that created rh-pre-commit.
 
 **Key benefits over rh-pre-commit**:
+
 - ✅ **No VPN requirement** — works for Red Hat associates and external contributors
 - ✅ **Open-source** — MIT licensed, publicly accessible on GitHub
 - ✅ **Can be committed to repos** — configuration lives in repository files
@@ -289,10 +292,9 @@ Both tools perform secret scanning using Gitleaks as the underlying engine. Here
 | **Open-source** | ❌ Internal Red Hat tool | ✅ Public GitHub repository |
 | **Installation** | ✅ Pre-built binary | ⚠️ Compiles from source (first time only) |
 
-
 #### Migration Steps
 
-**Step 1: Ensure system requirements**
+##### Step 1: Ensure system requirements
 
 Verify that all team members have Go 1.25+ installed:
 
@@ -341,22 +343,23 @@ repos:
       - id: leaktk.git.pre-commit
 ```
 
-**Step 3: Notify team**
+##### Step 3: Notify team
 
 Inform all developers that:
+
 1. System requirements must be met (Go 1.25+ only — no other dependencies needed)
 2. They should reinstall hooks: `make install-hooks`
 3. The **first commit** will take 3-5 minutes (one-time compilation)
 4. Subsequent commits will run instantly (cached binary)
 
-**Step 4: Commit the migration**
+##### Step 4: Commit the migration
 
 ```bash
 git add .pre-commit-config.yaml
 git commit -m "HYPERFLEET-XXX - chore: migrate from rh-pre-commit to LeakTK"
 ```
 
-**Step 5: Update CI/CD pipelines**
+##### Step 5: Update CI/CD pipelines
 
 If your repository enforces hooks in CI, update your pipeline configuration to use LeakTK instead of rh-pre-commit. The following steps apply regardless of CI platform (Prow, GitHub Actions, GitLab CI, etc.):
 
@@ -364,14 +367,17 @@ If your repository enforces hooks in CI, update your pipeline configuration to u
    - Verify with `go version` or install if needed
 
 2. **Install pre-commit framework**:
+
    ```bash
    pip install pre-commit
    ```
 
 3. **Run the repository's hook installation target** to ensure consistent setup:
+
    ```bash
    make install-hooks
    ```
+
    This mirrors the developer workflow and ensures pre-commit hooks are registered. The first run compiles LeakTK (3-5 minutes) — cache to avoid recompilation on subsequent runs.
 
 4. **Cache the pre-commit environment** to avoid recompiling LeakTK on every run
@@ -380,6 +386,7 @@ If your repository enforces hooks in CI, update your pipeline configuration to u
    - This reduces subsequent runs from minutes to seconds
 
 5. **Replace rh-pre-commit invocations** with pre-commit:
+
    ```bash
    # Before (rh-pre-commit)
    rh-pre-commit run --all-files
@@ -387,10 +394,11 @@ If your repository enforces hooks in CI, update your pipeline configuration to u
    # After (pre-commit with LeakTK)
    pre-commit run --all-files
    ```
-   
+
    **Note:** If your repo uses the `make install-hooks` wrapper, you can also run hooks via `make` targets that delegate to pre-commit.
 
 **Notes:**
+
 - The **first pipeline run** after migration compiles LeakTK (3-5 minutes). Subsequent runs use the cached binary.
 - **LeakTK builds with `CGO_ENABLED=0` by default** — no btrfs-progs-devel or other system dependencies required.
 - Search for `rh-pre-commit`, `LeakTK`, `make install-hooks`, and `pre-commit` in your CI configuration to locate and update all relevant pipeline steps.
@@ -398,6 +406,7 @@ If your repository enforces hooks in CI, update your pipeline configuration to u
 #### What Changes After Migration
 
 **During development**:
+
 ```bash
 # First commit after migration (one-time)
 git commit -m "feat: add feature"
@@ -410,6 +419,7 @@ git commit -m "feat: another feature"
 ```
 
 **Example output when a secret is detected**:
+
 ```text
 leaktk.git.pre-commit
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -423,7 +433,6 @@ leaktk.git.pre-commit
 The commit will be blocked until secrets are removed.
 
 ---
-
 
 ## Troubleshooting
 

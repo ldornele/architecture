@@ -15,9 +15,11 @@ Last Updated: 2025-12-02
 HyperFleet Core Architecture Overview:
 
 ### What is HyperFleet?
+
 HyperFleet is an event-driven, cloud-agnostic cluster lifecycle management platform for automating OpenShift cluster creation, configuration, and management.
 
 ### Core Components
+
 1. **HyperFleet API** - RESTful API providing CRUD operations for cluster resources
 2. **Sentinel** - Polls API, decides when to trigger reconciliation, publishes CloudEvents
 3. **Message Broker** - Message distribution (Pub/Sub, SQS, RabbitMQ)
@@ -25,6 +27,7 @@ HyperFleet is an event-driven, cloud-agnostic cluster lifecycle management platf
 5. **Database** - PostgreSQL storing cluster state and adapter state
 
 ### Key Architecture Patterns
+
 - **Event-Driven Architecture** - Sentinel publishes events, Adapters consume
 - **Anemic Events Pattern** - Events contain minimal information, adapters fetch complete data from API
 - **Config-Driven Adapters** - Single binary deployed as multiple adapter types through different configurations
@@ -32,6 +35,7 @@ HyperFleet is an event-driven, cloud-agnostic cluster lifecycle management platf
 - **Versioning Strategy** - Semantic versioning, independent version management for API/Sentinel/Adapter
 
 ### Existing Claude Code Plugin Infrastructure
+
 - Existing marketplace framework: `openshift-hyperfleet/hyperfleet-claude-plugins`
 - Supports 5 plugin types: Commands, Agents, Skills, Hooks, MCP Servers
 - Team is already using Claude Code
@@ -46,12 +50,14 @@ HyperFleet is an event-driven, cloud-agnostic cluster lifecycle management platf
 To ensure plugins focus on true value, the following principles guide the evaluation and selection of plugin ideas:
 
 **✅ Should Do**:
+
 1. **External systems Claude cannot directly access** (JIRA, Slack, Google Meeting)
 2. **Project-specific complex business logic** (dependency analysis, requirement validation)
 3. **High-frequency operations requiring optimization** (card validation, epic planning)
 4. **Cross-repo/cross-team content distribution** (AI Templates)
 
 **❌ Should Not Do**:
+
 1. Duplicate Claude's core capabilities
 2. Simple script execution
 3. Standardized needs solvable with template/context
@@ -68,6 +74,7 @@ Based on HyperFleet's architectural characteristics, development workflow, and t
 ### Category 1: Architecture and Design Assistance
 
 #### 1.1 AI Templates (Skill + Command Plugin)
+
 **Plugin Type**: Skill + Commands (Hybrid)
 **Purpose**: Unified prompt templates to reduce repetitive work and ensure team consistency
 
@@ -78,14 +85,17 @@ Based on HyperFleet's architectural characteristics, development workflow, and t
 **Core Templates** (examples):
 
 **Commands** (quick, deterministic):
+
 1. **commit-message** - Generate Conventional Commit messages (forces git diff input instead of conversation history)
 2. **pr-description** - Generate structured PR descriptions (forces git log input instead of conversation history)
 
 **Skills** (interactive, context-aware):
 3. **architecture-analyzer** - Generates architecture impact analysis plan
-   - Analyzes code changes and their architectural implications
-   - Identifies affected components and potential risks
-4. **multi-perspective-reviewer** - Multi-role perspective document review
+
+- Analyzes code changes and their architectural implications
+- Identifies affected components and potential risks
+
+1. **multi-perspective-reviewer** - Multi-role perspective document review
    - Analyzes documents from Developer, End User, QA, Product Manager, Architect perspectives
    - Standardizes review process and output format
    - Ensures documents consider different stakeholder concerns
@@ -95,11 +105,13 @@ Based on HyperFleet's architectural characteristics, development workflow, and t
 ---
 
 #### 1.2 Adapter Config Assistant (Skill Plugin)
+
 **Plugin Type**: Skill
 **Purpose**: Comprehensive adapter configuration lifecycle tool - generation, intelligent expression creation, validation, and analysis
 **Priority**: Medium
 
 **Problem Background**:
+
 - Writing adapter configs requires deep understanding of CEL expressions and HyperFleet semantics
 - Complex preconditions and resource expressions are error-prone
 - Difficult to understand and debug existing adapter configurations
@@ -111,11 +123,13 @@ Comprehensive plugin that handles the complete adapter configuration lifecycle -
 **Core Capabilities** (3 integrated features):
 
 ##### Capability 1: Smart Template Generation
+
 - Interactive prompting for adapter parameters (name, provider, event type, dependencies)
 - Generates complete YAML skeleton conforming to adapter config schema
 - Provides best-practice defaults and common patterns
 
 **Example Output**:
+
 ```yaml
 apiVersion: hyperfleet.openshift.io/v1alpha1
 kind: AdapterConfig
@@ -137,15 +151,18 @@ spec:
 ```
 
 ##### Capability 2: Intelligent CEL Expression Generation
+
 Convert natural language requirements into syntactically correct CEL expressions and precondition YAML.
 
 **Common Patterns**:
+
 - Phase checks: `cluster.status.phase in ['Provisioning', 'Ready']`
 - Condition checks: `cluster.status.conditions.exists(c, c.type == 'DNSReady' && c.status == 'True')`
 - Dependency validation, field validations (null, type, range checks)
 - Complete precondition blocks with explanations
 
 **Example Interaction**:
+
 ```yaml
 User: I need to check cluster phase is Provisioning or Ready, and DNS and Validation adapters are both complete
 
@@ -171,14 +188,17 @@ All three conditions must be true (&&) for the precondition to pass.
 ```
 
 ##### Capability 3: Configuration Validation & Analysis
+
 Validate, explain, and simulate existing adapter configurations.
 
 **Sub-Capabilities**:
+
 - **Validation**: CEL syntax checking, field reference validation, logic consistency, best practices
 - **Explanation**: Explain precondition pass/fail scenarios, resource creation triggers, status reporting logic
 - **Simulation**: Predict adapter behavior given input events, identify edge cases
 
 **Validation Example**:
+
 ```text
 User: Validate this precondition:
   expression: cluster.status.phase == 'Ready' && cluster.status.phase == 'Provisioning'
@@ -190,6 +210,7 @@ AI: ❌ Validation Error Found:
 ```
 
 **Explanation Example**:
+
 ```text
 User: What does this precondition mean?
   expression: |
@@ -218,6 +239,7 @@ Overall Behavior:
 ```
 
 **Simulation Example**:
+
 ```text
 User: Simulate this adapter config with a cluster in phase=Provisioning, provider=gcp, but no ValidationComplete condition
 
@@ -253,6 +275,7 @@ Wait for the Validation adapter to complete and set the ValidationComplete condi
 ```
 
 **Value**:
+
 - ✅ **High-frequency operation** - Every adapter development cycle involves config creation/modification
 - ✅ **Complex domain logic** - CEL expressions + HyperFleet semantics require expertise
 - ✅ **Reduce errors** - Catch syntax and logic errors before deployment
@@ -262,10 +285,12 @@ Wait for the Validation adapter to complete and set the ValidationComplete condi
 ---
 
 ### Category 2: Integration and Automation
+
 **Plugin Type**: Skill (Enhance existing `hyperfleet-jira` plugin)
 **Purpose**: Enhance existing JIRA integration, add intelligent task planning and acceptance validation capabilities
 
 **Existing Features** (Already implemented):
+
 - ✅ Create JIRA tickets (jira-ticket-creator skill)
 - ✅ Sprint management (/my-sprint, /sprint-status)
 - ✅ Ticket quality checks (jira-hygiene skill)
@@ -274,12 +299,14 @@ Wait for the Validation adapter to complete and set the ValidationComplete condi
 ### New Feature 1: Card Requirement Validator Skill
 
 **Functionality**:
+
 - Read JIRA card requirements and Acceptance Criteria (via jira-cli)
 - Analyze related implementations in current codebase
 - Semantically compare requirements with actual code
 - Generate acceptance report with completion %, completed/incomplete items, recommendations
 
 **Output Example**:
+
 ```markdown
 ## HYPERFLEET-123 Acceptance Report
 
@@ -308,12 +335,14 @@ Recommended follow-up actions:
 ### New Feature 2: Epic Task Optimizer Skill
 
 **Functionality**:
+
 - Read all issues in Epic (via jira-cli)
 - Analyze dependency relationships (JIRA links + descriptions)
 - Build dependency graph, generate optimal execution order
 - Identify parallelizable tasks and critical paths
 
 **Output Example**:
+
 ```markdown
 ## Epic HYPERFLEET-100 Execution Plan
 
@@ -342,6 +371,7 @@ Recommended follow-up actions:
 ```
 
 **Technical Implementation**:
+
 - Use jira-cli to read JIRA data
 - Use Glob/Grep/Read to analyze codebase
 - Claude semantic understanding for requirement and code comparison
@@ -349,16 +379,19 @@ Recommended follow-up actions:
 ---
 
 #### 2.2 Slack Discussion Summarizer (MCP Server)
+
 **Plugin Type**: MCP Server
 **Purpose**: Summarize Slack channel discussions, extract key insights and decisions
 
 **Functionality**:
+
 - Read channel/thread discussions, filter noise (emoji, small talk)
 - Categorize insights by topic and participant
 - Identify decisions, action items, unresolved issues
 - Generate structured summaries
 
 **Use Cases**:
+
 - Cross-timezone team information sync
 - Quickly understand missed discussions
 - Review related discussions before meetings
@@ -366,6 +399,7 @@ Recommended follow-up actions:
 - Convert Slack discussions into documentation
 
 **Output Example**:
+
 ```markdown
 ## Slack Discussion Summary - #hyperfleet-dev (Past 24 hours)
 
@@ -390,6 +424,7 @@ Recommended follow-up actions:
 ---
 
 #### 2.3 Local Development Environment Deployer (Agent Plugin)
+
 **Plugin Type**: Agent
 **Purpose**: Simplify local deployment of complete HyperFleet development environment, allowing developers to validate code changes before submitting PRs
 
@@ -402,11 +437,11 @@ Recommended follow-up actions:
 2. **Deploy Complete HyperFleet Framework**
    - Clone umbrella helm chart repo
    - helm install all components:
-     * HyperFleet API
-     * Sentinel
-     * Message Broker (Pub/Sub simulator / RabbitMQ)
-     * Database (PostgreSQL)
-     * Sample adapters (validation, dns, etc.)
+     - HyperFleet API
+     - Sentinel
+     - Message Broker (Pub/Sub simulator / RabbitMQ)
+     - Database (PostgreSQL)
+     - Sample adapters (validation, dns, etc.)
    - Wait for all components ready
 
 3. **Intelligent Code Injection**
@@ -418,10 +453,10 @@ Recommended follow-up actions:
 4. **Execute End-to-End Validation**
    - Run smoke tests (key subset of E2E tests, not full suite to save time)
    - Verify core flow:
-     * Create test cluster via API
-     * Verify Sentinel publishes event
-     * Verify Adapter receives and processes event
-     * Verify status updates correctly (phase, conditions)
+     - Create test cluster via API
+     - Verify Sentinel publishes event
+     - Verify Adapter receives and processes event
+     - Verify status updates correctly (phase, conditions)
    - Run component-specific integration tests (if exist)
 
 5. **AI-Assisted Analysis and Reporting**
@@ -437,6 +472,7 @@ Recommended follow-up actions:
    - Support re-running validation without redeploying environment
 
 **Trigger Methods** (On-Demand Only, NOT Automatic):
+
 - **This plugin is triggered ONLY when user explicitly requests it**
 - Command: `/deploy-local` - User manually executes when ready to validate
 - Command: `/cleanup-local` - Cleanup environment
@@ -444,6 +480,7 @@ Recommended follow-up actions:
 - Skill: "Cleanup local HyperFleet environment"
 
 **Typical Workflow**:
+
 1. Developer writes code locally (may involve multiple iterations with AI assistance)
 2. Developer continues debugging and refining code (NOT triggering deployment)
 3. When developer is ready to validate, **manually execute** `/deploy-local`
@@ -452,6 +489,7 @@ Recommended follow-up actions:
 6. After validation passes, developer executes `/cleanup-local` to clean up environment
 
 **Use Cases**:
+
 - Quick validation before PR submission
 - Integration testing after new adapter development
 - Compatibility validation after API changes
@@ -463,6 +501,7 @@ Recommended follow-up actions:
 ### Category 3: Debugging and Troubleshooting
 
 #### 3.1 HyperFleet System Debugger (Agent Plugin)
+
 **Plugin Type**: Agent
 **Purpose**: When encountering a HyperFleet issue, trace the complete event flow (API → Sentinel → Broker → Adapter → K8s) and collect relevant logs to identify where the problem occurred
 **Invocation**: `@Claude debug hyperfleet issue: <description>`
@@ -500,12 +539,14 @@ When you report an issue (e.g., "cluster cls-123 stuck in provisioning"), the pl
    - Any pod errors or crashes?
 
 **Use Cases**:
+
 - "Why is cluster cls-123 stuck in provisioning?"
 - "Why didn't DNS adapter update cluster cls-456?"
 - "Why is Sentinel not publishing events?"
 - "API request failed - what happened?"
 
 **Output Example**:
+
 ```text
 HyperFleet Debug Report - cluster cls-123
 ==========================================
@@ -564,6 +605,7 @@ DNS Adapter failed due to GCP permission issue. This blocks downstream adapters.
 ```
 
 **Value**:
+
 - Trace complete event flow across all HyperFleet components
 - Quickly identify which component is blocking progress
 - Collect relevant logs without manually checking each component
@@ -572,6 +614,7 @@ DNS Adapter failed due to GCP permission issue. This blocks downstream adapters.
 ---
 
 #### 3.2 Event Flow Tracer (Agent Plugin)
+
 **Plugin Type**: Agent
 **Purpose**: Visualize event flow timeline and analyze performance metrics to understand system behavior and identify bottlenecks
 **Invocation**: `@Claude trace event flow for <resource-id>` or `@Claude analyze event flow performance`
@@ -603,6 +646,7 @@ DNS Adapter failed due to GCP permission issue. This blocks downstream adapters.
    - Adapter concurrency utilization
 
 **Output Example**:
+
 ```text
 Event Flow Performance Analysis - cluster cls-123
 ==================================================
@@ -655,6 +699,7 @@ Suggested Actions:
 ```
 
 **Value**:
+
 - Understand event flow performance characteristics
 - Identify performance bottlenecks and optimization opportunities
 - Validate system meets latency SLOs
@@ -668,6 +713,7 @@ Suggested Actions:
 Based on development workflow and architectural characteristics, recommended implementation priorities:
 
 ### High Priority
+
 1. **AI Templates** - Solve repetitive prompt pain points, immediately improve efficiency
    - 4 core templates: Commit Message, PR Description, Architecture Analysis, Multi-Role Review
 2. **JIRA Integration Enhancement** - Enhance existing plugin, add Card Validator and Epic Optimizer
@@ -678,21 +724,24 @@ Based on development workflow and architectural characteristics, recommended imp
    - Reduce CI failures, accelerate development iteration
 
 ### Medium Priority
-4. **Adapter Config Assistant** - Comprehensive adapter configuration lifecycle tool
+
+1. **Adapter Config Assistant** - Comprehensive adapter configuration lifecycle tool
    - Requires deep understanding of CEL expressions and HyperFleet semantics
    - Need time to gather sufficient knowledge before implementation
-5. **Slack Discussion Summarizer (MCP Server)** - Summarize discussions, extract decisions, reduce information overload
-6. **HyperFleet System Debugger** - Diagnose platform issues by analyzing system logs, metrics, and component health
+2. **Slack Discussion Summarizer (MCP Server)** - Summarize discussions, extract decisions, reduce information overload
+3. **HyperFleet System Debugger** - Diagnose platform issues by analyzing system logs, metrics, and component health
    - Requires comprehensive knowledge of HyperFleet event flow and debugging patterns
 
 ### Low Priority
-7. **Event Flow Tracer** - Advanced debugging tool for complex event flow tracing
+
+1. **Event Flow Tracer** - Advanced debugging tool for complex event flow tracing
 
 ---
 
 ## Technical Implementation Recommendations
 
 ### Plugin Marketplace Structure
+
 ```text
 openshift-hyperfleet/hyperfleet-claude-plugins/
 ├── OWNERS
@@ -737,6 +786,7 @@ openshift-hyperfleet/hyperfleet-claude-plugins/
 ```
 
 **Notes**:
+
 - Each plugin is an independent top-level directory
 - Each plugin contains OWNERS, README.md
 - Skills placed in `skills/` directory, each skill in a subdirectory
@@ -747,6 +797,7 @@ openshift-hyperfleet/hyperfleet-claude-plugins/
 ### Dependencies and Integration
 
 **Key Dependencies**:
+
 - **AI Templates**: Self-contained in marketplace repo
 - **Adapter Config Assistant**: May reference adapter config schema from architecture docs
 - **JIRA Enhancement**: Requires jira-cli
@@ -793,6 +844,7 @@ All plugins follow the **design principles** defined at the beginning of the doc
 ## Existing Plugin Assets
 
 **Implemented Plugins**:
+
 - ✅ `hyperfleet-architecture` - Architecture documentation query skill
 - ✅ `hyperfleet-jira` - JIRA integration (ticket creation, sprint management, hygiene checks, story points estimation)
 
@@ -803,6 +855,7 @@ All plugins follow the **design principles** defined at the beginning of the doc
 See the **Priority Recommendations** section earlier in the document for details. Brief summary:
 
 **High Priority**:
+
 1. AI Templates - 4 core templates (commit, PR, architecture analysis, multi-perspective review)
 2. JIRA Integration Enhancement - Card Validator + Epic Optimizer
 3. Local Development Environment Deployer - One-click local development environment deployment and validation

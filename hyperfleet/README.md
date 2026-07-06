@@ -9,7 +9,8 @@ Last Updated: 2026-03-27
 
 HyperFleet is a scalable, event-driven system for managing OpenShift cluster lifecycle operations in a "provider-agnostic" way. It provides an API to manage customer requests for different resources (clusters, nodepools...) and orchestrates tasks that reconcile that state. These tasks which are provider-specific are outside of HyperFleet itself, which acts as a kind of "distributed kubernetes controller" with pluggable reconcilers. The architecture follows a separation of concerns pattern with distinct components for data storage, orchestration, and execution.
 
-**Core components**: 
+**Core components**:
+
 - API layer managing desired state for resources (clusters, nodepools)
 - Sentinel watching state changes and triggering asynchronous work
 - Adapters executing the provider-specific provisioning tasks and reporting status
@@ -19,7 +20,6 @@ HyperFleet is a scalable, event-driven system for managing OpenShift cluster lif
 ## Architecture Diagram
 
 The following diagram shows the different components of HyperFleet (in blue) and how they interact with other components in the greater system.
-
 
 ![HyperFleet architecture](./hyperfleet.png)
 
@@ -37,8 +37,8 @@ Simple REST API providing CRUD operations for cluster and node pool resources.
 - **Stack**: Go, PostgreSQL, OpenAPI-driven
 - **Design**: Stateless, no complex business logic, horizontally scalable
 
-
 The HyperFleet API sits behind a service-offering API that:
+
 - Contain specific security based on the cloud provider it is deployed
 - Validates service-offering specific schema contract
 - Exposes the system externally
@@ -95,6 +95,7 @@ Event-driven services that consume reconciliation events, evaluate preconditions
 - **Features**: Config-driven preconditions, Kubernetes/Maestro transport layers, idempotent operations
 
 **Adapter Types** (MVP):
+
 - Landing Zone Adapter - Namespace/secret/configmap preparation
 - Validation Adapter - Quota/networking/policy validation
 - DNS Adapter - DNS records and certificates
@@ -134,7 +135,7 @@ Kubernetes resources (Jobs, Secrets, ConfigMaps, Services) created by adapters t
 
 ### Cluster Creation Flow
 
-```
+```text
 1. User → POST /clusters → API → PostgreSQL
 2. Sentinel polls API → Evaluates decision logic
 3. Sentinel publishes CloudEvent → Message Broker

@@ -15,12 +15,14 @@ This document defines how we work together to deliver the HyperFleet MVP. Our ap
 **This working agreement is valid for the 12-week MVP phase.**
 
 During MVP, we intentionally use a **lightweight, flexible process** to:
+
 - Move fast and learn quickly
 - Empower engineers to make decisions
 - Minimize ceremony and maximize velocity
 - Focus on delivering value
 
 **Post-MVP**: After the 12-week MVP period, we will establish more formal processes based on what we learn:
+
 - Refined collaboration practices
 - Formal review and approval workflows
 - Enhanced governance for architecture decisions
@@ -33,14 +35,18 @@ During MVP, we intentionally use a **lightweight, flexible process** to:
 ## Core Principles
 
 ### 1. Loose Process, High Trust
+
 We operate with a **lightweight, flexible process** for MVP delivery:
+
 - Minimal ceremony, maximum velocity
 - Trust engineers to make the right decisions
 - Adapt the process as we learn
 - Focus on delivering value, not following process
 
 ### 2. Engineer Empowerment
+
 **All engineers are empowered to make decisions** within their work:
+
 - Technical implementation choices
 - Architecture decisions within their scope
 - Tooling and library selections
@@ -49,6 +55,7 @@ We operate with a **lightweight, flexible process** for MVP delivery:
 **You don't need permission to do the right thing.**
 
 ### 3. Decision-Making Philosophy
+
 - **Make decisions locally**: If it affects your work, you decide
 - **Consult when helpful**: Seek input from teammates when beneficial
 - **Escalate when needed**: Bring architectural or cross-team impacts to the group
@@ -59,12 +66,14 @@ We operate with a **lightweight, flexible process** for MVP delivery:
 ## Source of Truth: Jira
 
 ### Jira Tickets Are Our Contract
+
 - **Jira tickets are the single source of truth** for what we're building
 - Each ticket contains **acceptance criteria** that define success
 - Engineers should **strive to meet all acceptance criteria**
 - If acceptance criteria are unclear or incomplete, update them before starting work
 
 ### Handling Trade-offs
+
 When you need to make a trade-off that affects acceptance criteria:
 
 1. **Document the trade-off** in the architecture repo
@@ -78,9 +87,9 @@ When you need to make a trade-off that affects acceptance criteria:
    - Add a comment explaining the change
    - Tag relevant stakeholders if the trade-off is significant
 
-
 **Example**:
-```
+
+```text
 Original AC: "Adapter supports retry with exponential backoff up to 10 attempts"
 Trade-off: "Implemented retry with exponential backoff up to 5 attempts"
 Reason: "Testing showed 5 attempts is sufficient for 99% of failure cases.
@@ -95,18 +104,21 @@ Impact: "Reduces max retry time from 17 minutes to 5 minutes."
 Our definition of done is simple and non-negotiable:
 
 ### ✅ Code
+
 - Implementation meets acceptance criteria (or documented trade-offs)
 - Code is production-ready (error handling, logging, etc.)
 - Follows established patterns and conventions
 - Passes CI pipeline (build, lint, security scans)
 
 ### ✅ Tests
+
 - **Unit tests** for core logic (≥80% coverage target)
 - **Integration tests** where components interact
 - **E2E tests** for critical user flows (where applicable)
 - All tests passing in CI
 
 ### ✅ Documentation
+
 - **Code documentation**: Comments for complex logic, docstrings for public APIs
 - **Usage documentation**: How to use/operate the feature
 - **Architecture updates**: See "Architecture Repo Sync" below
@@ -118,7 +130,9 @@ Our definition of done is simple and non-negotiable:
 ## Architecture Repo Sync
 
 ### When to Update the Architecture Repo
+
 **Update the architecture repo when closing a ticket** if the work:
+
 - Changes system architecture or design
 - Adds/removes/modifies components or services
 - Changes APIs, events, or contracts
@@ -129,6 +143,7 @@ Our definition of done is simple and non-negotiable:
 **If your work changes how the system works, update the architecture repo.**
 
 ### What to Document
+
 When updating the architecture repo (`/architecture/hyperfleet/`):
 
 1. **Design decisions**: Why you chose this approach
@@ -138,12 +153,14 @@ When updating the architecture repo (`/architecture/hyperfleet/`):
 5. **Operational impacts**: Monitoring, alerting, runbook updates
 
 ### Where to Document
+
 - **`/architecture/hyperfleet/architecture/`**: System design, component architecture
 - **`/architecture/hyperfleet/components/`**: Component-specific documentation
 - **`/architecture/hyperfleet/docs/`**: Operational docs, runbooks, guides
 - **`/architecture/hyperfleet/mvp/`**: MVP-specific decisions and scope
 
 ### How to Keep in Sync
+
 1. **Before closing the ticket**: Review if architecture repo needs updates
 2. **Update the repo**: Make necessary documentation changes
 3. **Link in ticket**: Add link to architecture repo commit/PR in Jira ticket
@@ -156,16 +173,20 @@ When updating the architecture repo (`/architecture/hyperfleet/`):
 ## Decision Documentation
 
 ### When to Document Decisions
+
 Document significant decisions in the architecture repo when:
+
 - The decision has architectural impact
 - The decision affects multiple components/teams
 - The decision involves a trade-off worth remembering
 - Future engineers would benefit from understanding the "why"
 
 ### How to Document Decisions
+
 The architecture repo README provides comprehensive guidance on documenting decisions, trade-offs, and technical debt.
 
 **See**: [Architecture Repo README](../../../README.md) for:
+
 - Component design document templates (required sections)
 - Trade-offs and alternatives templates
 - Technical debt tracking
@@ -173,6 +194,7 @@ The architecture repo README provides comprehensive guidance on documenting deci
 - Review and merge process
 
 **Quick Links**:
+
 - [Document Types](../../../README.md#document-types) - Architecture, components, guides
 - [Tracking Trade-offs](../../../README.md#tracking-trade-offs-and-technical-debt) - Required trade-offs template
 - [Living Documents](../../../README.md#living-documents) - How to update documents
@@ -183,17 +205,20 @@ The architecture repo README provides comprehensive guidance on documenting deci
 ## Collaboration Practices
 
 ### Communication
+
 - **Async-first**: Use Jira, Slack, and architecture repo for decisions
 - **Sync when helpful**: Jump on a call when async is inefficient
 - **Document outcomes**: Record decisions from sync discussions
 
 ### Code Review
+
 - **Review for quality**: Look for bugs, edge cases, performance issues
 - **Review for learning**: Share knowledge and patterns
 - **Review for consistency**: Ensure patterns align across the codebase
 - **Empower the author**: Trust engineers to make the right calls
 
 ### Asking for Help
+
 - **Ask early**: Don't struggle alone
 - **Ask publicly**: Share questions in team channels (helps everyone learn)
 - **Ask specifically**: Include context, what you've tried, what you need
@@ -202,14 +227,16 @@ The architecture repo README provides comprehensive guidance on documenting deci
 
 ## Quality Expectations
 
-### Production-Ready Means:
+### Production-Ready Means
+
 - **Works reliably**: Not just "works once in ideal conditions"
 - **Handles errors**: Graceful degradation, clear error messages
 - **Observable**: Logs, metrics, traces for debugging
 - **Secure**: No vulnerabilities, secrets managed properly
 - **Maintainable**: Clear code, good patterns, documented trade-offs
 
-### Testing Expectations:
+### Testing Expectations
+
 - **Test what matters**: Focus on critical paths and edge cases
 - **Test at the right level**: Unit tests for logic, integration for interactions, E2E for flows
 - **Make tests reliable**: No flaky tests in CI
@@ -222,11 +249,13 @@ The architecture repo README provides comprehensive guidance on documenting deci
 With 2 global teams, we optimize for async collaboration:
 
 ### Handoffs
+
 - **Clear state in Jira**: Update tickets before end of day
 - **Document blockers**: Call out what's blocking progress
 - **Tag for help**: Mention teammates who can unblock you
 
 ### Overlaps
+
 - **Leverage overlap time**: Schedule sync discussions during overlap hours
 - **Record decisions**: Document outcomes for teammates in other zones
 - **Async reviews**: Don't block on reviews, keep PRs flowing
@@ -236,11 +265,13 @@ With 2 global teams, we optimize for async collaboration:
 ## Continuous Improvement
 
 ### Retrospectives
+
 - Regular retrospectives to reflect and improve
 - What's working? What's not?
 - Adjust this working agreement as needed
 
 ### Experiment and Learn
+
 - Try new approaches
 - Share learnings with the team
 - Update practices based on what we learn
@@ -270,5 +301,3 @@ With 2 global teams, we optimize for async collaboration:
 **Remember**: We trust you to make good decisions, deliver quality work, and keep the team informed. This working agreement exists to support you, not constrain you.
 
 **We're learning by doing**: This lightweight process is intentional for MVP. We'll refine our practices based on what we learn over the next 12 weeks.
-
-

@@ -48,16 +48,17 @@ Comprehensive design document for the HyperFleet Sentinel service — the centra
 
 ## What & Why
 
-**What**
+### What
 
 Implement a "HyperFleet Sentinel" service that continuously polls the HyperFleet API for resources (clusters, node pools, etc.) and publishes reconciliation events directly to the message broker to trigger adapter processing. The Sentinel acts as the "watchful guardian" of the HyperFleet system with configurable message decision logic using CEL expressions and composable boolean params. Multiple Sentinel deployments can be configured via YAML configuration files to handle different shards of resources for horizontal scalability.
 
 **Pattern Reusability**: The Sentinel is designed as a generic reconciliation service that can watch ANY HyperFleet resource type, not just clusters. Future deployments can include:
+
 - **Cluster Sentinel** (this epic) - watches clusters
 - **NodePool Sentinel** (future) - watches node pools
 - **[Resource] Sentinel** (future) - watches any HyperFleet resource
 
-**Why**
+### Why
 
 Without the Sentinel, the cluster provisioning workflow has a critical gap:
 
@@ -67,6 +68,7 @@ Without the Sentinel, the cluster provisioning workflow has a critical gap:
 4. **No Failure Recovery**: Transient failures cannot self-heal without a retry mechanism
 
 The Sentinel solves these problems by:
+
 - **Closing the reconciliation loop**: Continuously polls resources and publishes events to trigger adapter evaluation
 - **Uses adapter status updates**: Reads `status.conditions[].last_updated_time` and condition statuses (updated by adapters on every check) to determine when to create next event
 - **Fully configurable decision logic**: Named CEL params and a boolean result expression define the complete decision logic (e.g., different age thresholds for ready vs not-ready resources)
@@ -104,7 +106,8 @@ The Sentinel solves these problems by:
 ### The Problem: Stuck Workflows
 
 **Without Sentinel**:
-```
+
+```text
 User creates cluster
   → Validation adapter processes
   → Validation reports status
@@ -207,18 +210,23 @@ graph LR
 Resource filtering can be based on **any label criteria** of the cluster object being reconciled. The `resource_selector` uses a list of label/value pairs with AND logic (all labels must match), allowing for flexible filtering strategies:
 
 - **Regional filtering**:
+
   ```yaml
   resource_selector:
     - label: region
       value: us-east
   ```
+
 - **Environment-based**:
+
   ```yaml
   resource_selector:
     - label: environment
       value: production
   ```
+
 - **Multi-label filtering** (all must match):
+
   ```yaml
   resource_selector:
     - label: region
@@ -228,7 +236,9 @@ Resource filtering can be based on **any label criteria** of the cluster object 
     - label: cluster-type
       value: hypershift
   ```
+
 - **Tenant/Customer**:
+
   ```yaml
   resource_selector:
     - label: tenant
@@ -236,12 +246,14 @@ Resource filtering can be based on **any label criteria** of the cluster object 
   ```
 
 This flexibility allows you to:
+
 - Scale horizontally by dividing clusters across multiple Sentinel instances
 - Isolate blast radius (failures in one Sentinel don't affect others)
 - Optimize configurations per Sentinel instance (different message decision params for prod vs dev)
 - Deploy Sentinels close to their managed clusters (regional Sentinels in regional k8s clusters)
 
 **Important caveat**: Since this is label-based filtering (not true sharding), operators must manually ensure:
+
 - All resources are covered by at least one Sentinel (no gaps)
 - Resource coverage is appropriate (overlaps may be intentional or problematic depending on use case)
 
@@ -250,12 +262,14 @@ This flexibility allows you to:
 The service uses a fully configurable decision logic based on the `message_decision` configuration. There is no hardcoded check — all decision logic is expressed as CEL rules:
 
 **Publish Event IF**:
+
 - Evaluate all `message_decision.params` in dependency order (each param is a CEL expression or duration literal)
 - Params can reference other params (e.g., `is_reconciled` can be used in `reconciled_and_stale`)
 - Evaluate `message_decision.result` boolean expression (standard CEL logical operators)
 - If result is `true` → publish event
 
 **Skip IF**:
+
 - Message decision result is `false`
 
 **Key Insight — Why No Hardcoded Generation Check**:
@@ -263,6 +277,7 @@ The service uses a fully configurable decision logic based on the `message_decis
 The API already aggregates adapter statuses into the `Reconciled` condition. When a user changes the resource spec (incrementing `generation`), the API sets `Reconciled` to `False` because not all adapters have reconciled the new generation yet. This means `Reconciled == False` already covers the generation mismatch case — there is no need for the Sentinel to duplicate this logic with a separate generation check.
 
 This simplifies the Sentinel to a single unified rule engine:
+
 - The `Reconciled` condition is the canonical signal for "this resource needs reconciliation"
 - The `LastKnownReconciled` condition is informational but not used for decision-making in the default configuration
 - Operators can write custom rules using any condition type if their use case requires it
@@ -300,6 +315,7 @@ Debouncing is a programming technique that limits the rate at which a function f
 By introducing a debounce interval (10s default), the Sentinel limits the messages published for a resource — ensuring adapters have time to complete their work before triggering the next reconciliation cycle. Brand-new resources (`is_new_resource`) bypass this debounce because no adapter has processed them yet — there is no "previous work" to wait for.
 
 **Key Design Decisions**:
+
 - All CEL expressions are compiled at startup (fail-fast on invalid configuration)
 - Params are evaluated in dependency order (topological sort); circular dependencies are rejected at startup
 - Duration literals (e.g., `30m`, `10s`) in params are auto-detected and converted to CEL duration values
@@ -316,6 +332,7 @@ A single custom function is registered at startup. The `resource` parameter is i
 **`condition(name)`** — `(string) → Condition`
 
 Returns the full condition object matching the given `type` name, with fields:
+
 - `.status` — `"True"`, `"False"`, or `"Unknown"`
 - `.observed_generation` — which generation this condition last reconciled
 - `.last_updated_time` — ISO 8601 timestamp of last adapter check
@@ -324,6 +341,7 @@ Returns the full condition object matching the given `type` name, with fields:
 **When condition is missing**: Returns a zero-value Condition (`.status = ""`, `.observed_generation = 0`, `.last_updated_time` = zero time). This follows Go's zero-value convention and allows safe field access without null checks.
 
 **Examples**:
+
 ```cel
 condition("Reconciled").status == "True"              # check if resource is ready
 condition("Reconciled").last_updated_time             # get timestamp for age calculation
@@ -331,6 +349,7 @@ condition("Available").observed_generation       # get last reconciled generatio
 ```
 
 **Notes**:
+
 - Searches `resource.status.conditions[]` by the `type` field
 - Works with **any** condition type present on the resource (e.g., `"Reconciled"`, `"LastKnownReconciled"`, `"Applied"`, `"Health"`, or custom conditions)
 - When accessing `.last_updated_time` on a missing condition, the zero time value will cause `timestamp()` conversion to produce a very old timestamp, which naturally triggers age-exceeded checks — acting as a fail-safe that ensures new or unknown resources get reconciled (see Test 7)
@@ -412,7 +431,7 @@ data:
 
 Without this requirement, adapters that skip work due to unmet preconditions would create an infinite event loop:
 
-```
+```text
 Time 10:00 - DNS adapter receives event
 Time 10:00 - DNS checks preconditions: Validation not complete
 Time 10:00 - DNS does NOT update status (skips work)
@@ -429,6 +448,7 @@ Adapters MUST update status in ALL scenarios:
 
 1. **Preconditions Met** → Create Job → Report status with `observed_time=now`
 2. **Preconditions NOT Met** → Skip work → Report status anyway with:
+
    ```json
    {
      "adapter": "dns",
@@ -462,6 +482,7 @@ Adapters MUST update status in ALL scenarios:
 **Integration Testing**:
 
 Integration tests MUST verify that:
+
 - Adapters send `observed_time` when preconditions are met
 - Adapters send `observed_time` when preconditions are NOT met
 - Sentinel correctly calculates age from `cluster.status.last_updated_time` (aggregated from adapter reports) for message decision evaluation
@@ -516,6 +537,7 @@ When a user changes the cluster spec (e.g., scales nodes), `generation` incremen
 If a cluster stays in "Provisioning" state for 2 hours, `last_transition_time` would remain at the time it entered "Provisioning" (e.g., 10:00), even though adapters check it at 11:00, 11:30, 12:00. Using `last_transition_time` for age calculation would incorrectly trigger events too frequently. Using `last_updated_time` ensures age is calculated from the last adapter check, not the last status change.
 
 **For complete details on generation and observed_generation semantics, see:**
+
 - [HyperFleet Status Guide](../../docs/status-guide.md) - Complete documentation of the status contract, including how adapters report `observed_generation` and how the API aggregates it into the `Reconciled` condition
 
 ### Resource Filtering Architecture
@@ -523,12 +545,15 @@ If a cluster stays in "Provisioning" state for 2 hours, `last_transition_time` w
 > **MVP Scope**: For the initial MVP implementation (HYPERFLEET-33), we recommend deploying a **single Sentinel instance** watching all resources (`resource_selector: []` - empty list). Multi-Sentinel deployments with label-based filtering are documented below as a **post-MVP enhancement** for horizontal scalability.
 
 **Why Resource Filtering?**
+
 - Horizontal scalability - distribute load across multiple Sentinel instances
 - Regional isolation - deploy Sentinel per region
 - Blast radius reduction - failures affect only filtered resources
 - Flexibility - different configurations per Sentinel instance (e.g., different message decision params for dev vs prod)
 
+<!-- markdownlint-disable-next-line MD036 -->
 **Important: This is NOT True Sharding**
+
 - True sharding guarantees complete coverage: all resources are handled by exactly one shard
 - Sentinel uses `resource_selector` which is just label-based filtering
 - No coordination between Sentinel instances
@@ -537,6 +562,7 @@ If a cluster stays in "Provisioning" state for 2 hours, `last_transition_time` w
 - See also: [Sharding Coverage Design](../../docs/sharding-coverage-design.md)
 
 **How Resource Filtering Works**:
+
 1. Each Sentinel deployment uses ONE YAML configuration file (sentinel-config.yaml)
 2. Configuration file defines `resource_type` (clusters, nodepools, etc.) and `resource_selector` (label selector)
 3. Sentinel only fetches resources matching the resource type and resource selector
@@ -659,12 +685,14 @@ data:
 **Responsibility**: Load configuration from YAML files with environment variable overrides
 
 **Key Functions**:
+
 - `Load(configPath)` - Load Sentinel configuration from YAML file
 - `LoadBrokerConfig()` - Load broker configuration from environment or ConfigMap
 - `BuildLabelSelector(cfg)` - Convert `resource_selector` to label selector
 - `ParseMessageData(cfg)` - Parse message_data configuration for CloudEvent payload composition
 
 **Implementation Requirements**:
+
 - Load Sentinel configuration from YAML file path specified via command-line flag
 - Parse duration strings (poll_interval, timeout)
 - Parse `message_decision` section: params (CEL expressions or duration literals) and result expression
@@ -682,6 +710,7 @@ data:
 **Responsibility**: Fetch resources from HyperFleet API that need reconciliation
 
 **Key Functions**:
+
 - `FetchResources(ctx, resourceType, selector)` - Fetch resources matching label selector and condition criteria
 
 The Resource Watcher uses the API's condition-based search to selectively query only resources that need attention (not-ready or stale), rather than fetching all resources on every poll cycle. See the API and Sentinel component documentation for query details.
@@ -691,9 +720,11 @@ The Resource Watcher uses the API's condition-based search to selectively query 
 **Responsibility**: Configurable decision logic via CEL-based message decision
 
 **Key Functions**:
+
 - `Evaluate(resource, now)` - Determine if resource needs an event
 
 **Decision Logic**:
+
 1. **Evaluate message decision params** in dependency order, building an activation map:
    - Duration literal params (e.g., `30m`) are converted to CEL duration values
    - CEL expression params are evaluated with access to `resource`, `now`, and previously evaluated params
@@ -706,6 +737,7 @@ The Resource Watcher uses the API's condition-based search to selectively query 
    - If result is `false` → skip (reason: "message decision not matched")
 
 **Implementation Requirements**:
+
 - All CEL expressions compiled at startup (fail-fast on invalid expressions)
 - Param dependencies resolved via topological sort; circular dependencies rejected at startup
 - Clear logging of decision reasoning
@@ -715,9 +747,11 @@ The Resource Watcher uses the API's condition-based search to selectively query 
 **Responsibility**: Publish CloudEvents to message broker
 
 **Key Functions**:
+
 - `PublishEvent(ctx, resource, reason)` - Publish CloudEvent to broker
 
 **CloudEvent Format** (CloudEvents 1.0):
+
 ```json
 {
   "specversion": "1.0",
@@ -740,12 +774,14 @@ The Resource Watcher uses the API's condition-based search to selectively query 
 The `data` field structure is defined by the `message_data` configuration in sentinel-config.yaml using **Go template syntax**. This allows Sentinel to be generic across different resource types (clusters, nodepools, etc.) by configuring which fields to extract and include in CloudEvents.
 
 **Template Syntax**:
+
 - Uses Go template language (`text/template` package)
 - Resource object available as `.` (dot) in template context
 - Supports dot notation for nested fields: `.metadata.labels.region`
 - Supports simple conditionals and functions
 
 **Configuration Format**:
+
 ```yaml
 message_data:
   resource_id: .id                           # Simple field access
@@ -757,21 +793,25 @@ message_data:
 ```
 
 **Evaluation Context**:
+
 - Template receives the resource object (cluster, nodepool, etc.)
 - Field paths are relative to the resource root
 - Missing fields result in empty string (not error)
 
 **Error Handling**:
+
 - Invalid template syntax → Sentinel fails at startup (fail-fast)
 - Missing fields at runtime → Log warning, use empty string
 - Type mismatches → Convert to string representation
 
 **Validation**:
+
 - Templates validated at startup (before starting polling loop)
 - Invalid templates cause Sentinel to exit with error
 - Provides clear error messages indicating which template failed
 
 **Example Template Evaluation**:
+
 ```yaml
 # Configuration:
 message_data:
@@ -796,6 +836,7 @@ message_data:
 ```
 
 **Implementation Requirements**:
+
 - Support GCP Pub/Sub:
   - Use `cloud.google.com/go/pubsub` SDK
   - Publish to configured topic
@@ -814,10 +855,12 @@ message_data:
 **Responsibility**: Orchestrate reconciliation loop with periodic polling
 
 **Key Functions**:
+
 - `Run(ctx)` - Main reconciliation loop
 - `Start()` - Initialize and start the service
 
 **Initialization Steps** (executed once at startup):
+
 1. **Load Configuration**:
    - Load Sentinel configuration from YAML file specified via command-line flag
    - Load broker configuration from environment or shared ConfigMap
@@ -827,6 +870,7 @@ message_data:
    - Log configuration details and validate all required fields
 
 **Polling Loop Steps** (repeated every poll_interval):
+
 1. **Fetch Resources**:
    - Build label selector from resource_selector configuration
    - Determine resource endpoint from resource_type (e.g., /clusters, /nodepools)
@@ -851,12 +895,14 @@ message_data:
    - Repeat the loop
 
 **Service Architecture**:
+
 - **Single-phase initialization**: Load configuration once during startup, resolve param dependencies, compile CEL expressions, fail fast if invalid
 - **Stateless polling loop**: No configuration reloading during runtime
 - **Simple service model**: No Kubernetes controller pattern, just periodic polling
 - **Graceful shutdown**: Support clean termination on SIGTERM/SIGINT (see [Graceful Shutdown Standard](../../standards/graceful-shutdown.md))
 
 **Error Handling**:
+
 - On config load failure: exit with error code
 - On resource fetch failure: log error, wait poll interval, retry
 - On event publishing failure: log error, record metric, continue to next resource
@@ -869,8 +915,9 @@ The following test scenarios ensure the Decision Engine correctly implements the
 
 ### Message Decision Tests
 
-**Test 1: Reconciled resource with recent check → skip**
-```
+#### Test 1: Reconciled resource with recent check - skip
+
+```text
 Given:
   - Resource Reconciled condition status: True
   - resource.generation = 2
@@ -883,8 +930,9 @@ Then:
   - Result: false || false || false = false
 ```
 
-**Test 2: Not-reconciled resource with debounce elapsed → publish**
-```
+#### Test 2: Not-reconciled resource with debounce elapsed - publish
+
+```text
 Given:
   - Resource Reconciled condition status: False
   - resource.generation = 2
@@ -897,8 +945,9 @@ Then:
   - Result: false || false || true = true
 ```
 
-**Test 3: Not-reconciled resource within debounce period → skip**
-```
+#### Test 3: Not-reconciled resource within debounce period - skip
+
+```text
 Given:
   - Resource Reconciled condition status: False
   - resource.generation = 2
@@ -911,8 +960,9 @@ Then:
   - Result: false || false || false = false
 ```
 
-**Test 4: Reconciled resource with stale check → publish (periodic health check)**
-```
+#### Test 4: Reconciled resource with stale check - publish (periodic health check)
+
+```text
 Given:
   - Resource Reconciled condition status: True
   - resource.generation = 2
@@ -925,8 +975,9 @@ Then:
   - Result: false || true || false = true
 ```
 
-**Test 5: Brand-new resource (generation 1, not ready) → publish immediately**
-```
+#### Test 5: Brand-new resource (generation 1, not ready) - publish immediately
+
+```text
 Given:
   - Resource Reconciled condition status: False
   - resource.generation = 1
@@ -942,8 +993,9 @@ Note:
     processed them yet — there is no "previous work" to wait for.
 ```
 
-**Test 6: Not-reconciled resource due to generation mismatch → publish via debounce**
-```
+#### Test 6: Not-reconciled resource due to generation mismatch - publish via debounce
+
+```text
 Given:
   - resource.generation = 2 (user changed spec)
   - API has set Reconciled condition status: False (because adapters haven't reconciled generation 2)
@@ -962,8 +1014,9 @@ Note:
 
 ### Edge Cases
 
-**Test 7: Missing Reconciled condition on resource (zero-value fail-safe)**
-```
+#### Test 7: Missing Reconciled condition on resource (zero-value fail-safe)
+
+```text
 Given:
   - Resource has no Reconciled condition
   - resource.generation = 1
@@ -979,8 +1032,9 @@ Note:
     a very old timestamp, making not_reconciled_and_debounced true as well.
 ```
 
-**Test 8: CEL expression compilation failure at startup**
-```
+#### Test 8: CEL expression compilation failure at startup
+
+```text
 Given:
   - Configuration contains invalid CEL expression in params or result
 Then:
@@ -988,8 +1042,9 @@ Then:
   - Clear error message indicating which param/expression failed
 ```
 
-**Test 9: Circular param dependency at startup**
-```
+#### Test 9: Circular param dependency at startup
+
+```text
 Given:
   - Param A references Param B, and Param B references Param A
 Then:
@@ -997,8 +1052,9 @@ Then:
   - Clear error message indicating the circular dependency
 ```
 
-**Test 10: Brand-new resource with no Reconciled condition and generation > 1**
-```
+#### Test 10: Brand-new resource with no Reconciled condition and generation > 1
+
+```text
 Given:
   - Resource has no Reconciled condition (no adapter has reported yet)
   - resource.generation = 2 (created with a spec update before any adapter ran)
@@ -1015,8 +1071,9 @@ Note:
     timestamp, so not_reconciled_and_debounced catches it as a fail-safe.
 ```
 
-**Test 11: message_decision omitted from configuration**
-```
+#### Test 11: message_decision omitted from configuration
+
+```text
 Given:
   - Configuration YAML has no message_decision section
 Then:
@@ -1028,8 +1085,9 @@ Note:
     decision logic rather than relying on hidden defaults.
 ```
 
-**Test 12: Params reference non-Reconciled condition types**
-```
+#### Test 12: Params reference non-Reconciled condition types
+
+```text
 Given:
   - Configuration uses custom condition types:
     params:
@@ -1055,6 +1113,7 @@ Note:
 **Unit Tests** (Decision Engine):
 
 The Decision Engine logic should be tested with unit tests covering:
+
 - All decision paths: param evaluation → result evaluation → publish/skip
 - CEL expression compilation (valid and invalid expressions)
 - CEL custom function behavior (condition() with zero-value handling)

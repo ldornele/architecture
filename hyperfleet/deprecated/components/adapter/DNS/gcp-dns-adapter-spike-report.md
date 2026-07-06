@@ -6,7 +6,6 @@ Last Updated: 2025-12-03
 
 # SPIKE REPORT: Define DNS Adapter Requirements and Implementation Plan for GCP
 
-
 ## 1. Overview
 
 > Note: This spike report is outdated due to the DNS adapter rescope described in HYPERFLEET-55. As a result, the focus has shifted from implementing DNS creation logic to developing a DNS placement adapter that supports DNS zone placement decisions.
@@ -14,6 +13,7 @@ Last Updated: 2025-12-03
 This spike defines the implementation approach for a **GCP DNS adapter** that runs as part of the adapter framework to automate DNS infrastructure setup for GKE cluster provisioning. The solution leverages **Config Connector DNS Custom Resources** to create and manage Cloud DNS zones and records, following patterns proven in CS ROSA HCP DNS implementation.
 
 ### Candidate Solutions
+
 - **Implementation Vehicle**: Config Connector DNS Custom Resources (DNSManagedZone, DNSRecordSet)
 - **Deployment**: DNS adapter framework creates DNS CRs when cluster creation events occur
 - **Architecture**: Declarative DNS management via Kubernetes CRs
@@ -21,12 +21,14 @@ This spike defines the implementation approach for a **GCP DNS adapter** that ru
 - **DNS Flow**: Create private zone → Create public zone → Get public zone nameservers → Add NS record to RH zone → Add CNAME records to customer public zone.
 
 ### Primary Risks
+
 - Cross-project IAM permission complexity for DNS management across RH and customer projects
 - GCP DNS workflow involves several DNS CRs, which follow a dependency chain. E.g., the public and private zones must be created first. Once the public zone becomes ready, its status.nameservers are used as input to create the NS record in the RH project. Supporting this workflow requires the adapter framework to provide `when` expression capabilities to enforce the correct creation order.
 
 ---
 
 ## 2. Clusters Service (CS) ROSA HCP DNS Workflow (Route53)
+
 CS ROSA HCP creates the DNS infrastructure for each cluster using AWS Route53, involving both Red Hat managed zones and customer-owned zones. The workflow consists of four main steps:
 
 ```text
@@ -78,6 +80,7 @@ Step 4: Create Public Zone & Delegation (Customer + RH Accounts)
 ---
 
 ## 3. GCP DNS Adapter Requirements
+
 ### 3.1 GCP DNS Adapter Workflow
 
 The GCP DNS adapter follows a similar four-step workflow, adapted for Cloud DNS using config-connector:
@@ -127,10 +130,12 @@ Step 4: Create Public Zone & Delegation (Customer + RH Projects)
 ### 3.2 DNS Record Lifecycle Management
 
 **Creation Only (MVP Scope)**:
+
 - Adapter creates DNS resources during cluster provisioning
 - No updates or deletions handled in MVP
 
 **Deletion Considerations (Post-MVP)**:
+
 - **Critical Constraint**: DNSManagedZone cannot be deleted if it contains DNSRecordSet records
 - **Required Deletion Order**:
   1. Delete all DNSRecordSet CRs in the zone
@@ -150,6 +155,7 @@ Config Connector enables declarative management of Google Cloud resources using 
 - **DNSRecordSet**: Represents DNS records within a managed zone
 
 **Key Benefits**:
+
 - Declarative configuration
 - Built-in reconciliation and status reporting
 - Kubernetes-native resource management
@@ -160,6 +166,7 @@ Config Connector enables declarative management of Google Cloud resources using 
 Config Connector supports two methods to specify the target GCP project for DNS resources:
 
 #### Option 1: Per-Resource Annotation
+
 ```yaml
 apiVersion: dns.cnrm.cloud.google.com/v1beta1
 kind: DNSManagedZone
@@ -176,6 +183,7 @@ spec:
 **Use Case**: Adapter creates resources across multiple projects (customer + RH projects) from a single namespace.
 
 #### Option 2: Namespace Annotation
+
 ```bash
 kubectl annotate namespace dns-adapter \
   cnrm.cloud.google.com/project-id=customer-project-123
@@ -192,6 +200,7 @@ kubectl annotate namespace dns-adapter \
 **Purpose**: Provide private DNS resolution within the customer's VPC.
 
 **DNSManagedZone CR**:
+
 ```yaml
 apiVersion: dns.cnrm.cloud.google.com/v1beta1
 kind: DNSManagedZone
@@ -216,6 +225,7 @@ spec:
 ```
 
 **Expected Status** (after successful creation):
+
 ```yaml
 status:
   conditions:
@@ -230,6 +240,7 @@ status:
     - ns-gcp-private.googledomains.com.
   observedGeneration: 2
 ```
+
 ---
 
 #### Example 2: Create Public Managed Zone (Customer Project)
@@ -237,6 +248,7 @@ status:
 **Purpose**: Provide public DNS resolution for cluster ingress endpoints.
 
 **DNSManagedZone CR**:
+
 ```yaml
 apiVersion: dns.cnrm.cloud.google.com/v1beta1
 kind: DNSManagedZone
@@ -255,6 +267,7 @@ spec:
 ```
 
 **Expected Status** (after successful creation):
+
 ```yaml
 status:
   conditions:
@@ -282,10 +295,12 @@ status:
 **Purpose**: Delegate DNS queries from RH's base domain zone to the customer's public zone.
 
 **Assumptions for MVP**:
+
 - RH base domain zone `gcp.devshift.org` exists in the CLM deployment project
 - Pre-existing DNSManagedZone: `gcp-devshift-org-base-zone`
 
 **DNSRecordSet CR**:
+
 ```yaml
 apiVersion: dns.cnrm.cloud.google.com/v1beta1
 kind: DNSRecordSet
@@ -313,6 +328,7 @@ spec:
 ```
 
 **Expected Status**:
+
 ```yaml
 status:
   conditions:
@@ -323,6 +339,7 @@ status:
       type: Ready
   observedGeneration: 1
 ```
+
 ---
 
 #### Example 4: Add CNAME Records (Customer Public Zone)
@@ -332,6 +349,7 @@ status:
 ##### ACME Challenge CNAME Record
 
 **DNSRecordSet CR**:
+
 ```yaml
 apiVersion: dns.cnrm.cloud.google.com/v1beta1
 kind: DNSRecordSet
@@ -357,6 +375,7 @@ spec:
 ##### Ingress CNAME Record
 
 **DNSRecordSet CR**:
+
 ```yaml
 apiVersion: dns.cnrm.cloud.google.com/v1beta1
 kind: DNSRecordSet
@@ -380,6 +399,7 @@ spec:
 ```
 
 **Expected Status** (for both records):
+
 ```yaml
 status:
   conditions:
@@ -405,6 +425,7 @@ status:
 **IAM Role Grants**:
 
 **In RH CLM Project** (for NS delegation records):
+
 ```bash
 gcloud projects add-iam-policy-binding rh-clm-project-456 \
   --member="serviceAccount:hyperfleet-config-connector@<RH CLM Project>.iam.gserviceaccount.com" \
@@ -412,6 +433,7 @@ gcloud projects add-iam-policy-binding rh-clm-project-456 \
 ```
 
 **In Customer Project** (for zone and record creation):
+
 ```bash
 gcloud projects add-iam-policy-binding customer-project-123 \
   --member="serviceAccount:hyperfleet-config-connector@<RH CLM Project>.iam.gserviceaccount.com" \
@@ -421,6 +443,7 @@ gcloud projects add-iam-policy-binding customer-project-123 \
 ### 5.2 Config Connector Configuration
 
 **ConfigConnector Resource** (in GKE cluster):
+
 ```yaml
 apiVersion: core.cnrm.cloud.google.com/v1beta1
 kind: ConfigConnector
@@ -450,6 +473,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 **Goal**: Prove the DNS adapter architecture works end-to-end with Config Connector for basic DNS zone creation and delegation.
 
 **In Scope**:
+
 - ✅ Create private DNS managed zone in customer project
 - ✅ Create public DNS managed zone in customer project
 - ✅ Retrieve public zone nameservers from CR status
@@ -460,6 +484,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 - ✅ Report DNS setup success/failure to adapter framework
 
 **Out of Scope (Post-MVP)**:
+
 - ❌ Base domain selection logic (use hardcoded `gcp.devshift.org`)
 - ❌ Domain prefix uniqueness verification
 - ❌ DNS resource deletion handling
@@ -468,12 +493,14 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 - ❌ Advanced error recovery and retry logic
 
 **MVP Assumptions**:
+
 - RH base domain zone (`gcp-devshift-org-base-zone`) already exists in CLM project
 - Config Connector already configured with GSA authentication
 - Customer project has granted `roles/dns.admin` to Config Connector GSA
 - Customer VPC already exists (VPC self-link provided in cluster spec)
 
 **MVP Deliverables**:
+
 - [ ] DNS adapter configuration YAML (`dns-adapter-config.yaml`)
 - [ ] DNS CR templates for 5 resources (2 zones + 3 records)
 - [ ] Integration with adapter framework (event handling + CR creation logic)
@@ -483,6 +510,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 - [ ] Documentation (setup guide, DNS workflow diagram, troubleshooting)
 
 **Success Criteria**:
+
 - [ ] Adapter triggers on GCP cluster creation event
 - [ ] All 5 DNS CRs created successfully
 - [ ] Private zone associated with customer VPC
@@ -499,6 +527,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 ### Ticket: GCP DNS Adapter MVP - Config Connector-Based DNS Management
 
 **DNS Resource Creation**:
+
 - [ ] Adapter creates `DNSManagedZone` CR for private zone in customer project, CR reaches `Ready=True` status
 - [ ] Adapter creates `DNSManagedZone` CR for public zone in customer project, CR reaches `Ready=True` status
 - [ ] Adapter retrieves public zone nameservers from CR status, wait up to 5 minutes for nameservers to appear
@@ -507,6 +536,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 - [ ] Adapter creates `DNSRecordSet` CR for ingress CNAME, CR reaches `Ready=True` status
 
 **Configuration and Integration**:
+
 - [ ] GCP DNS Adapter configuration
   - DNS config (baseDomain, zone naming patterns, TTL, RH project config)
   - 5 CR templates (2 zones + 3 recordsets)
@@ -517,6 +547,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
   - Status aggregation and reporting rules
 
 **Status Monitoring and Reporting**:
+
 - [ ] Adapter reports success to API when:
   - All 5 DNS CRs reach `Ready=True` status
   - Public zone nameservers successfully propagated to NS record
@@ -531,6 +562,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
   - Public zone nameservers (array of 4 nameserver FQDNs)
 
 **Validation and Testing**:
+
 - [ ] Cross-project resource creation validated:
   - Private/public zones created in customer project
   - NS delegation record created in RH CLM project
@@ -544,6 +576,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 - [ ] DNS resolution test
 
 **Deliverables**:
+
 - [ ] GCP DNS adapter configuration
 - [ ] Integration test suite
 - [ ] Documentation (setup, workflow, troubleshooting)
@@ -552,6 +585,7 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 ---
 
 ## 9. References
+
 - [GKE Cluster Creation Automation Script with Config Connector Add-on Enabled](https://github.com/openshift-hyperfleet/architecture/blob/main/hyperfleet/deployment/GKE/create-gke-cluster.sh)
 - [Explore Cloud DNS Creation via Config Connector on OSD on GCP Cluster](https://github.com/openshift-hyperfleet/architecture/blob/main/hyperfleet/components/adapter/DNS/GCP/cloud-dns-exploration.md)
 - [DNS Build of CS ROSA HCP](https://gitlab.cee.redhat.com/service/uhc-clusters-service/-/blob/master/pkg/clusterprovisioner/acm/rosa/rosa_hcp_provision_job_dns.go)
@@ -560,4 +594,5 @@ GCP imposes default quotas of 10,000 managed zones per project and 10,000 RRsets
 - [GCP HCP - DNS Management Proposal](https://docs.google.com/document/d/1xa_QQic8h2_n_fjpCuiLmQOal_9JOzvZO0PR1v9k8_s/edit?tab=t.0)
 - [Cloud DNSManagedZone](https://docs.cloud.google.com/config-connector/docs/reference/resource-docs/dns/dnsmanagedzone?hl=en)
 - [Cloud DNSRecordSet](https://docs.cloud.google.com/config-connector/docs/reference/resource-docs/dns/dnsrecordset?hl=en)
+
 ---

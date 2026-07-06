@@ -18,4 +18,3 @@ Last Updated: 2026-03-25
 | `components/adapter/deprecated-PullSecret/` | GCP Pull Secret Service adapter DDR | 2025-12 | GCP-specific adapters moved out of core HyperFleet scope | GCP team repo |
 | `components/adapter/deprecated-validation/` | GCP validation adapter spike report | 2025-12 | GCP-specific; superseded by current adapter framework | `components/adapter/framework/` + GCP team repo |
 | `mvp/` | MVP scope and working agreements | 2024-12 | MVP complete | `hyperfleet/README.md` |
-

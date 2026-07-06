@@ -44,18 +44,20 @@ This spike report evaluates E2E testing frameworks for **Hyperfleet's core data 
 ### ✅ Decision: Ginkgo v2 + Gomega + Markdown Documentation
 
 After evaluating Ginkgo v2, Godog, and Testify across seven dimensions, we select **Ginkgo v2 + Gomega** because this combination excels in:
+
 - **Reliability & Flakiness Prevention**: Gomega's built-in async testing (`Eventually`/`Consistently`) prevents flaky tests in distributed systems
 - **AI-Assisted Development**: Pure Go optimizes LLM-driven test generation, maintenance, and debugging
 - **Maturity & Ecosystem**: Large community, widely adopted, strong long-term support
 
 **What This Means:**
+
 - **Ginkgo v2**: BDD-style test framework providing test organization, labels, parallel execution, and lifecycle hooks
 - **Gomega**: Assertion library with expressive matchers and async testing primitives
 - **Markdown**: Documentation format for test scenarios, linked to code via AI-Sync-ID metadata
 
 We mitigate documentation drift risk through AI-powered validation and CI checks (detailed in Section 2.3).
 
-**Scope**: This framework tests our core data flow architecture. Provider-specific adapter implementations (validation, DNS, etc.) are **out of scope** and should have dedicated stories. 
+**Scope**: This framework tests our core data flow architecture. Provider-specific adapter implementations (validation, DNS, etc.) are **out of scope** and should have dedicated stories.
 
 ---
 
@@ -67,9 +69,11 @@ The target system comprises the **core Hyperfleet data flow framework**:
 
 ![Hyperfleet E2E Data Flow Architecture](./hyperfleet-e2e.png)
 
+<!-- markdownlint-disable-next-line MD036 -->
 *Diagram provided by Ciaran*
 
 **Core Data Flow (In Scope):**
+
 1. **User → API**: User creates/queries objects through Hyperfleet API
 2. **API → Sentinel**: Sentinel polls API for objects requiring orchestration
 3. **Sentinel → Broker**: Sentinel creates topics and publishes to message broker
@@ -77,6 +81,7 @@ The target system comprises the **core Hyperfleet data flow framework**:
 5. **Adapter → API**: Adapters orchestrate task lifecycle and report state back to API
 
 **Out of Scope:**
+
 - Provider-specific adapter implementations (validation, DNS, pull-secret adapters, etc.)
 - Provider-specific infrastructure provisioning
 - Multi-provider deployment architecture
@@ -124,7 +129,7 @@ Three candidate frameworks were evaluated—**Ginkgo v2**, **Godog**, and **Test
 | **Ginkgo v2 + Gomega** | • Gomega's async testing (`Eventually`/`Consistently`)<br>• Pure Go (AI-friendly, single language)<br>• Rich organization (labels, parallel, ordered)<br>• Expressive matchers for clear assertions | • Separate docs (drift risk)<br>• Less accessible to non-developers |
 | **Godog** | • Executable specs (zero drift by design)<br>• Readable by non-developers<br>• Industry-standard Gherkin | • Manual async patterns<br>• Two-file system overhead<br>• Less AI-optimal (context switching) |
 
-**✅ Decision: Ginkgo v2 + Gomega + Markdown**
+#### Decision: Ginkgo v2 + Gomega + Markdown
 
 For Hyperfleet E2E testing, we prioritize **reliability** (Gomega's robust async testing) and **development velocity** (AI-assisted workflows with pure Go) over executable documentation. Meanwhile, we mitigate doc drift through AI-powered validation (Section 2.3).
 
@@ -134,9 +139,10 @@ For Hyperfleet E2E testing, we prioritize **reliability** (Gomega's robust async
 
 ### 2.3 Implementation: Ginkgo v2 + Gomega + Markdown Documentation
 
-**This is our chosen approach.** The Hyperfleet E2E testing framework uses **Ginkgo v2** (test framework) with **Gomega** (assertion library) and **Markdown documentation**. 
+**This is our chosen approach.** The Hyperfleet E2E testing framework uses **Ginkgo v2** (test framework) with **Gomega** (assertion library) and **Markdown documentation**.
 
 **Why This Combination:**
+
 - **Ginkgo v2**: Provides BDD-style test organization, label-based filtering, parallel execution, and powerful lifecycle hooks
 - **Gomega**: Offers rich, expressive matchers and built-in async testing (`Eventually`/`Consistently`) for distributed systems
 - **Markdown**: Flexible documentation format supporting diagrams, code samples, and rich formatting beyond Gherkin limitations
@@ -172,7 +178,6 @@ AfterEach(func() {
 
 </details>
 
-
 #### 2.3.2 AI-Assisted Development
 
 - **Single language**: LLMs parse pure Go without Gherkin/Go context switching
@@ -180,13 +185,16 @@ AfterEach(func() {
 - **High generation accuracy**: LLMs produce correct Ginkgo patterns with minimal context
 
 #### 2.3.3 Test Organization
+
 **Label-based filtering:**
+
 ```bash
 ginkgo --label-filter="smoke && gcp"      # Smoke tests for GCP
 ginkgo --label-filter="critical && !day2"    # Critical excluding day2
 ```
 
 **Ordered execution with shared setup:**
+
 ```go
 Describe("Nodepool", Ordered, func() {
     BeforeAll(func() { clusterID = createCluster() })
@@ -205,9 +213,11 @@ Describe("Nodepool", Ordered, func() {
 **Approach:**
 
 1. **Metadata anchors** link docs to tests:
+
    ```markdown
    **AI-Sync-ID:** E2E-FLOW-001
    ```
+
    ```go
    // @AI-Sync-ID: E2E-FLOW-001
    var _ = Describe("Data Flow", Label("E2E-FLOW-001"), ...)
@@ -218,7 +228,9 @@ Describe("Nodepool", Ordered, func() {
 3. **Markdown advantages**: Supports diagrams, links, embedded content beyond Gherkin's limitations
 
 #### 2.3.5 Test Case Structure
+
 **Example:**
+
 ```markdown
 <!-- scenarios/data_flow.md -->
 ## Scenario: End-to-End Object Creation Data Flow
@@ -226,6 +238,7 @@ Describe("Nodepool", Ordered, func() {
 **Priority:** Critical
 ...
 ```
+
 *Refer to the [Test Case Markdown Template](https://github.com/openshift-hyperfleet/hyperfleet-e2e/blob/main/testcases/template.md) for detailed structure.*
 
 ```go
@@ -237,13 +250,14 @@ var _ = Describe("End-to-End Data Flow", Label("E2E-FLOW-001", "critical"), func
 ```
 
 #### 2.3.6 Complete Example Implementation
+
 <details>
 <summary>Complete Ginkgo + Gomega + Markdown Test Example (click to expand)</summary>
 
 **Part 1: Markdown Documentation**
 *Refer to the [Test Case Markdown Template](https://github.com/openshift-hyperfleet/hyperfleet-e2e/blob/main/testcases/template.md) for detailed structure.*
 
-**Part 2: Go Test Implementation**
+##### Part 2: Go Test Implementation
 
 ```go
 // tests/data_flow_test.go
@@ -289,7 +303,8 @@ var _ = Describe("End-to-End Data Flow Validation", Label("data-flow", "framewor
 **Principle:** Repository branch = CLM Framework version (no version tracking in test code).
 
 **Structure:**
-```
+
+```text
 e2e-tests/
 ├── release-1.0.x/        # Tests for Hyperfleet v1.0.x
 ├── release-1.1.x/        # Tests for Hyperfleet v1.1.x
@@ -314,6 +329,7 @@ git checkout release-1.1          # Old tests
 ```
 
 **Validates:**
+
 - API contract stability across versions
 - Topic format compatibility
 - Framework component interoperability
@@ -327,11 +343,13 @@ This section outlines the implementation roadmap following this spike report. Ta
 ### 4.1 Phase 1: Framework Foundation
 
 #### 4.1.1 Initialize HyperFleet E2E Automation Framework
+
 **Objective:** Establish the base testing infrastructure with Ginkgo v2 + Gomega.
 
 **Related Ticket:** HYPERFLEET-486
 
 #### 4.1.2 Update E2E Testing Image Dockerfile for Optimized Build
+
 **Objective:** Create containerized test execution environment.
 
 **Related Ticket:** HYPERFLEET-487
@@ -339,11 +357,13 @@ This section outlines the implementation roadmap following this spike report. Ta
 ### 4.2 Phase 2: Core Test Implementation
 
 #### 4.2.1 Automate Cluster Creation Test Case with Status Validation
+
 **Objective:** Validate end-to-end cluster creation flow through the data pipeline.
 
 **Related Ticket:** HYPERFLEET-490
 
 #### 4.2.2 Automate Nodepool Creation Test Case with Status Validation
+
 **Objective:** Validate nodepool creation as dependent resource within cluster lifecycle.
 
 **Related Ticket:** HYPERFLEET-491
@@ -351,6 +371,7 @@ This section outlines the implementation roadmap following this spike report. Ta
 ### 4.3 Phase 3: CI/CD Integration
 
 #### 4.3.1 Update Prow E2E Testing Step with Real Test Execution
+
 **Objective:** Integrate E2E tests into Prow CI pipeline for automated validation.
 
 **Related Ticket:** HYPERFLEET-488
@@ -358,22 +379,27 @@ This section outlines the implementation roadmap following this spike report. Ta
 ### 4.4 Phase 4 (Post-MVP): Documentation Standards and AI Validation
 
 #### 4.4.1 Improve Test Case Documentation Templates
+
 **Objective:** Standardize test scenario documentation.
 
 **Tasks:**
+
 - Finalize Markdown template structure
 - Create examples for common test patterns
 - Document AI-Sync-ID conventions and best practices based on the AI sync validation.
 - Provide guidelines for test case authoring
 
 **Deliverables:**
+
 - Test case template
 - Contribution guidelines for new test cases
 
 #### 4.4.2 Implement AI-Powered Documentation Sync Validation
+
 **Objective:** Ensure test case Markdown documentation and test code remain synchronized to prevent drift and outdated documentation.
 
 **Tasks:**
+
 - Develop AI-powered validation tool that:
   - Scans AI-Sync-ID metadata in both Markdown files and Go test files
   - Uses LLM to semantically compare test scenarios in docs vs. actual test implementation
@@ -390,14 +416,17 @@ This section outlines the implementation roadmap following this spike report. Ta
   - Require human review and approval for all changes
 
 **Deliverables:**
+
 - AI validation CLI tool with LLM integration
 - CI job configuration for PR-based validation
 - User guide for interpreting validation results and resolving drift
 
 #### 4.4.3 AI-Powered Test Case Generation (Including Markdown testcase file and testing code)
+
 **Objective:** Accelerate test case development by using AI to automatically generate both test documentation (Markdown) and implementation code (Ginkgo + Gomega) from high-level test requirements.
 
 **AI Capabilities:**
+
 - **Pattern Recognition:** Analyze existing test suite to learn project-specific patterns
 - **Best Practice Application:** Automatically apply async testing patterns (`Eventually`/`Consistently`)
 - **Smart Defaults:** Infer reasonable timeouts, poll intervals, and cleanup logic
@@ -405,6 +434,7 @@ This section outlines the implementation roadmap following this spike report. Ta
 - **Anti-Flakiness:** Automatically include idempotent cleanup, proper error handling, and stable assertions
 
 **Deliverables:**
+
 - AI test generation CLI tool with multiple input modes
 - Prompt template library for common Hyperfleet test scenarios
 - Code validation pipeline ensuring generated tests meet quality standards
@@ -417,12 +447,14 @@ This section outlines the implementation roadmap following this spike report. Ta
 
 **Required Capabilities:**
 
-**1. Component-Level Failure Attribution**
+#### 1. Component-Level Failure Attribution
+
 - Automatically identify which CLM component caused test failure
 - Correlate test failures with service logs and metrics
 - Tag failures by component for targeted investigation
 
-**2. Root Cause Analysis Automation**
+#### 2. Root Cause Analysis Automation
+
 - Classify failure reasons automatically:
   - Infrastructure issues (timeout, network connectivity, resource exhaustion)
   - Product defects (API bugs, logic errors, state machine issues)
@@ -432,24 +464,28 @@ This section outlines the implementation roadmap following this spike report. Ta
 - Link failures to similar historical failures for faster resolution
 - Generate suggested remediation actions based on failure patterns
 
-**3. Flaky Test Identification and Management**
+#### 3. Flaky Test Identification and Management
+
 - Track test pass/fail patterns across multiple runs
 - Reduce false-positive noise in CI results
 
-**4. Advanced Visualization and Dashboards**
+#### 4. Advanced Visualization and Dashboards
+
 - Test suite health overview (pass rate, execution time trends)
 - Failure distribution by component, test type, and severity
 - Time-series analysis of test reliability over releases
 - Comparison views (current vs. previous release, PR branch vs. main)
 - Performance regression detection (test execution time trending)
 
-**5. Integration with Development Workflow**
+#### 5. Integration with Development Workflow
+
 - Automatic GitHub issue creation for new failure patterns
 - PR comments with failure analysis and suggested fixes
 - Slack/email notifications with actionable context
 - Link test failures to relevant code changes (git blame integration)
 
 **Deliverables:**
+
 - Production-ready test analytics platform deployment
 - Component-level failure attribution and root cause analysis
 - Flaky test identification dashboard with auto-quarantine
@@ -495,12 +531,14 @@ This appendix provides detailed assessments of each framework for reference.
 An alternative approach using Ginkgo v2 as the test runner with Godog (Gherkin) for scenario definition in critical user flows.
 
 **Key Characteristics:**
+
 - Executable Gherkin `.feature` files serve as both documentation and test specifications
 - Step definitions map Gherkin steps to Go implementation
 - Zero drift between documentation and code (tests fail if out of sync)
 - Industry-standard Gherkin syntax for cross-tool compatibility
 
 **When This Approach Makes Sense:**
+
 - Organizations with strong compliance/audit requirements requiring traceable documentation
 - Cross-functional teams with significant non-developer involvement (Product, QA, Legal, Compliance)
 - Projects where business stakeholders must validate test scenarios
@@ -508,6 +546,7 @@ An alternative approach using Ginkgo v2 as the test runner with Godog (Gherkin) 
 - Teams with existing Gherkin/Cucumber expertise and tooling
 
 **Trade-offs vs. Recommended Approach:**
+
 - **Learning Curve:** Requires team to learn Gherkin syntax and step definition patterns
 - **Development Velocity:** Slower test creation with AI assistance compared to pure Go
 - **Debugging Complexity:** Stack traces require mapping from Gherkin steps to Go code
@@ -616,6 +655,7 @@ func registerFeatureTests() {
 ### A.2 Other Frameworks Considered
 
 **Testify:**
+
 - Lightweight assertion library excellent for unit/integration tests
 - Standard Go test integration with zero setup overhead
 - **Not suitable for E2E**: Lacks hierarchical organization, parallel execution primitives, and built-in async polling (`Eventually`/`Consistently`)
@@ -623,14 +663,17 @@ func registerFeatureTests() {
 - Better suited for unit tests than distributed E2E orchestration
 
 **Cucumber:**
+
 - Industry standard for BDD but requires maintaining Ruby/JavaScript alongside Go
 - Adds language complexity and deployment overhead without leveraging team's Go expertise
 
 **Bruno:**
+
 - Open-source API client for manual/semi-automated API testing
 - Better suited for ad-hoc API exploration than systematic regression testing
 
 **Markdown Style Test (ty pattern):**
+
 - Python project using markdown files with embedded test assertions
 - Designed for unit tests, not distributed E2E scenarios
 - Lacks orchestration primitives for multi-service coordination
@@ -639,6 +682,7 @@ func registerFeatureTests() {
 ---
 
 ## References
+
 - [Ginkgo](https://github.com/onsi/ginkgo)
 - [Gomega](https://github.com/onsi/gomega)
 - [Cucumber for golang](https://github.com/cucumber/godog)

@@ -29,12 +29,11 @@ Last Updated: 2026-01-28
 
 ## Overview
 
-This document provides guidance for adding pre-submit testing and image built-up pipelines for components to OpenShift CI. 
+This document provides guidance for adding pre-submit testing and image built-up pipelines for components to OpenShift CI.
 
 Presubmit jobs are configured per repository and are the primary mechanism to catch regressions before code is merged. They can be configured as required or optional, though required jobs provide stronger guarantees against regressions.
 
 Images published in this manner are produced when the source repository branch is updated (e.g. when a PR merges or the branch is manually updated), not when the images are built as in an in-flight PR.
-
 
 ## Initial Setup
 
@@ -105,6 +104,7 @@ Updating Prow plugin configuration ...
 /Library/Developer/CommandLineTools/usr/bin/make boskos-config
 cd core-services/prow/02_config && ./generate-boskos.py
 ```
+
 </details>
 
 The generated file for the above example is like this: `ci-operator/config/openshift-hyperfleet/hyperfleet-logger/openshift-hyperfleet-hyperfleet-logger-main.yaml`. The file structure should be `ci-operator/config/$org/$repo/$org-$repo-$branch.yaml`
@@ -155,7 +155,9 @@ zz_generated_metadata:
 ```
 
 ### Integration Tests
+
 For the `$org-$repo-$branch__presubmits.yaml` file, you must add a **variant: presubmits** field.
+
 ```yaml
 build_root:
   image_stream_tag:
@@ -220,7 +222,7 @@ The Test Platform team provides a [tool](https://github.com/openshift/ci-tools/t
 Once you've placed your ci-operator configuration file in `ci-operator/config/$org/$repo`, generate the Prow files by running this command from the root of the openshift/release repository:
 
 ```bash
-$ make jobs
+make jobs
 ```
 
 This will create all necessary files under `ci-operator/jobs/$org/$repo` with a sensible default set of Prow jobs.
@@ -232,6 +234,7 @@ This will create all necessary files under `ci-operator/jobs/$org/$repo` with a 
 While the initial PR to [openshift/release](https://github.com/openshift/release) requires review and approval by [root approvers](https://github.com/openshift/release/blob/master/OWNERS), the component configuration should be owned by the component team once merged.
 
 To enable team ownership, place an **OWNERS** file (matching the one in your component repository) in both:
+
 - `ci-operator/config/$org/$repo`
 - `ci-operator/jobs/$org/$repo`
 
@@ -240,6 +243,7 @@ You can include the **OWNERS** file in your initial PR if you want the component
 ### Automatic Synchronization
 
 After your onboarding PR is merged, the **periodic-prow-auto-owners** job will automatically sync the **OWNERS** file from your component repository to the relevant directories. This sync:
+
 - Runs periodically
 - Pulls from the **OWNERS** file in your repository's base directory
 - Syncs all members who are also members of the openshift GitHub organization
@@ -251,7 +255,9 @@ This means you only need to maintain the **OWNERS** file in your component repos
 We have some integration tests with TestContainers that require Podman or Docker. Since Prow does not allow privileged mode, it provides an image configured to run Podman. See the [official documentation](https://docs.ci.openshift.org/docs/how-tos/nested-podman/).
 
 ### Base Image
+
   An image with such requirements is already available in Test Platform CI to be used as base image.
+
   ```yaml
    base_images:
     nested-podman:
@@ -259,14 +265,19 @@ We have some integration tests with TestContainers that require Podman or Docker
         name: nested-podman
         tag: latest
   ```
+
 ### Capability
- Only the clusters tagged with the nested-podman capability (see [capabilities](https://docs.ci.openshift.org/docs/how-tos/capabilities/)) are able to run a container within a container. 
+
+ Only the clusters tagged with the nested-podman capability (see [capabilities](https://docs.ci.openshift.org/docs/how-tos/capabilities/)) are able to run a container within a container.
+
   ```yaml
    - as: nested-podman-unit-test
     capabilities:
     - nested-podman
   ```
+
 ### Enable the feature on a test
+
 This example includes all the requirements described above, along with comments explaining the purpose of each stanza.
 <details>
 <summary> Working Example</summary>
@@ -328,12 +339,13 @@ zz_generated_metadata:
   repo: hyperfleet-logger
   variant: presubmits
 ```
+
 </details>
 
 ## Presubmit/Image jobs example PR
- - For a complete example of adding CI configuration, see this [PR](https://github.com/openshift/release/pull/72905)
- - For an example with Podman, see this [PR](https://github.com/openshift/release/pull/72331)
 
+- For a complete example of adding CI configuration, see this [PR](https://github.com/openshift/release/pull/72905)
+- For an example with Podman, see this [PR](https://github.com/openshift/release/pull/72331)
 
 ## Test Step Registry
 
@@ -353,7 +365,8 @@ Other files that are allowed in the step registry but are not used for testing a
 More detailed configurations can refer to official doc [Step-Registry](https://docs.ci.openshift.org/docs/architecture/step-registry/)
 
 ## Prow References
+
 For more detailed information, refer to the official OpenShift CI documentation:
+
 - [CI Operator Architecture](https://docs.ci.openshift.org/docs/architecture/ci-operator/)
 - [Contributing to openshift/release](https://docs.ci.openshift.org/docs/how-tos/contributing-openshift-release/)
-

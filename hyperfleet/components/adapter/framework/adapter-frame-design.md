@@ -60,6 +60,7 @@ Last Updated: 2026-05-25
 This document describes the design of the HyperFleet Adapter Framework, a config-driven Go-based framework for building cloud provider adapters. The framework enables adapters to consume CloudEvents from message brokers, evaluate conditions, create Kubernetes resources, and report status back to the HyperFleet API.
 
 **Related Documentation:**
+
 - [Adapter Flow Diagrams](./adapter-flow-diagrams.md) - **Complete system workflow, adapter lifecycle sequence, and event flow patterns**
 - `adapter-config-template-MVP.yaml` - MVP configuration template
 - `adapter-config-template-post-MVP.yaml` - Post-MVP configuration template with advanced features
@@ -123,7 +124,7 @@ graph TB
 
 ### Code Structure
 
-```
+```text
 hyperfleet-adapter/
 ├── cmd/
 │   └── adapter/          # Main application entry point
@@ -148,6 +149,7 @@ hyperfleet-adapter/
 ### 1. Config Loader and Criteria Evaluator
 
 #### Purpose
+
 - Load and parse adapter configuration from YAML files
 - Validate configuration structure and required fields
 - Extract parameters from environment variables and CloudEvent data
@@ -162,8 +164,9 @@ hyperfleet-adapter/
 - **GetParameterValue(name, env, eventData)**: Extracts parameter values from environment or event data based on source specification
 
 **Key Structures:**
+
 - `Config`: Root configuration structure matching adapter-config-template-MVP.yaml
-- `ParamConfig`: Defines parameter extraction rules (env.* or event.* sources)
+- `ParamConfig`: Defines parameter extraction rules (env.*or event.* sources)
 - `PreconditionConfig`: Defines API calls with `apiCall`, `capture`, `conditions`/`expression`
 - `ResourceConfig`: Defines resources with `manifest`, `discovery`, `recreateOnChange`
 - `PostConfig`: Defines `payloads` (with `build`/`buildRef`) and `postActions`
@@ -185,6 +188,7 @@ hyperfleet-adapter/
    - Evaluate expressions with event-specific data
 
 **Example:**
+
 ```go
 // Loaded ONCE at startup
 config := LoadConfig("/etc/adapter/config/adapter-config.yaml")
@@ -206,6 +210,7 @@ for event := range broker.Subscribe() {
 ```
 
 **Key Insight**:
+
 - **Config = Static Template** (loaded once, defines the structure)
 - **Event Data = Dynamic Values** (different per event, fills in the template)
 - **Result = Dynamic Resources** (generated for each specific cluster/resource)
@@ -215,17 +220,20 @@ for event := range broker.Subscribe() {
 Configuration is deployed and managed via Helm charts with **multiple Kubernetes ConfigMaps** for separation of concerns:
 
 **Configuration Layers:**
+
 1. **Adapter Logic ConfigMap** (`adapter-config`): Business logic, resource templates, preconditions
 2. **Broker ConfigMap** (`adapter-broker-config`): Message broker settings
 3. **Environment ConfigMap** (`adapter-env-config`): Environment-specific settings (API URLs, timeouts)
 4. **Observability ConfigMap** (`adapter-observability`): Logging, metrics, health checks, tracing
 
 **Implementation:**
+
 ```go
 config, err := config.Load("/etc/adapter/config/adapter-config.yaml", log)
 ```
 
 **Deployment:**
+
 ```yaml
 spec:
   containers:
@@ -248,6 +256,7 @@ spec:
 ```
 
 **Characteristics:**
+
 - Configuration mounted via multiple Kubernetes ConfigMaps
 - Managed through Helm chart templates
 - Kubernetes-native, secure, auditable
@@ -267,21 +276,25 @@ spec:
 - **EvaluateField(field, data)**: Translates simple field paths to CEL and evaluates
 
 **Variable Building:**
+
 - `BuildVariables(env, eventData, resources, parameters)`: Constructs variable map for expression evaluation
 - Variables include: `event`, `resources.*` (tracked), `env.*`, and custom parameters
 
 **Expression Compilation:**
+
 - Compile expressions at startup when `compileOnStartup: true`
 - Use strict type checking when `strictTypes: true`
 - Store compiled programs in map for reuse
 
 **Integration with CEL (Common Expression Language):**
+
 - Uses `github.com/google/cel-go` for expression evaluation
 - CEL is the standard expression language used in Kubernetes
 - Supports all CEL built-in functions and operators
 - Custom functions can be registered for adapter-specific logic
 
 **CEL Optional Chaining:**
+
 - Use `?.` for safe field access on potentially missing fields
 - Use `.orValue(default)` to provide a default value when field is missing
 - Example: `resources.?clusterNamespace.?status.?phase.orValue("")`
@@ -309,6 +322,7 @@ The adapter configuration uses a **dual-syntax approach** for flexibility and cl
    - Required for complex operations (filter, map, has, size, etc.)
 
 **Design Benefits:**
+
 - ✅ **Clarity**: `field` is simpler and more readable for common cases
 - ✅ **Power**: `expression` provides full CEL capabilities when needed
 - ✅ **Consistency**: Go templates handle all variable interpolation uniformly
@@ -335,7 +349,8 @@ url: "{{ .hyperfleetApiBaseUrl }}/api/hyperfleet/{{ .hyperfleetApiVersion }}/clu
 
 The `when` block supports two syntaxes for maximum flexibility:
 
-**Option 1: Expression Syntax (CEL)**
+##### Option 1: Expression Syntax (CEL)
+
 - Full CEL expressions for complex logic
 - Recommended for conditions with multiple checks, null-safety, or complex logic
 
@@ -361,7 +376,8 @@ when:
   description: "Execute when validation available and adapter not yet installed"
 ```
 
-**Option 2: Structured Conditions (Field + Operator + Value)**
+##### Option 2: Structured Conditions (Field + Operator + Value)
+
 - Declarative syntax for simple comparisons
 - More readable for basic field checks
 - Internally translated to CEL by the adapter
@@ -394,6 +410,7 @@ when:
 ```
 
 **Supported Operators:**
+
 - `equals` - Field equals value
 - `notEquals` - Field does not equal value
 - `in` - Field value is in list
@@ -407,12 +424,14 @@ when:
 - `lessThanOrEqual` - Field <= value
 
 **When to Use Each:**
+
 - Use **expression** for: Complex logic, null-safety, filtering, transformations
 - Use **conditions** for: Simple field comparisons, existence checks, list membership
 
 ### 2. HyperFleet API Client
 
 #### Purpose
+
 - Make HTTP requests to HyperFleet API for fetching cluster details and reporting status
 - Support retry logic with configurable backoff strategies
 - Handle authentication (future: Service Account tokens)
@@ -428,6 +447,7 @@ when:
 - **Put/Delete**: Additional HTTP methods as needed
 
 **Features:**
+
 - Configurable timeout from `hyperfleetApi.timeout`
 - Retry logic with exponential/linear/constant backoff (post-MVP)
 - Template variable substitution in endpoints (e.g., `{{ .hyperfleetApiBaseUrl }}/api/hyperfleet/{{ .hyperfleetApiVersion }}/clusters/{{ .clusterId }}`)
@@ -435,6 +455,7 @@ when:
 - Error handling with status code checking
 
 **Configuration:**
+
 - Base URL from `HYPERFLEET_API_BASE_URL` environment variable
 - API version from `HYPERFLEET_API_VERSION` environment variable
 - Token from `HYPERFLEET_API_TOKEN` environment variable (for Authorization header)
@@ -442,6 +463,7 @@ when:
 ### 3. Message Broker Consumer and Event Handler
 
 #### Purpose
+
 - Consume CloudEvents from message broker (Pub/Sub, SQS, RabbitMQ)
 - Import and use HyperFleet broker library for Publish/Subscribe operations
 - Handle message acknowledgment and error handling
@@ -488,6 +510,7 @@ graph TB
 ```
 
 **Broker Library Responsibilities:**
+
 - ✅ **Broker configuration loading** (reads from environment variables/ConfigMap)
 - ✅ Connection management (connect, reconnect, backoff)
 - ✅ Message delivery (publish, subscribe)
@@ -497,6 +520,7 @@ graph TB
 - ✅ Multiple broker implementations (Pub/Sub, SQS, RabbitMQ)
 
 **Adapter Framework Responsibilities:**
+
 - ✅ Import broker library
 - ✅ Initialize broker client (broker library handles config loading)
 - ✅ Parse CloudEvents from messages
@@ -504,7 +528,7 @@ graph TB
 - ✅ Process events (evaluate preconditions, create resources, report status)
 - ✅ Handle adapter-specific business logic
 
-**Broker Configuration (Handled by Broker Library)**
+##### Broker Configuration (Handled by Broker Library)
 
 The broker library reads configuration directly from environment variables (set by ConfigMap):
 
@@ -523,6 +547,7 @@ subscriber.Subscribe(ctx, handler)
 ```
 
 **Environment Variables (Set by validation-adapter-broker-config ConfigMap):**
+
 - Required: `BROKER_TYPE` (pubsub, awsSqs, rabbitmq)
 - Broker-specific variables:
   - **Pub/Sub**: `BROKER_PROJECT_ID`, `BROKER_SUBSCRIPTION_ID`
@@ -532,6 +557,7 @@ subscriber.Subscribe(ctx, handler)
 The adapter framework does **not** need to implement broker config loading logic - it's all handled by the broker library.
 
 **Event Processing:**
+
 - Parse incoming messages as CloudEvents
 - Extract event data and parameters
 - Route to main event handler
@@ -547,12 +573,14 @@ messageBroker:
 ```
 
 **How it Works:**
+
 1. **Broker library** delivers messages one at a time (or in small batches)
 2. **Adapter framework** maintains a worker pool with bounded concurrency
 3. Each event is processed by an available worker
 4. Worker pool ensures max `maxConcurrency` events are processed simultaneously
 
 **Implementation:**
+
 ```go
 // Adapter controls concurrency with semaphore/worker pool
 semaphore := make(chan struct{}, config.MessageBroker.MaxConcurrency)
@@ -571,12 +599,14 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 ```
 
 **Why Adapter Controls Concurrency:**
+
 - ✅ Adapter knows its resource limits (CPU, memory)
 - ✅ Protects Kubernetes API from overload
 - ✅ Prevents memory exhaustion from too many concurrent events
 - ✅ Independent of broker message delivery rate
 
 **Typical Values:**
+
 - **Development**: `maxConcurrency: 10` (low load)
 - **Production**: `maxConcurrency: 100` (high throughput)
 - **Resource-constrained**: `maxConcurrency: 5` (limited CPU/memory)
@@ -584,6 +614,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 ### 4. Kubernetes Client and Resource Management
 
 #### Purpose
+
 - Create and manage Kubernetes resources based on configuration templates
 - Track resources for status evaluation
 - Discover resources by name or label selectors
@@ -601,12 +632,14 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 - **DeleteResource(ctx, namespace, kind, name)**: Deletes a resource
 
 **Resource Creation:**
+
 - Parse resource manifests (inline YAML or external template via `ref`)
 - Substitute template variables (e.g., `{{ .clusterId }}`, `{{ .vpcId }}`)
 - Apply resource to Kubernetes cluster
 - Track resource by name for status reporting
 
 **Resource Configuration:**
+
 - Each resource has:
   - `name`: Resource identifier for referencing in status evaluation (e.g., `resources.clusterNamespace`)
   - `manifest`: Inline YAML spec or `ref` to external template file
@@ -615,16 +648,19 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 - Store resources in map: `resources[name] = resourceStatus`
 
 **Resource Discovery:**
+
 - `namespace`: Target namespace for resource lookup (supports templating)
 - `bySelectors.labelSelector`: Label key-value pairs to match resources
 - Used for finding resources created in previous events or by other adapters
 
 **Template Processing:**
+
 - Support inline YAML in config or external template files
 - Use Go text/template or similar for variable substitution
 - Handle nested structures and arrays
 
 **Status Extraction:**
+
 - Extract status fields from Kubernetes resources
 - Convert to map[string]interface{} for expression evaluation
 - Handle different resource types (Namespace, Deployment, Service, etc.)
@@ -632,6 +668,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 ### 5. Status Reporter Utilities
 
 #### Purpose
+
 - Evaluate tracked Kubernetes resources using CEL expressions
 - Build status payload with conditions (applied, available, health) and custom data
 - Report status to HyperFleet API via PUT requests
@@ -647,6 +684,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 - **ReportStatus(ctx, endpoint, payload, headers)**: Reports status to API
 
 **Status Evaluation:**
+
 - **Always executes** as part of post-processing, regardless of precondition results
 - Build variables map from tracked resources (may be empty if no resources were created)
 - Evaluate condition expressions (applied, available, health):
@@ -655,6 +693,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
   - `message`: Expression for status message (with null coalescence)
 - Evaluate data expressions for custom fields
 - Build final status payload:
+
   ```json
   {
     "adapter": "example-adapter",
@@ -668,23 +707,26 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
     "observed_time": "2025-01-01T00:00:00Z"
   }
   ```
+
 - When preconditions fail, conditions will typically evaluate to False, allowing proper status reporting
 - `observed_generation` tracks which event generation was processed for idempotency
 
-
 **Conditional Reporting:**
+
 - Evaluate `when` expression in postActions
 - Only execute action if expression evaluates to true
 - Support multiple postActions with different conditions
 - Allows selective reporting (e.g., only report when status changes, or always report False conditions)
 
 **Template Variable Substitution:**
+
 - Substitute variables in endpoint URLs and headers
 - Use parameters built during status evaluation
 
 ### 6. Main Service Implementation
 
 #### Purpose
+
 - Orchestrate all components and implement the main adapter workflow
 - Handle event processing pipeline
 - Manage lifecycle and graceful shutdown
@@ -700,10 +742,12 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 - **shutdown(ctx)**: Gracefully shuts down the service
 
 **Supporting Packages:**
+
 - `pkg/logger`: Context-aware structured logging with operation IDs
 - `pkg/errors`: Structured error handling with error codes and references
 
 **Component Initialization:**
+
 1. Load adapter configuration from YAML file
 2. Create evaluator and compile expressions (if `compileOnStartup: true`)
 3. Create API client with config
@@ -727,6 +771,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 8. **Decision:** If resources EXIST → Evaluate post conditions/data, report status, acknowledge, exit
 
 **Precondition Evaluation:**
+
 - Execute API calls in order (if configured)
 - Store responses as parameters (e.g., `clusterDetails`)
 - Extract fields into parameters (e.g., `cloudProvider`, `vpcId`)
@@ -735,6 +780,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 - If preconditions pass: Proceed to resource existence check
 
 **Resource Existence Check:**
+
 - **Only executes when preconditions are met**
 - Check if resources already exist before creating
 - Use discovery rules from resource `discovery` configuration:
@@ -744,6 +790,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 - If resources don't exist: Create new resources, then report
 
 **Resource Creation:**
+
 - Only executes if all preconditions pass AND resources don't exist
 - Process each resource in `resources` list
 - Substitute template variables (cluster data, parameters)
@@ -754,6 +801,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 - Acknowledge message and exit (no post-processing needed for newly created resources)
 
 **Post-Processing (When Resources Exist):**
+
 - **Only executes when preconditions are met AND resources already exist**
 - Discover tracked resources using resource `discovery` configuration:
   - Look up resources by namespace and label selectors
@@ -777,6 +825,7 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
 - Acknowledge message to broker
 
 **Status Reporting Patterns:**
+
 - **Preconditions NOT met**: `Applied=False, Available=False, Health=True`
   - Adapter cannot act yet (dependencies not satisfied)
   - Report immediately, acknowledge message, exit
@@ -799,16 +848,19 @@ subscriber.Subscribe(ctx, func(ctx context.Context, msg []byte) error {
   - Report error status, acknowledge message (or nack if retry needed)
 
 **Key Workflow Points:**
+
 - When preconditions meet AND resources don't exist: Create resources → Report → Exit
 - When preconditions meet AND resources exist: Evaluate post conditions/data → Report → Exit
 - Post-processing (evaluating post conditions and data) only happens when resources already exist
 - Each event triggers a fresh evaluation of resource status
 
 **HTTP Servers:**
+
 - Metrics server on `observability.metricsPort` (Prometheus metrics)
 - Health server on `observability.healthPort` (`/healthz`, `/readyz`)
 
 **Error Handling (see [ADR-0017](../../../adrs/0017-adapter-error-taxonomy.md)):**
+
 - Classify errors as Transient or Terminal
 - Transient errors: return error to broker (NACK — broker redelivers with backoff)
 - Terminal errors: report status to API, log at error level, return nil (ACK — prevent redelivery)
@@ -921,6 +973,7 @@ graph TB
 ```
 
 **Key Points:**
+
 - **Config = Static Template** (loaded once, defines structure)
 - **Event Data = Dynamic Values** (different per event, provides clusterId, resourceId)
 - **Resources = Dynamically Rendered** (template + event data → cluster-specific resources)
@@ -938,12 +991,14 @@ graph TB
 These patterns align with the workflow described in [Adapter Flow Diagrams](./adapter-flow-diagrams.md):
 
 ### Anemic Events Pattern
+
 - CloudEvents contain **only** minimal fields (using **snake_case** naming convention)
 - Adapters **always** fetch full resource data from HyperFleet API using `href` or constructing endpoint from `resource_type`/`resource_id`
 - Single source of truth: HyperFleet API database
 - Prevents event payload bloat and ensures data consistency
 
 **Event Structure (CloudEvent Data):**
+
 ```json
 {
   "id": "11111111-1111-1111-1111-111111111111",
@@ -959,6 +1014,7 @@ These patterns align with the workflow described in [Adapter Flow Diagrams](./ad
 ```
 
 **Field Usage:**
+
 - `id` - Unique ID of resource itself
 - `kind` - Type of resource (Cluster, NodePool, etc.)
 - `owner_references.id` - For dependent resources: parent resource ID (e.g., Cluster ID for NodePool)
@@ -967,17 +1023,20 @@ These patterns align with the workflow described in [Adapter Flow Diagrams](./ad
 - `owner_references` - Reference to the owner resource (if any)
 
 **API Response Structure (snake_case):**
+
 - All API responses use snake_case for field names
 - Example: `spec.vpc_id`, `spec.node_count`, `status.validation_conditions`
 - Kubernetes standard fields remain unchanged: `metadata.name`, `status.phase`
 
 ### Status Upsert Pattern
+
 - Adapters PUT status updates to HyperFleet API: `PUT /api/hyperfleet/v1/clusters/{resourceId}/statuses`
 - API handles create-or-update logic server-side (idempotent)
 - Same PUT multiple times = same result
 - Prevents race conditions between adapters
 
 ### Idempotency Pattern
+
 - Adapters check if resources already exist before creating (GET by name/labels)
 - Resource naming convention: `{adapter-name}-{clusterId-short}-gen{generation}`
 - If resources exist: Check postconditions to determine current state
@@ -986,6 +1045,7 @@ These patterns align with the workflow described in [Adapter Flow Diagrams](./ad
 - Each event triggers a fresh evaluation of resource status
 
 ### Reconciliation Loop
+
 - Sentinel continuously polls HyperFleet API (every 5 seconds)
 - For each cluster, Sentinel checks `status.phase` (Ready vs Not Ready)
 - Sentinel applies backoff interval based on phase (10s for Not Ready, 30m for Ready)
@@ -1009,30 +1069,33 @@ These patterns align with the workflow described in [Adapter Flow Diagrams](./ad
 Expressions have access to different variables depending on the stage:
 
 **Preconditions Stage:**
+
 - `event`: CloudEvent object (Type, Source, Data)
 - `env`: Environment variables map
 - Custom parameters: All extracted parameters
 - Cluster data: Full cluster object from HyperFleet API
 
 **Post-Processing Stage:**
+
 - `event`: CloudEvent object (Type, Source, Data)
 - `env`: Environment variables map
 - `resources.*`: Tracked Kubernetes resources created by adapter (by alias)
 - Custom parameters: All extracted and built parameters
 - Cluster data: Full cluster object from HyperFleet API
 
-
 ## Memory Management
 
 ### Memory Footprint Analysis
 
 **Static Memory (Loaded Once):**
+
 - Config YAML structure: ~1-10 KB (typical adapter config)
 - Compiled CEL programs: ~5-50 KB (depends on expression complexity)
 - Framework code: ~20-50 MB (Go binary + libraries)
 - **Total Static**: ~30-60 MB (acceptable, doesn't grow)
 
 **Per-Event Memory (Temporary):**
+
 - CloudEvent object: ~1-5 KB
 - Cluster object from API: ~10-50 KB (depends on cluster size)
 - Template rendering context: ~20-100 KB (variables, parameters)
@@ -1045,6 +1108,7 @@ Expressions have access to different variables depending on the stage:
 #### ❌ **Issue 1: Unbounded Resource Tracking**
 
 **Problem:**
+
 ```go
 // BAD: Accumulates forever
 var trackedResources = make(map[string]Resource)
@@ -1058,6 +1122,7 @@ for event := range events {
 ```
 
 **Solution:**
+
 ```go
 // GOOD: Per-event tracking, cleared after processing
 func ProcessEvent(event CloudEvent) {
@@ -1074,6 +1139,7 @@ func ProcessEvent(event CloudEvent) {
 #### ❌ **Issue 2: Caching Cluster Data Without Expiration**
 
 **Problem:**
+
 ```go
 // BAD: Cache grows unbounded
 var clusterCache = make(map[string]*Cluster)
@@ -1089,6 +1155,7 @@ func FetchCluster(id string) *Cluster {
 ```
 
 **Solution:**
+
 ```go
 // GOOD: No caching (MVP), always fetch fresh
 func FetchCluster(id string) *Cluster {
@@ -1102,6 +1169,7 @@ var clusterCache = NewTTLCache(maxSize: 1000, ttl: 5*time.Minute)
 #### ❌ **Issue 3: Goroutine Leaks**
 
 **Problem:**
+
 ```go
 // BAD: Goroutines never cleaned up
 for event := range events {
@@ -1110,6 +1178,7 @@ for event := range events {
 ```
 
 **Solution:**
+
 ```go
 // GOOD: Worker pool with bounded concurrency
 workers := NewWorkerPool(maxConcurrency: 100)
@@ -1124,7 +1193,7 @@ for event := range events {
 
 #### MVP Approach (Stateless Processing)
 
-**Design Principle: No Persistent State**
+##### Design Principle: No Persistent State
 
 ```go
 func ProcessEvent(ctx context.Context, event CloudEvent) error {
@@ -1155,6 +1224,7 @@ func ProcessEvent(ctx context.Context, event CloudEvent) error {
 ```
 
 **Memory Characteristics:**
+
 - ✅ **No global state** accumulation
 - ✅ **Variables scoped to function** (GC'd when function exits)
 - ✅ **No caching** (MVP simplicity)
@@ -1163,6 +1233,7 @@ func ProcessEvent(ctx context.Context, event CloudEvent) error {
 #### Memory Limits
 
 **Recommended Pod Resources:**
+
 ```yaml
 resources:
   requests:
@@ -1172,7 +1243,8 @@ resources:
 ```
 
 **Memory Usage Calculation:**
-```
+
+```text
 Base (framework + config):        ~50 MB
 Per concurrent event:             ~200 KB
 Max concurrent (100 events):      ~20 MB
@@ -1185,6 +1257,7 @@ Limit with safety margin:         512 MB
 #### Monitoring and Alerts
 
 **Metrics to Track:**
+
 ```go
 // Memory usage
 go_memstats_alloc_bytes          // Current allocated memory
@@ -1200,6 +1273,7 @@ rate(go_gc_duration_seconds[5m]) // GC frequency
 ```
 
 **Alert Thresholds:**
+
 ```yaml
 # Memory approaching limit
 - alert: AdapterHighMemoryUsage
@@ -1219,6 +1293,7 @@ rate(go_gc_duration_seconds[5m]) // GC frequency
 If memory becomes a concern, consider:
 
 1. **Resource Pooling**
+
    ```go
    var bufferPool = sync.Pool{
        New: func() interface{} {
@@ -1228,6 +1303,7 @@ If memory becomes a concern, consider:
    ```
 
 2. **Streaming Processing** (for large cluster objects)
+
    ```go
    // Instead of loading entire cluster into memory
    stream := apiClient.StreamCluster(id)
@@ -1237,11 +1313,13 @@ If memory becomes a concern, consider:
    ```
 
 3. **Bounded Caching** (with LRU eviction)
+
    ```go
    cache := lru.New(maxEntries: 1000)  // Max 1000 clusters
    ```
 
 4. **Memory Profiling**
+
    ```bash
    # Enable pprof endpoint
    go tool pprof http://adapter:6060/debug/pprof/heap
@@ -1253,6 +1331,7 @@ If memory becomes a concern, consider:
 ### Best Practices
 
 **Recommended:**
+
 - Use function-scoped variables (auto GC'd)
 - Limit concurrent event processing (worker pool)
 - Set memory limits in Pod spec
@@ -1260,6 +1339,7 @@ If memory becomes a concern, consider:
 - Use pprof for profiling in development
 
 **Avoid:**
+
 - Storing cluster data in global maps without expiration
 - Creating unbounded goroutines
 - Accumulating resources without cleanup
@@ -1269,6 +1349,7 @@ If memory becomes a concern, consider:
 ### Memory Safety Characteristics
 
 **Design Properties:**
+
 - Config loaded once (static, small)
 - Per-event processing (temporary, GC'd)
 - No persistent state (stateless)
@@ -1276,6 +1357,7 @@ If memory becomes a concern, consider:
 - Memory limits enforced (512 MB)
 
 **Anti-Patterns to Avoid:**
+
 - Caching without limits
 - Global state accumulation
 - Unbounded goroutines
@@ -1321,6 +1403,7 @@ Handlers classify errors using the `IsTransient(err error) bool` helper. See the
 ### Configuration
 
 Observability settings are managed via the **Observability ConfigMap** (`adapter-observability`), which provides environment-specific configuration for:
+
 - Logging (level, format)
 - Metrics (enabled, port, path)
 - Health checks (enabled, port, paths)
@@ -1329,6 +1412,7 @@ Observability settings are managed via the **Observability ConfigMap** (`adapter
 **See:** `adapter-observability-config-template.yaml`
 
 **Environment Variables (from ConfigMap):**
+
 ```yaml
 # Logging
 LOG_LEVEL: "info"           # debug, info, warn, error
@@ -1356,33 +1440,40 @@ TRACE_SAMPLE_RATE: "0.1"    # 10% sampling in production
 **Endpoint:** `http://adapter:9090/metrics`
 
 **Event Processing:**
+
 - `adapter_events_processed_total{adapter, status}`: Total events processed
 - `adapter_event_processing_duration_seconds{adapter}`: Event processing latency
 - `adapter_events_in_flight{adapter}`: Currently processing events
 
 **API Calls:**
+
 - `adapter_api_calls_total{adapter, method, endpoint, status}`: API call count
 - `adapter_api_call_duration_seconds{adapter, method, endpoint}`: API call latency
 
 **Kubernetes Operations:**
+
 - `adapter_k8s_operations_total{adapter, operation, kind, status}`: K8s operation count
 - `adapter_k8s_operation_duration_seconds{adapter, operation, kind}`: K8s operation latency
 
 **Resource Management:**
+
 - `adapter_resources_created_total{adapter, kind, status}`: Resources created
 - `adapter_resources_tracked_total{adapter}`: Currently tracked resources
 
 **Status Reporting:**
+
 - `adapter_status_reports_total{adapter, status}`: Status report count
 - `adapter_status_report_duration_seconds{adapter}`: Status report latency
 
 **Error Classification ([Error Handling Guide](./adapter-error-handling.md)):**
+
 - `hyperfleet_adapter_errors_total{adapter, classification, error_type}`: Total errors by classification (transient/terminal) and type
 - `hyperfleet_adapter_terminal_errors_total{adapter, error_type, source}`: Terminal errors that were ACK'd and reported
 - `hyperfleet_adapter_nacks_total{adapter}`: Messages NACK'd for retry
 - `hyperfleet_adapter_dlq_messages_total{adapter}`: Messages routed to DLQ (max retries exceeded)
 
 **Memory and Performance:**
+
 - `go_memstats_alloc_bytes`: Current allocated memory
 - `go_memstats_heap_inuse_bytes`: Heap memory in use
 - `go_goroutines`: Number of goroutines
@@ -1398,6 +1489,7 @@ TRACE_SAMPLE_RATE: "0.1"    # 10% sampling in production
 - Error classification fields ([Error Handling Guide](./adapter-error-handling.md)): `error_classification` (transient/terminal), `error_type` (e.g., InvalidManifest), `action` (e.g., ack_and_report, nack_for_retry)
 
 **Example:**
+
 ```json
 {
   "level": "info",
@@ -1424,6 +1516,7 @@ TRACE_SAMPLE_RATE: "0.1"    # 10% sampling in production
   - Template rendering
 
 **Typical Sample Rates:**
+
 - Development: `1.0` (100% sampling)
 - Staging: `0.1` (10% sampling)
 - Production: `0.01` (1% sampling)
@@ -1433,12 +1526,14 @@ TRACE_SAMPLE_RATE: "0.1"    # 10% sampling in production
 ### Health Checks
 
 **Endpoints:**
+
 - `/healthz`: Liveness probe (service is running) - Port 8080
 - `/readyz`: Readiness probe (ready to process events, broker connected) - Port 8080
 - `/metrics`: Prometheus metrics endpoint - Port 9090
 - `/debug/pprof/*`: Memory profiling (if enabled) - Port 6060
 
 **Kubernetes Probes:**
+
 ```yaml
 livenessProbe:
   httpGet:
@@ -1460,6 +1555,7 @@ readinessProbe:
 ### External Libraries
 
 **Core Dependencies:**
+
 - `github.com/google/cel-go`: CEL (Common Expression Language) evaluation engine
 - `github.com/cloudevents/sdk-go/v2`: CloudEvents handling
 - `k8s.io/client-go`: Kubernetes client library
@@ -1469,10 +1565,12 @@ readinessProbe:
 - Custom template functions (`pkg/utils/template.go`): string manipulation (`lower`, `upper`, `trim`, `replace`), type conversion (`int`, `float`, `string`), date formatting (`now`, `date`), and utility (`default`, `quote`)
 
 **Logging and Observability:**
+
 - `go.uber.org/zap`: Structured logging (implemented in `pkg/logger`)
 - Custom error handling (`pkg/errors`)
 
 **Message Broker:**
+
 - `github.com/openshift-hyperfleet/hyperfleet-broker`: HyperFleet broker library (Publish/Subscribe interfaces)
   - **Imported and used by adapter framework**
   - Provides broker-agnostic Pub/Sub interfaces
@@ -1480,10 +1578,12 @@ readinessProbe:
   - Handles connection management, retries, acknowledgments
 
 **Testing:**
+
 - `github.com/testcontainers/testcontainers-go`: Integration testing
 - `sigs.k8s.io/controller-runtime/pkg/envtest`: Kubernetes envtest
 
 **Optional (Post-MVP):**
+
 - `go.opentelemetry.io/otel`: OpenTelemetry SDK for tracing
 - `github.com/prometheus/client_golang`: Prometheus client for metrics
 
@@ -1492,23 +1592,27 @@ readinessProbe:
 ### MVP Scope
 
 **Error Handling:**
+
 - ✅ All action failures **block** by default (no `onFailure` configuration)
 - ✅ Simple error logging and reporting
 - ✅ Message acknowledgment on completion
 
 **Retry and Timeout:**
+
 - ✅ Global API client timeout and retry configuration (`hyperfleetApi.timeout`, `hyperfleetApi.retryAttempts`)
 - ✅ Per-precondition timeout and retry for API calls
 - ❌ **NOT** per-resource timeout and retry (post-MVP)
 - ❌ **NOT** handler-level timeout (broker ack timeout handles this)
 
 **Resource Management:**
+
 - ✅ Create resources based on preconditions
 - ✅ Track resources for status evaluation
 - ✅ Discover resources by name or label selectors
 - ✅ Delete resources in `onTerminating` handler
 
 **Status Reporting:**
+
 - ✅ Report status with conditions (applied, available, health)
 - ✅ Conditional reporting based on expressions
 - ✅ Always execute post-processing, even when preconditions fail
@@ -1516,22 +1620,26 @@ readinessProbe:
 ### Post-MVP Enhancements
 
 **Advanced Resource Management:** (HIGH)
+
 - **Resource Management `onFailure`**: Configurable behavior when the *workload* represented by the resource fails (e.g., Job pod fails, Deployment crashes) after successful resource creation/update.
 - **Resource Management `onNewGeneration`**: Handling logic when a new resource generation is detected (update existing vs. recreate).
 - **Resource Management `onDeleting`**: Cleanup logic when parent resource is deleting (cascading deletion, finalizer removal).
 - **Resource Security**: Reconciliation and restoration of lost/deleted Custom Resources (CRs) to ensure state matches intent (drift detection).
 
 **Advanced Error Handling:** (HIGH)
+
 - `onFailure` configuration per action (block, warn, continue)
 - Granular error handling strategies
 - Error recovery workflows
 
 **Resource-Level Controls:** (MEDIUM)
+
 - Per-resource `timeout` configuration
 - Per-resource `retry` strategy (attempts, backoff)
 - Resource-level `onFailure` actions
 
 **Additional Features:** (MEDIUM)
+
 1. **Authentication**: Service Account token support for API calls
 2. **Resource Updates**: Handle update events, not just create
 3. **Template Caching**: Cache compiled templates for performance
@@ -1572,6 +1680,7 @@ readinessProbe:
 - Logger functionality (`pkg/logger/logger.go`)
 
 **Run:**
+
 ```bash
 make test
 ```
@@ -1587,6 +1696,7 @@ make test
 - Configuration loading from multiple sources
 
 **Run:**
+
 ```bash
 make test-integration
 ```
@@ -1594,6 +1704,7 @@ make test-integration
 ### Test Coverage
 
 **Generate coverage report:**
+
 ```bash
 make test-coverage        # Terminal output
 make test-coverage-html   # HTML report

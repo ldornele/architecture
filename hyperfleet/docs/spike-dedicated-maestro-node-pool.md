@@ -278,6 +278,7 @@ GKE [maintenance windows](https://docs.cloud.google.com/kubernetes-engine/docs/c
 - Per-pool maintenance exclusion can block upgrades on maestro pool entirely while shared pool upgrades normally.
 
 **Recommended config:**
+
 - Set cluster-wide maintenance window during off-hours (cluster currently has none — new addition).
 - Add [node pool maintenance exclusion](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/maintenance-windows-and-exclusions) on maestro pool to prevent auto-upgrades during E2E test windows.
 
@@ -292,6 +293,7 @@ Pinning maestro to 1-node tainted pool = single point of failure: if node dies (
 On current 2-node shared pool, pod could immediately reschedule to surviving node.
 
 **Acceptable for CI/dev cluster** because:
+
 - Node-level disruptions mid-test (the motivating incidents) corrupt test results; a clean node-replacement from auto-repair just delays the next run.
 - Maestro single-replica, no HA requirement in dev.
 - PDB cannot help here (cannot conjure node), but auto-repair restores pool automatically.

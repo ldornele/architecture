@@ -10,25 +10,29 @@ Last Updated: 2025-12-23
 
 This document provides an overview of the workflow for onboarding new public component repositories to the Openshift CI.
 
-
 ## Granting Robots Privileges
+
 In order to add labels, move PRs and issues into milestones, merge PRs, etc., the robots will need write access to your repository.
 
 There is a team named  **automation-bots** created that has added bot **openshift-ci-robot** and **openshift-merge-robot**. The two bots are using to handle CI jobs triggering and code merging behaviors. For the repositories under **openshift-hyperfleet** organization they just need to added team **automation-bots** to grant the same permission for the two bots. And if it has already been done by referring to the [repository-creation-guidelines.md](../../repository-creation-guidelines.md) when create the new repository just skip the above step.
 
+<!-- markdownlint-disable-next-line MD036 -->
 **Note**
- - If your component repository is not in the **openshift-hyperfleet** Github organization, you can refer to the guidance [Granting Robots Privileges and Installing the GitHub App](https://docs.ci.openshift.org/docs/how-tos/onboarding-a-new-component/#granting-robots-privileges-and-installing-the-github-app) to grant robots premission
 
+- If your component repository is not in the **openshift-hyperfleet** Github organization, you can refer to the guidance [Granting Robots Privileges and Installing the GitHub App](https://docs.ci.openshift.org/docs/how-tos/onboarding-a-new-component/#granting-robots-privileges-and-installing-the-github-app) to grant robots premission
 
 ## Prow Configuration
+
 ### 1. Bootstrap the Prow configuration
 
 [Prow](https://docs.prow.k8s.io/docs/overview/) is the k8s-native upstream CI system, source code hosted in the kubernetes-sigs/prow repository. Prow interacts with GitHub to provide the automation UX that developers use on their pull requests, as well as orchestrating test workloads for those pull requests.
 
 From the root of the [openshift/release](https://github.com/openshift/release) repository, run the following target and use the interactive tool to bootstrap a configuration for your repository:
+
   ```bash
   make new-repo
   ```
+
 This will place a new **_pluginconfig.yaml** file in the **/core-services/prow/02_config/$org/$repo** directory. This file is used to configure the specific plugins for your repository.
 
 ### 2. Setting Up Team Ownership
@@ -104,6 +108,7 @@ Updating Prow plugin configuration ...
 /Library/Developer/CommandLineTools/usr/bin/make boskos-config
 cd core-services/prow/02_config && ./generate-boskos.py
 ```
+
 </details>
 
 The command generates the Prow configuration files automatically under **$org/$repo** as shown below:
@@ -123,10 +128,12 @@ approve:
 ```
 
 Here is the example to enable the Prow configures (You can set it in one PR)
- - [Enable the prow configures](https://github.com/openshift/release/pull/72693/files)
- - [Set the lgtm_acts_as_approve to true](https://github.com/openshift/release/pull/72902/files)
+
+- [Enable the prow configures](https://github.com/openshift/release/pull/72693/files)
+- [Set the lgtm_acts_as_approve to true](https://github.com/openshift/release/pull/72902/files)
 
 ## References
 
 For more detailed information, refer to the official OpenShift CI documentation:
+
 - [Onboarding a New Component](https://docs.ci.openshift.org/docs/how-tos/onboarding-a-new-component/)

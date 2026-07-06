@@ -6,7 +6,6 @@ Last Updated: 2026-01-27
 
 # Maestro Integration Spike
 
-
 ## Overview
 
 Documents the original strategy for integrating adapters with Maestro via the Maestro CLI. Deprecated — the CLI-based integration approach was replaced by the Maestro SDK integration. See `adapter/maestro-integration/` for the current approach.
@@ -15,7 +14,7 @@ Maestro is a system that leverages CloudEvents to transport Kubernetes resources
 
 | | |
 |---|---|
-| **Repository** | https://github.com/openshift-online/maestro |
+| **Repository** | <https://github.com/openshift-online/maestro> |
 | **Container Image** | `quay.io/redhat-user-workloads/maestro-rhtap-tenant/maestro/maestro@sha256:062efc1b4a78e45c714f1925528443d49201acd0c7ce447c20e60706138550ec` |
 | **Reference Doc** | [Maestro Service Architecture](https://docs.google.com/document/d/1wHTDIFIonfyVYlJcOBXz8jW4s7xVWtm3UFBZGcB7oiE/edit?tab=t.0#heading=h.r9mskro39h4i) |
 
@@ -28,6 +27,7 @@ Maestro is a system that leverages CloudEvents to transport Kubernetes resources
 **Pattern**: Adapters create Kubernetes Jobs with maestro-cli binary that handles resource operations.
 
 ### Broker Choice: gRPC Mode
+
 - Minimal infrastructure overhead
 - Better performance for HyperFleet's use cases
 - Integrated with server deployment
@@ -36,6 +36,7 @@ Maestro is a system that leverages CloudEvents to transport Kubernetes resources
 ### Resource ManifestWork Strategy: One ManifestWork Per Adapter Per Cluster
 
 **Chosen Approach**: One ManifestWork per adapter per cluster
+
 - **One ManifestWork per adapter per cluster** to avoid race conditions
 - **Independent adapter operations** with no coordination needed
 - **Landing Zone tracks multiple ManifestWork names** per cluster for each adapter
@@ -45,7 +46,8 @@ Maestro is a system that leverages CloudEvents to transport Kubernetes resources
 **Naming Convention**: `hyperfleet-{cluster-name}-{adapter-type}`
 
 **Example multi-cluster resource organization:**
-```
+
+```text
 cluster-west-1 (consumer):
 ├── hyperfleet-cluster-west-1-namespace   (Landing Zone decides name)
 ├── hyperfleet-cluster-west-1-nodepool    (Nodepool Adapter decides name)
@@ -60,6 +62,7 @@ cluster-east-2 (consumer):
 ```
 
 **Example ManifestWork mapping:**
+
 ```go
 // ManifestWork for cluster-west-1
 workv1.ManifestWork{
@@ -76,11 +79,13 @@ workv1.ManifestWork{
 ```
 
 **Benefits of cluster-name-first pattern:**
+
 - Resources for same cluster are grouped together when sorted
 - Easy to identify all ManifestWorks for a specific cluster
 - Clear association between ManifestWork name and target cluster
 
 **Alternative Considered**: One ManifestWork Per Cluster (Rejected)
+
 - **Single shared ManifestWork** containing all resources for the cluster
 - **All adapters coordinate** to update the same ManifestWork
 - **Simpler cluster deletion** - delete one ManifestWork cleans up entire cluster
@@ -106,6 +111,7 @@ Result: nodepool resource is LOST even though both operations "succeeded"
 ```
 
 **Root Cause**:
+
 - maestro-cli requires **complete manifests** for apply operations
 - Each adapter only knows about resources it manages
 - Maestro version control prevents corruption but doesn't prevent resource loss
@@ -114,11 +120,13 @@ Result: nodepool resource is LOST even though both operations "succeeded"
 </details>
 
 **Why One ManifestWork Per Adapter Per Cluster Eliminates This Problem**:
+
 - Each adapter works with its own ManifestWork → no shared state to corrupt
 - Concurrent operations are truly independent → no race conditions possible
 - Resource loss impossible → adapters can't overwrite each other's resources
 
 ### Communication Pattern: Hybrid Approach
+
 ```bash
 # Resource operations: Use gRPC (required)
 maestro-cli apply --manifest-file=job.yaml --consumer=cluster-west-1     # gRPC - creates new ManifestWork
@@ -132,6 +140,7 @@ maestro-cli list --consumer=cluster-west-1                               # HTTP
 ```
 
 **Benefits:**
+
 - ✅ **Simplicity**: No gRPC connection management for monitoring
 - ✅ **Reliability**: HTTP polling works regardless of broker type
 - ✅ **Safety**: No event consumption conflicts
@@ -268,6 +277,7 @@ spec:
 ```
 
 **Status Reporting:**
+
 - Handled by existing [HyperFleet status-reporter](https://github.com/openshift-hyperfleet/status-reporter)
 - No custom sidecar container needed
 - Status-reporter monitors job completion and updates HyperFleet components
@@ -301,11 +311,13 @@ grpc-client-key-file: /path/to/client.key
 ## Security Considerations
 
 ### Network Security
+
 - **TLS encryption** for all communications
 - **mTLS** for agent authentication
 - **Network policies** to restrict access
 
 ### Authentication Strategy
+
 ```yaml
 # HTTP API: JWT for monitoring/management (optional)
 Authorization: Bearer <jwt-token>
@@ -397,14 +409,16 @@ spec:
 
 **Status reporting is handled by the existing HyperFleet status-reporter component.**
 
-See: https://github.com/openshift-hyperfleet/status-reporter
+See: <https://github.com/openshift-hyperfleet/status-reporter>
 
 **Integration points:**
+
 - **maestro-cli** writes status to `RESULTS_PATH` environment variable location
 - **status-reporter** monitors job status and updates HyperFleet components
 - **No custom sidecar needed** - leverages existing infrastructure
 
 **Status Output Format:**
+
 ```go
 type StatusResult struct {
     ManifestWorkName string            `json:"manifestWorkName"`
@@ -440,7 +454,8 @@ func getResultsPath(flags *MaestroCLIFlags) string {
 ```
 
 **Status Flow:**
-```
+
+```text
 maestro-cli (writes RESULTS_PATH) → status-reporter (reads RESULTS_PATH) → HyperFleet status updates
 ```
 
@@ -461,11 +476,13 @@ maestro-cli (writes RESULTS_PATH) → status-reporter (reads RESULTS_PATH) → H
 ### ManifestWork Name Tracking
 
 **ManifestWork name flow:**
-```
+
+```text
 Each Adapter define name rule → K8s Job (maestro-cli apply) → Maestro → Creates ManifestWork with semantic name → Stored in Adapter's status data
 ```
 
 **Usage by adapters:**
+
 - **Each adapter**: Uses `maestro-cli apply` to create its own ManifestWork with semantic naming
 - **Subsequent updates**: Each adapter uses `maestro-cli apply` with the same manifest file for updates
 - **ManifestWork name** is stored in each adapter's status data for independent tracking
@@ -485,12 +502,14 @@ Each Adapter define name rule → K8s Job (maestro-cli apply) → Maestro → Cr
 ### Version Control Mechanism
 
 **Maestro handles version control internally:**
+
 - Maestro server maintains ManifestWork resource versions
 - Concurrent updates are detected and resolved by Maestro
 - Version conflicts result in error responses to clients
 - Successful updates increment ManifestWork version
 
 **maestro-cli behavior:**
+
 - Submits gRPC request to Maestro
 - Returns success/failure based on Maestro response
 - No retry logic or conflict resolution in CLI
@@ -518,6 +537,7 @@ Each Adapter define name rule → K8s Job (maestro-cli apply) → Maestro → Cr
 ```
 
 **Root Cause**:
+
 - maestro-cli requires **complete manifests** in apply operations
 - Each adapter only knows about resources it manages
 - No coordination mechanism between concurrent adapter jobs
@@ -526,6 +546,7 @@ Each Adapter define name rule → K8s Job (maestro-cli apply) → Maestro → Cr
 ### Version Conflict vs Resource Loss
 
 **Version Conflict (Handled by Maestro)**:
+
 ```bash
 # Same version scenario - Maestro rejects the second update
 # T1: Adapter A fetches ManifestWork (version: v1)
@@ -535,6 +556,7 @@ Each Adapter define name rule → K8s Job (maestro-cli apply) → Maestro → Cr
 ```
 
 **Resource Loss (NOT prevented)**:
+
 ```bash
 # Different timing - both updates "succeed" but resources are lost
 # T1: Adapter A fetches ManifestWork (version: v1) → [resource1]
@@ -566,6 +588,7 @@ Nodepool Adapter    → ManifestWork: cluster123-nodepool-storage
 ```
 
 **Benefits**:
+
 - ✅ **Completely eliminates race conditions** - no shared state anywhere
 - ✅ **No fetching required** - each resource is independent
 - ✅ **True parallel execution** - concurrent nodepool operations safe
@@ -574,6 +597,7 @@ Nodepool Adapter    → ManifestWork: cluster123-nodepool-storage
 - ✅ **Fine-grained status tracking** - per-resource status visibility
 
 **Trade-offs**:
+
 - ❌ **More ManifestWorks to manage** - many ManifestWorks per cluster
 - ❌ **Higher operational overhead** - tracking multiple resources
 - ❌ **Less atomic cluster operations** - can't update related resources together
@@ -581,6 +605,7 @@ Nodepool Adapter    → ManifestWork: cluster123-nodepool-storage
 ### ManifestWork Granularity Patterns
 
 #### Pattern A: One ManifestWork Per Adapter Per Cluster
+
 ```bash
 # Each adapter manages its own ManifestWork - requires --name for updates
 Nodepool: maestro-cli apply --name=hyperfleet-cluster-1-nodepool --manifest-file=nodepool.yaml --consumer=cluster-1
@@ -592,6 +617,7 @@ Ingress:  maestro-cli apply --name=hyperfleet-cluster-1-ingress --manifest-file=
 ```
 
 #### Pattern B: One ManifestWork Per Resource Per Cluster (Recommended for HyperFleet)
+
 ```bash
 # Each resource gets its own ManifestWork - maximum granularity
 Nodepool-1: maestro-cli apply --name=cluster-1-nodepool-workers --manifest-file=nodepool-1.yaml --consumer=cluster-1
@@ -605,6 +631,7 @@ Ingress:    maestro-cli apply --name=cluster-1-ingress --manifest-file=ingress.y
 ```
 
 #### Pattern C: One ManifestWork Per Cluster (Future - maybe with framework integration)
+
 ```bash
 # Single shared ManifestWork per cluster - all adapters coordinate
 All:        maestro-cli apply --name=hyperfleet-cluster-1 --manifest-file=cluster-1-complete.yaml --consumer=cluster-1
@@ -625,22 +652,26 @@ All:        maestro-cli apply --name=hyperfleet-cluster-1 --manifest-file=cluste
 ### Recommended Approach for HyperFleet
 
 **Use Pattern A (One ManifestWork Per Adapter Per Cluster)** when:
+
 - **Each adapter manages single resources** (one namespace, one IDP config, one ingress)
 - **Adapter operations are infrequent**
 - **Simpler ManifestWork tracking** is preferred over performance
 
 **Limitations of Pattern A**:
+
 - ⚠️ **Still requires fetching** if adapter manages multiple resources (e.g., multiple nodepools)
 - ⚠️ **Race conditions possible** within same adapter (concurrent nodepool operations)
 - ⚠️ **Must use `maestro-cli build`** to fetch and merge existing resources
 
 **Use Pattern B (Per Resource Per Cluster)** when:
+
 - **Multiple nodepools** need independent lifecycle management
 - **Parallel nodepool scaling** is critical for performance
 - **True parallel operations** needed (no fetching/coordination required)
 - **High-frequency resource operations**
 
 **Benefits of Pattern B for Multi-Nodepool Scenarios**:
+
 - ✅ **No fetching needed** - each resource is independent
 - ✅ **True parallel execution** - no coordination between nodepool operations
 - ✅ **Eliminates race conditions entirely** - no shared state even within adapter
@@ -666,6 +697,7 @@ All:        maestro-cli apply --name=hyperfleet-cluster-1 --manifest-file=cluste
 ### Framework Integration Considerations
 
 **Framework integration would involve:**
+
 1. **Direct WorkClient integration** - Embed `grpcsource.NewMaestroGRPCSourceWorkClient` in adapter process
 2. **Connection pooling** - Reuse gRPC connections across operations
 3. **Subscribe to broker/stream** - Listen for ManifestWork status events from Maestro
@@ -679,6 +711,7 @@ All:        maestro-cli apply --name=hyperfleet-cluster-1 --manifest-file=cluste
 ### Migration Path
 
 **Framework Migration:**
+
 1. **Phase 1 (Current):** Job-based maestro-cli for all adapters
 2. **Phase 2:** Identify high-frequency adapters that need optimization
 3. **Phase 3:** Integrate Maestro client library directly into specific adapters
@@ -695,11 +728,13 @@ If transitioning existing clusters from per-adapter ManifestWorks to shared per-
 5. **Update adapter configuration** - Point adapters to use shared ManifestWork name
 
 **Migration considerations:**
+
 - Requires coordination window to avoid race conditions during transition
 - Rollback plan: Keep old ManifestWorks until new pattern is verified
 - Status tracking: Update cluster status to reference new ManifestWork name
 
 **Decision criteria for framework migration:**
+
 - Job startup overhead > 50% of total operation time
 - Operation frequency > 10 ops/minute per adapter
 - Latency SLA < 1 second
@@ -711,6 +746,7 @@ If transitioning existing clusters from per-adapter ManifestWorks to shared per-
 Maestro provides a robust, scalable solution for multi-cluster Kubernetes resource management that aligns well with HyperFleet's needs.
 
 **Key takeaways:**
+
 1. **Use gRPC mode** for broker communication (recommended for HyperFleet)
 2. **HTTP API is read-only** for monitoring and consumer management
 3. **gRPC is required** for ManifestWork lifecycle operations (create, update, delete)
