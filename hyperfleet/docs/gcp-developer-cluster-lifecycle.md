@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Platform Team
-Last Updated: 2026-06-16
+Last Updated: 2026-07-06
 ---
 
 # GCP Developer Cluster Lifecycle Policy
@@ -114,9 +114,7 @@ Exceptions require explicit approval from the team lead.
 
 ---
 
-## Automated Daily Enforcement
-
-> **Note:** The automation described below is not yet implemented. See [HYPERFLEET-1229](https://redhat.atlassian.net/browse/HYPERFLEET-1229) for the implementation tracker. Until automation is in place, these rules are enforced manually.
+## Automated Enforcement
 
 ### Idle Node Shutdown
 
@@ -131,15 +129,17 @@ Excluded from idle shutdown:
 
 Clusters **without** a valid `owner` label are treated as unowned and are **automatically shut down** (scaled to zero nodes) on detection. If no owner label is added within **7 days**, the cluster is deleted.
 
-### Future Automation (Proposed)
+### Automation Components
 
 | Component | Purpose |
 |---|---|
-| Cloud Scheduler | Hourly cron trigger |
-| Cloud Function | Iterates clusters, checks node age (>12h), labels, and TTL; resizes node pools to 0 or deletes |
+| Cloud Scheduler | Hourly cron trigger (UTC) |
+| Cloud Function (Gen2) | Iterates clusters, checks node age (>12h), labels, and TTL; resizes node pools to 0 or deletes |
 | Label check | Shuts down clusters missing `owner` label; deletes after 7 days |
 | TTL check | Shuts down clusters past their `ttl` date; deletes after 48 hours |
-| Terraform update | Add `ttl` label to `common_labels` (current date + 5 days) |
+| Terraform | Sets `owner` and `ttl` labels automatically at apply time |
+
+Implementation: [hyperfleet-infra/functions/lifecycle-enforcer](https://github.com/openshift-hyperfleet/hyperfleet-infra/tree/main/functions/lifecycle-enforcer) — deployed via `terraform/shared/`.
 
 ---
 
