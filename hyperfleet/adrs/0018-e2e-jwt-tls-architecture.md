@@ -19,12 +19,13 @@ graph TD
     A[Client HTTPS] --> B[Ingress / Service Mesh / Cloud Load Balancer]
     B -->|TLS termination| C[hyperfleet-api Pod HTTP]
     C -->|JWT validation| D[Database]
-    
+
     style B fill:#f9f,stroke:#333,stroke-width:2px
     style C fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
 This means:
+
 - Infrastructure (Ingress/Service Mesh) handles TLS termination
 - Application pods receive HTTP traffic (not HTTPS)
 - Application validates JWT tokens for authentication
@@ -59,7 +60,7 @@ sequenceDiagram
     participant OIDC as Mock OIDC Server
     participant Client as API Client
     participant API as hyperfleet-api
-    
+
     Test->>OIDC: POST /token (request JWT)
     OIDC->>Test: Return signed JWT with test identity
     Test->>Client: Inject Authorization header
