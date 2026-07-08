@@ -32,112 +32,146 @@ This means:
 
 ## Decision
 
-**E2E tests will use a cloud-agnostic authentication approach that mirrors the production contract without replicating infrastructure:**
+**E2E tests will use Kubernetes-native authentication that mirrors how Sentinel and Adapters authenticate to the API:**
 
 1. **No application-level TLS testing** — Infrastructure handles TLS termination; E2E tests connect via HTTP to the API (matching production pod behavior)
-2. **Deploy Mock OIDC server for E2E tests** — Use a lightweight mock OIDC server (e.g., [oauth2-mock-server](https://github.com/navikt/mock-oauth2-server)) in the test cluster instead of cloud-specific identity providers
+2. **Use Kubernetes Service Account Tokens for JWT authentication** — E2E test pods mount projected service account tokens with `audience: hyperfleet-api`, matching the authentication mechanism used by Sentinel and Adapters
 3. **Test the API contract, not infrastructure** — Validate HTTP + JWT authentication flow, not TLS/certificate handling
 
 ### Implementation Details
 
-**Mock OIDC Server Configuration:**
+**Service Account Token Configuration:**
+
+E2E test pods will mount Kubernetes service account tokens using projected volumes, the same mechanism used by Sentinel and Adapters:
+
+```yaml
+# E2E test pod configuration
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hyperfleet-e2e-test
+  namespace: hyperfleet-e2e
+spec:
+  serviceAccountName: hyperfleet-e2e-sa
+  containers:
+    - name: test
+      image: hyperfleet-e2e:latest
+      volumeMounts:
+        - name: api-token
+          mountPath: /var/run/secrets/hyperfleet-api
+          readOnly: true
+      env:
+        - name: HYPERFLEET_API_TOKEN_PATH
+          value: /var/run/secrets/hyperfleet-api/token
+  volumes:
+    - name: api-token
+      projected:
+        sources:
+          - serviceAccountToken:
+              audience: hyperfleet-api
+              expirationSeconds: 3600
+              path: token
+```
+
+**API Configuration** remains unchanged — the API validates service account tokens signed by the Kubernetes cluster:
 
 ```yaml
 config:
   server:
     jwt:
       enabled: true
-      issuer_url: "http://mock-oidc-server.hyperfleet-e2e.svc.cluster.local:8080"
-      audience: "hyperfleet-e2e-tests"
-      identity_claim: "email"
+      issuer_url: "https://kubernetes.default.svc.cluster.local"
+      audience: "hyperfleet-api"
+      identity_claim: "sub"  # Service account subject (system:serviceaccount:namespace:name)
 ```
 
 **Test Flow:**
 
 ```mermaid
 sequenceDiagram
-    participant Test as E2E Test
-    participant OIDC as Mock OIDC Server
+    participant K8s as Kubernetes API
+    participant Test as E2E Test Pod
     participant Client as API Client
     participant API as hyperfleet-api
 
-    Test->>OIDC: POST /token (request JWT)
-    OIDC->>Test: Return signed JWT with test identity
-    Test->>Client: Inject Authorization header
-    Client->>API: Make API calls with JWT
-    API->>OIDC: Validate JWT signature (JWKS)
-    OIDC->>API: Return public key
-    API->>API: Verify signature & extract claims
+    K8s->>Test: Mount service account token via projected volume
+    Test->>Test: Read token from /var/run/secrets/hyperfleet-api/token
+    Test->>Client: Inject Authorization: Bearer <token>
+    Client->>API: Make API calls with service account JWT
+    API->>K8s: Validate JWT signature (TokenReview API)
+    K8s->>API: Token valid, subject: system:serviceaccount:hyperfleet-e2e:hyperfleet-e2e-sa
+    API->>API: Extract identity from subject claim
     API->>Test: Return response
     Test->>Test: Verify audit fields
 ```
 
 **E2E Client Changes** (in [hyperfleet-e2e](https://gitlab.cee.redhat.com/service/hyperfleet/hyperfleet-e2e) repository):
 
-Modify `pkg/client/client.go` to accept optional `Authorization` header and add JWT token generator client:
+Modify `pkg/client/client.go` to read service account token from mounted volume:
 
 ```go
 // Example implementation in hyperfleet-e2e repository (not this architecture repo)
 type APIConfig struct {
     URL            string
     JWTEnabled     bool   // Enable JWT authentication
-    JWTIssuerURL   string // Mock OIDC server URL
-    JWTEmail       string // Email claim for test identity
+    TokenPath      string // Path to service account token file (default: /var/run/secrets/hyperfleet-api/token)
+}
+
+// NewClient reads the service account token and injects it in all requests
+func NewClient(cfg APIConfig) (*Client, error) {
+    var token string
+    if cfg.JWTEnabled {
+        tokenBytes, err := os.ReadFile(cfg.TokenPath)
+        if err != nil {
+            return nil, fmt.Errorf("failed to read service account token: %w", err)
+        }
+        token = string(tokenBytes)
+    }
+    // ... inject token in Authorization header for all requests
 }
 ```
 
 **Test Coverage:**
 
-- ✅ API receives HTTP traffic with `Authorization: Bearer <JWT>` header
-- ✅ JWT signature validation (via mock OIDC keys)
-- ✅ JWT claims extraction (`email` → caller identity)
-- ✅ Audit fields populated correctly (`created_by`, `updated_by`, `deleted_by`) — see [v1.0.0 Upgrade Guide §1.4](../docs/release/v0.2.0-to-v1.0.0-upgrade-guide.md#14-jwt-identity-claim-for-audit-fields) for JWT identity claim mapping
+- ✅ API receives HTTP traffic with `Authorization: Bearer <JWT>` header (service account token)
+- ✅ JWT signature validation (via Kubernetes TokenReview API)
+- ✅ JWT claims extraction (`sub` → caller identity as `system:serviceaccount:namespace:sa-name`)
+- ✅ Audit fields populated correctly (`created_by`, `updated_by`, `deleted_by`) using service account subject — see [v1.0.0 Upgrade Guide §1.4](../docs/release/v0.2.0-to-v1.0.0-upgrade-guide.md#14-jwt-identity-claim-for-audit-fields) for JWT identity claim mapping
 - ✅ 401 responses for invalid/missing tokens on **all** requests (GET and mutating) — per v1.0.0, valid JWT required for all operations
-- ✅ GETs with valid JWT but missing `identity_claim` proceed without caller identity (no `created_by`/`updated_by` attribution)
+- ✅ Token refresh behavior (tokens auto-rotate every 3600s via projected volume)
 - ❌ TLS termination (infrastructure responsibility, out of scope)
 - ❌ Certificate validation (infrastructure responsibility, out of scope)
+- ❌ External user OIDC authentication (E2E tests validate internal service-to-service auth only)
 
 ## Consequences
 
 **Gains:**
 
-- ✅ **Cloud-agnostic testing** — E2E tests run identically in GCP, AWS, Azure, on-premises, and local developer machines without cloud-specific authentication
-- ✅ **Self-contained CI/CD** — No external dependencies on cloud identity providers; tests run anywhere
-- ✅ **Contract testing** — Validates the OIDC/JWT integration contract without cloud lock-in
-- ✅ **Test isolation** — Full control over JWT claims, expiration, and failure scenarios for comprehensive testing
-- ✅ **Simpler local development** — Developers can run E2E tests locally without cloud credentials
-- ✅ **Aligned with production** — Tests mirror production API behavior (HTTP + JWT validation) without replicating infrastructure concerns
+- ✅ **Kubernetes-native** — Uses built-in service account token projection; no additional infrastructure to deploy/maintain
+- ✅ **Aligned with Sentinel/Adapters** — E2E tests use the exact same authentication mechanism as production components (service account tokens with `audience: hyperfleet-api`)
+- ✅ **Real JWT validation** — Tests validate actual Kubernetes-signed tokens, not mocked credentials
+- ✅ **Automatic token rotation** — Projected tokens auto-refresh; tests validate token expiration/renewal behavior
+- ✅ **Simpler E2E infrastructure** — Eliminates mock OIDC server deployment, configuration, and maintenance
+- ✅ **Cloud-agnostic** — Works in any Kubernetes cluster (GKE, EKS, AKS, on-premises, kind for local development)
+- ✅ **No new local dependencies** — Leverages existing kind cluster infrastructure already required for E2E tests
 
 **Trade-offs:**
 
-- ⚠️ **Additional test infrastructure** — Must deploy and maintain mock OIDC server in E2E test environments
-- ⚠️ **Not testing real cloud identity integration** — Mock OIDC validates the contract but doesn't test actual GCP/AWS/Azure identity provider integration (acceptable because production infrastructure testing is out of scope for E2E tests)
+- ⚠️ **Only tests service-to-service authentication** — E2E tests validate internal component authentication (service accounts) but not external user authentication via OIDC providers (acceptable because E2E tests focus on API behavior, not end-user identity flows)
+- ⚠️ **Service account identity format** — Audit fields will show `system:serviceaccount:namespace:sa-name` instead of human-readable emails (acceptable for E2E test validation; production user flows tested separately)
 - ⚠️ **No TLS/certificate testing** — E2E tests don't validate TLS termination or certificate handling (acceptable because this is infrastructure responsibility, tested separately)
+
+**Note:** Service account tokens work natively in kind clusters, which are already the minimum infrastructure requirement for E2E tests per the [E2E Run Strategy](../docs/e2e-testing/e2e-run-strategy-spike-report.md). No additional local setup is needed beyond the existing kind-based test environment.
 
 ## Alternatives Considered
 
 | Alternative | Why Rejected |
 |-------------|--------------|
+| **Deploy Mock OIDC server (e.g., oauth2-mock-server)** | ⚠️ **Changed to Accepted during review** — Initially proposed but replaced with service account tokens after feedback that Sentinel/Adapters already use this mechanism. Mock OIDC adds unnecessary infrastructure when Kubernetes provides native JWT authentication. Service account tokens align E2E tests with production component authentication. |
 | **Use GCP Identity Tokens for E2E tests** | ❌ Violates cloud-agnostic principle — creates hard dependency on GCP. Cannot run tests locally without GCP authentication. Cannot run in AWS or Azure CI/CD environments. Contradicts Office Hours decision: "do not rely on specific cloud provider behaviors". |
 | **Implement application-level TLS in hyperfleet-api** | ❌ Production uses infrastructure-level TLS termination (Ingress/Service Mesh). Application pods receive HTTP traffic. Testing app-level TLS would test non-production behavior. |
 | **Skip JWT testing entirely in E2E** | ❌ Leaves gap between test and production. Audit field population (`created_by`, `updated_by`, `deleted_by`) wouldn't be validated. Authentication contract wouldn't be tested. |
-| **Use separate OIDC mock per cloud provider** | ❌ Unnecessary complexity. OIDC/JWT is a standard protocol; one mock server validates the contract across all environments. |
-
-**Optional GCP Support for Local Development:**
-
-While the decision is to use mock OIDC by default, GCP Identity Token support can be kept as an **optional convenience** for local development:
-
-```bash
-# Default: Mock OIDC (cloud-agnostic)
-make test-e2e
-
-# Optional: GCP tokens (for developers with GCP access)
-export HYPERFLEET_E2E_USE_GCP_JWT=true
-gcloud auth login
-make test-e2e
-```
-
-This preserves developer ergonomics while keeping mock OIDC as the default for CI/CD and cloud-agnostic testing.
+| **Use external OIDC provider (Keycloak, Dex)** | ❌ Adds operational complexity and external dependencies. Service account tokens are simpler, Kubernetes-native, and already proven in Sentinel/Adapters. |
 
 ---
 
@@ -147,6 +181,6 @@ This preserves developer ergonomics while keeping mock OIDC as the default for C
   - [HYPERFLEET-1235](https://redhat.atlassian.net/browse/HYPERFLEET-1235) — Investigation
   - [HYPERFLEET-1146](https://redhat.atlassian.net/browse/HYPERFLEET-1146) — Original E2E security gap identification
 - **External Resources**:
-  - [oauth2-mock-server](https://github.com/navikt/mock-oauth2-server) — Mock OIDC server implementation
+  - [Kubernetes Service Account Token Projection](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#serviceaccount-token-volume-projection) — Official K8s documentation
   - [RFC 7519 - JWT](https://datatracker.ietf.org/doc/html/rfc7519) — JWT specification
-  - [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html) — OIDC specification
+  - [Kubernetes TokenReview API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-review-v1/) — JWT validation mechanism
