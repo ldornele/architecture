@@ -33,7 +33,7 @@ Last Updated: 2026-05-25
 
 - **Current Status Aggregation**: [ADR-0008 — Dynamic Status Aggregation](../../adrs/0008-dynamic-status-aggregation.md) — aggregation computed on write path; [ADR-0007 — Conditions-Based Status Model](../../adrs/0007-conditions-based-status-model.md) — ResourceCondition and AdapterCondition contracts; [Status Guide](../../docs/status-guide.md) — condition reporting and validation rules
 - [API Service Design](./api-service.md) — API architecture and service layer patterns
-- [Sentinel Message Decision Config](../sentinel/sentinel.md) — Existing CEL usage in Sentinel
+- [Sentinel Decision Engine Reference](https://github.com/openshift-hyperfleet/hyperfleet-sentinel/blob/main/docs/decision-engine.md) — Existing CEL usage in Sentinel
 - [Adapter Framework Design](../adapter/framework/adapter-frame-design.md) — Existing CEL usage in adapters (Config Loader and Criteria Evaluator sections)
 
 ### Scope
@@ -503,5 +503,5 @@ mappings:
 - [Status Guide](../../docs/status-guide.md)
 - [Error Model Standard](../../standards/error-model.md)
 - [Logging Standard](../../standards/logging-specification.md)
-- [Sentinel Message Decision Config](../sentinel/sentinel.md)
+- [Sentinel Decision Engine Reference](https://github.com/openshift-hyperfleet/hyperfleet-sentinel/blob/main/docs/decision-engine.md)
 - [Adapter Framework Design](../adapter/framework/adapter-frame-design.md)
