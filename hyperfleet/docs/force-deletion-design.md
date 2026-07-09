@@ -10,7 +10,7 @@ Last Updated: 2026-05-06
 
 **Related**:
 
-- [Adapter Deletion Flow Design](../components/adapter/framework/adapter-deletion-flow-design.md)
+- [Adapter Deletion Flow Design](../components/adapter/framework/lifecycle/adapter-lifecycle-delete-design.md)
 - [Hard Delete Design](../components/api-service/hard-delete-design.md)
 - [ADR 0013 — Force Delete Scope: Database-Only](../adrs/0013-force-delete-scope-db-only.md)
 
@@ -32,7 +32,7 @@ Last Updated: 2026-05-06
 
 ## Problem Statement
 
-The existing deletion flow ([Adapter Deletion Flow Design](../components/adapter/framework/adapter-deletion-flow-design.md)) relies on all adapters confirming cleanup (`Finalized=True`) before the API hard-deletes records. If an adapter is stuck, unreachable, or permanently unable to clean up its resources, the resource remains in `Finalizing` state indefinitely with no recovery path.
+The existing deletion flow ([Adapter Deletion Flow Design](../components/adapter/framework/lifecycle/adapter-lifecycle-delete-design.md)) relies on all adapters confirming cleanup (`Finalized=True`) before the API hard-deletes records. If an adapter is stuck, unreachable, or permanently unable to clean up its resources, the resource remains in `Finalizing` state indefinitely with no recovery path.
 
 Force deletion must provide an escape hatch that allows operators to hard-delete resource and subresource records from the database when the normal deletion flow is blocked.
 

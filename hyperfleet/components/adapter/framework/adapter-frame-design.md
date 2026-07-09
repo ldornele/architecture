@@ -68,6 +68,8 @@ This document describes the design of the HyperFleet Adapter Framework, a config
 - [Adapter Metrics](./adapter-metrics.md) - Required metrics for observability and monitoring
 - [Adapter Design Decisions](./adapter-design-decisions.md) - Architecture decisions and trade-offs
 - [Adapter Deployment Guide](./adapter-deployment.md) - Deployment and operations guide
+- [Adapter Lifecycle: Deletion](./lifecycle/adapter-lifecycle-delete-design.md) - Per-resource conditional deletion
+- [Adapter Lifecycle: Creation](./lifecycle/adapter-lifecycle-create-design.md) - Per-resource conditional creation
 
 ## Architecture
 

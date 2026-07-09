@@ -15,7 +15,7 @@ Last Updated: 2026-04-23
 | **Soft Deletion** | Setting `deleted_time` (and `deleted_by`) on a resource to signal deletion intent. The resource remains in the database while adapters clean up Kubernetes resources. API resources in this state are pending for deletion. |
 | **Hard Delete** | Permanently removing resource, subresource, and adapter status rows from the database. The data is gone and cannot be recovered. Triggered when `deleted_time` is set and `Reconciled=True`. |
 
-> See [Adapter Deletion Flow Design § Terminology](../adapter/framework/adapter-deletion-flow-design.md#terminology) for the full terminology table including soft-delete disambiguation.
+> See [Adapter Deletion Flow Design § Terminology](../adapter/framework/lifecycle/adapter-lifecycle-delete-design.md#terminology) for the full terminology table including soft-delete disambiguation.
 
 ## What & Why
 
@@ -26,7 +26,7 @@ Last Updated: 2026-04-23
 **Related Documentation:**
 
 - [ADR 0012 — Hard-Delete Ownership and Execution](../../adrs/0012-hard-delete-mechanism-after-adapter-reconciliation.md) — architectural decision and alternatives
-- [Adapter Deletion Flow Design](../adapter/framework/adapter-deletion-flow-design.md) — adapter-side cleanup, status reporting, and DSL changes
+- [Adapter Deletion Flow Design](../adapter/framework/lifecycle/adapter-lifecycle-delete-design.md) — adapter-side cleanup, status reporting, and DSL changes
 - [API Service Design](./api-service.md) — API service architecture
 
 ### Scope
@@ -39,7 +39,7 @@ Last Updated: 2026-04-23
 
 ### Out of Scope
 
-- **Pending deletion** (setting `deleted_time`, cascading to subresources) — covered by [Adapter Deletion Flow Design](../adapter/framework/adapter-deletion-flow-design.md)
+- **Pending deletion** (setting `deleted_time`, cascading to subresources) — covered by [Adapter Deletion Flow Design](../adapter/framework/lifecycle/adapter-lifecycle-delete-design.md)
 - **Force deletion** — covered by [Force Deletion Design](../../docs/force-deletion-design.md)
 - **Retention window + CronJob** — viable but deferred; see [ADR 0012 Alternatives](../../adrs/0012-hard-delete-mechanism-after-adapter-reconciliation.md#alternatives-considered)
 
@@ -165,7 +165,7 @@ For large clusters (500+ nodepools), the cluster adapter will repeatedly report 
 Deletion observability is tracked by [HYPERFLEET-856](https://redhat.atlassian.net/browse/HYPERFLEET-856). For existing conventions and deletion-specific areas to instrument, see:
 
 - [Adapter Metrics](../adapter/framework/adapter-metrics.md) — MVP adapter metrics specification
-- [Adapter Deletion Flow Design § Observability](../adapter/framework/adapter-deletion-flow-design.md#observability) — deletion-specific metric areas (adapter-level and API-level)
+- [Adapter Deletion Flow Design § Observability](../adapter/framework/lifecycle/adapter-lifecycle-delete-design.md#observability) — deletion-specific metric areas (adapter-level and API-level)
 - [Metrics Standard](../../standards/metrics.md) — cross-component Prometheus naming and label conventions
 
 ---
@@ -185,7 +185,7 @@ Deletion observability is tracked by [HYPERFLEET-856](https://redhat.atlassian.n
 ### What We Lose / What Gets Harder
 
 - No `GET` after hard-delete — investigation requires log tooling
-- Premature `Finalized=True` from adapter bug = permanent data loss (mitigated by Health guard in post-processing that prevents `Finalized=True` when executor didn't complete successfully, and adapters reporting `Finalized=False` with reason `AdapterUnhealthy` when cleanup cannot be confirmed — see [Adapter Deletion Flow Design § Deletion Error Reporting](../adapter/framework/adapter-deletion-flow-design.md#deletion-error-reporting-11))
+- Premature `Finalized=True` from adapter bug = permanent data loss (mitigated by Health guard in post-processing that prevents `Finalized=True` when executor didn't complete successfully, and adapters reporting `Finalized=False` with reason `AdapterUnhealthy` when cleanup cannot be confirmed — see [Adapter Deletion Flow Design § Deletion Error Reporting](../adapter/framework/lifecycle/adapter-lifecycle-delete-design.md#deletion-error-reporting-11))
 - For large clusters, adapter re-reporting generates load proportional to Sentinel polling frequency × nodepool cleanup duration
 
 ### Acceptable Because
@@ -206,6 +206,6 @@ See [ADR 0012 — Alternatives Considered](../../adrs/0012-hard-delete-mechanism
 ## References
 
 - [ADR 0012 — Hard-Delete Ownership and Execution](../../adrs/0012-hard-delete-mechanism-after-adapter-reconciliation.md)
-- [Adapter Deletion Flow Design](../adapter/framework/adapter-deletion-flow-design.md)
+- [Adapter Deletion Flow Design](../adapter/framework/lifecycle/adapter-lifecycle-delete-design.md)
 - [HYPERFLEET-904](https://redhat.atlassian.net/browse/HYPERFLEET-904) — SPIKE: Design API hard-deletion mechanism
 - [HYPERFLEET-560](https://issues.redhat.com/browse/HYPERFLEET-560) — SPIKE: Design deletion flow between API and Adapters

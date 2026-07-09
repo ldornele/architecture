@@ -238,7 +238,7 @@ When accessing optional/nested fields (like `data`), use the **safe navigation o
 
 **Why**: The optional `?` operator safely accesses maps without errors on missing keys. Combined with `hasValue()` (for existence checks) and `orValue(default)` (for safe access with defaults), this pattern handles all states: key missing, key with nil value, key with value.
 
-**Reference**: See [Adapter Framework — CEL resource presence pattern](../adapter/framework/adapter-deletion-flow-design.md#example-task-config-with-deletion) for detailed rationale on why `has()` and direct access are unsafe.
+**Reference**: See [Adapter Framework — CEL resource presence pattern](../adapter/framework/lifecycle/adapter-lifecycle-delete-design.md#example-task-config-with-deletion) for detailed rationale on why `has()` and direct access are unsafe.
 
 **Field Allowlist**: All condition fields are exposed to CEL, including the six standard fields (`type`, `status`, `reason`, `message`, `observed_generation`, `last_transition_time`), `adapter`, and `data` (adapter-specific JSONB). **Operator Responsibility**: The `data` field may contain sensitive information (API tokens, internal IPs, credentials). Operators configuring mapping rules are responsible for ensuring that sensitive data is not exposed to external consumers via mapped conditions. Use safe navigation (`c.?data.?field.hasValue()` / `orValue(default)`) when accessing optional fields. Test mapping rules thoroughly in non-production environments before deploying to production.
 
