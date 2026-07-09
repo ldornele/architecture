@@ -93,3 +93,4 @@ What did we decide? State it plainly.
 | [0015](0015-eventual-consistency-for-read-path.md) | Eventual Consistency for the API Read Path | Active | 2026-05-08 |
 | [0016](0016-helm-oci-distribution.md) | Helm OCI Distribution via Konflux | Active | 2026-05-11 |
 | [0017](0017-adapter-error-taxonomy.md) | Selective Message Acknowledgment in Adapters | Active | 2026-05-25 |
+| [0018](0018-e2e-jwt-tls-architecture.md) | E2E JWT/TLS Architecture | Active | 2026-07-07 |
