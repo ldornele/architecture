@@ -79,10 +79,10 @@ sequenceDiagram
     participant K8s as Kubernetes API
     participant API as hyperfleet-api<br/>(inside cluster)
 
-    E2E->>K8s: kubectl create token hyperfleet-e2e-sa<br/>--audience hyperfleet-api --duration 1h
+    E2E->>K8s: kubectl create token hyperfleet-e2e-sa<br/>--namespace e2e-${RUN_ID} --audience hyperfleet-api --duration 1h
     K8s->>E2E: Returns service account JWT token
     E2E->>E2E: export HYPERFLEET_API_TOKEN=<token>
-    E2E->>K8s: kubectl port-forward svc/hyperfleet-api 8000:8000
+    E2E->>K8s: kubectl port-forward -n e2e-${RUN_ID}<br/>svc/hyperfleet-api 8000:8000
     E2E->>API: HTTP GET /clusters<br/>Authorization: Bearer <token>
     API->>K8s: Validate JWT signature (TokenReview API)
     K8s->>API: Token valid, subject: system:serviceaccount:e2e-xxx:hyperfleet-e2e-sa
@@ -102,7 +102,7 @@ Read token from `HYPERFLEET_API_TOKEN` environment variable and inject in `Autho
 - ✅ JWT claims extraction (`sub` → caller identity as `system:serviceaccount:namespace:sa-name`)
 - ✅ Audit fields populated correctly (`created_by`, `updated_by`, `deleted_by`) using service account subject — see [v1.0.0 Upgrade Guide §1.4](../docs/release/v0.2.0-to-v1.0.0-upgrade-guide.md#14-jwt-identity-claim-for-audit-fields) for JWT identity claim mapping
 - ✅ 401 responses for invalid/missing tokens on **all** requests (GET and mutating) — per v1.0.0, valid JWT required for all operations
-- ✅ Token expiration behavior (tokens generated with 1h duration via `kubectl create token --duration 1h`)
+- ✅ Token expiration configuration (tokens generated with 1h duration via `kubectl create token --duration 1h`)
 - ❌ TLS termination (infrastructure responsibility, out of scope)
 - ❌ Certificate validation (infrastructure responsibility, out of scope)
 - ❌ External user OIDC authentication (E2E tests validate internal service-to-service auth only)
