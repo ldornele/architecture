@@ -1,7 +1,7 @@
 ---
 Status: Active
 Owner: HyperFleet Platform Team
-Last Updated: 2026-07-07
+Last Updated: 2026-07-10
 ---
 
 # 0018 — E2E JWT/TLS Architecture
@@ -35,43 +35,29 @@ This means:
 **E2E tests will use Kubernetes-native authentication that mirrors how Sentinel and Adapters authenticate to the API:**
 
 1. **No application-level TLS testing** — Infrastructure handles TLS termination; E2E tests connect via HTTP to the API (matching production pod behavior)
-2. **Use Kubernetes Service Account Tokens for JWT authentication** — E2E test pods mount projected service account tokens with `audience: hyperfleet-api`, matching the authentication mechanism used by Sentinel and Adapters
+2. **Use Kubernetes Service Account Tokens for JWT authentication** — Ginkgo tests run **outside the cluster** (developer laptops / CI runners) and use `kubectl create token` to generate service account tokens with `audience: hyperfleet-api`
 3. **Test the API contract, not infrastructure** — Validate HTTP + JWT authentication flow, not TLS/certificate handling
 
 ### Implementation Details
 
-**Service Account Token Configuration:**
+**Test Execution Model:**
 
-E2E test pods will mount Kubernetes service account tokens using projected volumes, the same mechanism used by Sentinel and Adapters:
+Ginkgo E2E tests run **outside the Kubernetes cluster** (developer laptops / CI runners). Only infrastructure components (API, Sentinel, Adapters) run as pods inside the test namespace.
 
-```yaml
-# E2E test pod configuration
-apiVersion: v1
-kind: Pod
-metadata:
-  name: hyperfleet-e2e-test
-  namespace: hyperfleet-e2e
-spec:
-  serviceAccountName: hyperfleet-e2e-sa
-  containers:
-    - name: test
-      image: hyperfleet-e2e:latest
-      volumeMounts:
-        - name: api-token
-          mountPath: /var/run/secrets/hyperfleet-api
-          readOnly: true
-      env:
-        - name: HYPERFLEET_API_TOKEN_PATH
-          value: /var/run/secrets/hyperfleet-api/token
-  volumes:
-    - name: api-token
-      projected:
-        sources:
-          - serviceAccountToken:
-              audience: hyperfleet-api
-              expirationSeconds: 3600
-              path: token
+**Token Generation:**
+
+```bash
+# Generate service account token from outside the cluster
+export HYPERFLEET_API_TOKEN=$(kubectl create token hyperfleet-e2e-sa \
+  --namespace e2e-${RUN_ID} \
+  --audience hyperfleet-api \
+  --duration 1h)
+
+# Run Ginkgo tests with token
+ginkgo run ./test/e2e
 ```
+
+**Note:** Infrastructure pods (Sentinel/Adapters) use projected service account token volumes as documented in their component designs. E2E tests use `kubectl create token` because they run externally.
 
 **API Configuration** remains unchanged — the API validates service account tokens signed by the Kubernetes cluster:
 
@@ -89,47 +75,25 @@ config:
 
 ```mermaid
 sequenceDiagram
+    participant E2E as E2E Test Runner<br/>(external)
     participant K8s as Kubernetes API
-    participant Test as E2E Test Pod
-    participant Client as API Client
-    participant API as hyperfleet-api
+    participant API as hyperfleet-api<br/>(inside cluster)
 
-    K8s->>Test: Mount service account token via projected volume
-    Test->>Test: Read token from /var/run/secrets/hyperfleet-api/token
-    Test->>Client: Inject Authorization: Bearer <token>
-    Client->>API: Make API calls with service account JWT
+    E2E->>K8s: kubectl create token hyperfleet-e2e-sa<br/>--audience hyperfleet-api --duration 1h
+    K8s->>E2E: Returns service account JWT token
+    E2E->>E2E: export HYPERFLEET_API_TOKEN=<token>
+    E2E->>K8s: kubectl port-forward svc/hyperfleet-api 8000:8000
+    E2E->>API: HTTP GET /clusters<br/>Authorization: Bearer <token>
     API->>K8s: Validate JWT signature (TokenReview API)
-    K8s->>API: Token valid, subject: system:serviceaccount:hyperfleet-e2e:hyperfleet-e2e-sa
+    K8s->>API: Token valid, subject: system:serviceaccount:e2e-xxx:hyperfleet-e2e-sa
     API->>API: Extract identity from subject claim
-    API->>Test: Return response
-    Test->>Test: Verify audit fields
+    API->>E2E: Return clusters (audit fields populated)
+    E2E->>E2E: Ginkgo assertions verify response
 ```
 
 **E2E Client Changes** (in [hyperfleet-e2e](https://gitlab.cee.redhat.com/service/hyperfleet/hyperfleet-e2e) repository):
 
-Modify `pkg/client/client.go` to read service account token from mounted volume:
-
-```go
-// Example implementation in hyperfleet-e2e repository (not this architecture repo)
-type APIConfig struct {
-    URL            string
-    JWTEnabled     bool   // Enable JWT authentication
-    TokenPath      string // Path to service account token file (default: /var/run/secrets/hyperfleet-api/token)
-}
-
-// NewClient reads the service account token and injects it in all requests
-func NewClient(cfg APIConfig) (*Client, error) {
-    var token string
-    if cfg.JWTEnabled {
-        tokenBytes, err := os.ReadFile(cfg.TokenPath)
-        if err != nil {
-            return nil, fmt.Errorf("failed to read service account token: %w", err)
-        }
-        token = string(tokenBytes)
-    }
-    // ... inject token in Authorization header for all requests
-}
-```
+Read token from `HYPERFLEET_API_TOKEN` environment variable and inject in `Authorization: Bearer` header for all requests.
 
 **Test Coverage:**
 
@@ -138,7 +102,7 @@ func NewClient(cfg APIConfig) (*Client, error) {
 - ✅ JWT claims extraction (`sub` → caller identity as `system:serviceaccount:namespace:sa-name`)
 - ✅ Audit fields populated correctly (`created_by`, `updated_by`, `deleted_by`) using service account subject — see [v1.0.0 Upgrade Guide §1.4](../docs/release/v0.2.0-to-v1.0.0-upgrade-guide.md#14-jwt-identity-claim-for-audit-fields) for JWT identity claim mapping
 - ✅ 401 responses for invalid/missing tokens on **all** requests (GET and mutating) — per v1.0.0, valid JWT required for all operations
-- ✅ Token refresh behavior (tokens auto-rotate every 3600s via projected volume)
+- ✅ Token expiration behavior (tokens generated with 1h duration via `kubectl create token --duration 1h`)
 - ❌ TLS termination (infrastructure responsibility, out of scope)
 - ❌ Certificate validation (infrastructure responsibility, out of scope)
 - ❌ External user OIDC authentication (E2E tests validate internal service-to-service auth only)
@@ -147,40 +111,41 @@ func NewClient(cfg APIConfig) (*Client, error) {
 
 **Gains:**
 
-- ✅ **Kubernetes-native** — Uses built-in service account token projection; no additional infrastructure to deploy/maintain
-- ✅ **Aligned with Sentinel/Adapters** — E2E tests use the exact same authentication mechanism as production components (service account tokens with `audience: hyperfleet-api`)
-- ✅ **Real JWT validation** — Tests validate actual Kubernetes-signed tokens, not mocked credentials
-- ✅ **Automatic token rotation** — Projected tokens auto-refresh; tests validate token expiration/renewal behavior
-- ✅ **Simpler E2E infrastructure** — Eliminates mock OIDC server deployment, configuration, and maintenance
-- ✅ **Cloud-agnostic** — Works in any Kubernetes cluster (GKE, EKS, AKS, on-premises, kind for local development)
-- ✅ **No new local dependencies** — Leverages existing kind cluster infrastructure already required for E2E tests
+- ✅ **Kubernetes-native** — Uses built-in TokenRequest API via `kubectl create token`
+- ✅ **Real JWT validation** — Tests validate actual Kubernetes-signed tokens, not mocks
+- ✅ **Ephemeral tokens** — Generated on-demand with 1h expiration, not stored in cluster
+- ✅ **Zero infrastructure** — No pods for token extraction, no mock OIDC server deployment
+- ✅ **Cloud-agnostic** — Works in any Kubernetes 1.24+ cluster (GKE, EKS, AKS, kind)
+- ✅ **Fast** — Token generation in ~100ms vs ~5-10s for Job-based approaches
 
 **Trade-offs:**
 
-- ⚠️ **Only tests service-to-service authentication** — E2E tests validate internal component authentication (service accounts) but not external user authentication via OIDC providers (acceptable because E2E tests focus on API behavior, not end-user identity flows)
-- ⚠️ **Service account identity format** — Audit fields will show `system:serviceaccount:namespace:sa-name` instead of human-readable emails (acceptable for E2E test validation; production user flows tested separately)
-- ⚠️ **No TLS/certificate testing** — E2E tests don't validate TLS termination or certificate handling (acceptable because this is infrastructure responsibility, tested separately)
-
-**Note:** Service account tokens work natively in kind clusters, which are already the minimum infrastructure requirement for E2E tests per the [E2E Run Strategy](../docs/e2e-testing/e2e-run-strategy-spike-report.md). No additional local setup is needed beyond the existing kind-based test environment.
+- ⚠️ **Service-to-service auth only** — Tests validate service account authentication, not external user OIDC flows
+- ⚠️ **Service account identity format** — Audit fields show `system:serviceaccount:namespace:sa-name` instead of user emails
+- ⚠️ **No TLS testing** — Infrastructure-level TLS termination is out of scope for E2E tests
+- ⚠️ **Requires kubectl 1.24+** — Kind and modern CI/CD environments already meet this requirement
 
 ## Alternatives Considered
 
 | Alternative | Why Rejected |
 |-------------|--------------|
-| **Deploy Mock OIDC server (e.g., oauth2-mock-server)** | ⚠️ **Changed to Accepted during review** — Initially proposed but replaced with service account tokens after feedback that Sentinel/Adapters already use this mechanism. Mock OIDC adds unnecessary infrastructure when Kubernetes provides native JWT authentication. Service account tokens align E2E tests with production component authentication. |
-| **Use GCP Identity Tokens for E2E tests** | ❌ Violates cloud-agnostic principle — creates hard dependency on GCP. Cannot run tests locally without GCP authentication. Cannot run in AWS or Azure CI/CD environments. Contradicts Office Hours decision: "do not rely on specific cloud provider behaviors". |
-| **Implement application-level TLS in hyperfleet-api** | ❌ Production uses infrastructure-level TLS termination (Ingress/Service Mesh). Application pods receive HTTP traffic. Testing app-level TLS would test non-production behavior. |
-| **Skip JWT testing entirely in E2E** | ❌ Leaves gap between test and production. Audit field population (`created_by`, `updated_by`, `deleted_by`) wouldn't be validated. Authentication contract wouldn't be tested. |
-| **Use external OIDC provider (Keycloak, Dex)** | ❌ Adds operational complexity and external dependencies. Service account tokens are simpler, Kubernetes-native, and already proven in Sentinel/Adapters. |
+| **Job-based token extraction** | ❌ Requires deploying Job pod, waiting ~5-10s, writing to annotation. `kubectl create token` achieves same result in ~100ms with zero resources. |
+| **Mock OIDC server** | ❌ Unnecessary infrastructure. Kubernetes provides native JWT authentication via service account tokens. |
+| **GCP Identity Tokens** | ❌ Violates cloud-agnostic principle. Cannot run locally or in AWS/Azure CI/CD. |
+| **Application-level TLS** | ❌ Production uses infrastructure-level TLS termination. Would test non-production behavior. |
+| **Skip JWT testing** | ❌ Leaves gap in authentication contract testing. Audit fields wouldn't be validated. |
+| **External OIDC (Keycloak, Dex)** | ❌ Adds operational complexity. Service account tokens are simpler and Kubernetes-native. |
 
 ---
 
 ## References
 
 - **JIRA Tickets**:
-  - [HYPERFLEET-1235](https://redhat.atlassian.net/browse/HYPERFLEET-1235) — Investigation
+  - [HYPERFLEET-1235](https://redhat.atlassian.net/browse/HYPERFLEET-1235) — Investigation and ADR creation
+  - [HYPERFLEET-1342](https://redhat.atlassian.net/browse/HYPERFLEET-1342) — Implementation of `kubectl create token` approach
   - [HYPERFLEET-1146](https://redhat.atlassian.net/browse/HYPERFLEET-1146) — Original E2E security gap identification
 - **External Resources**:
-  - [Kubernetes Service Account Token Projection](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#serviceaccount-token-volume-projection) — Official K8s documentation
+  - [kubectl create token documentation](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-token-em-) — Official kubectl command reference
+  - [Kubernetes TokenRequest API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-request-v1/) — JWT generation and validation mechanism
+  - [Kubernetes Service Account Token Projection](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#serviceaccount-token-volume-projection) — How infrastructure pods (Sentinel/Adapters) mount tokens
   - [RFC 7519 - JWT](https://datatracker.ietf.org/doc/html/rfc7519) — JWT specification
-  - [Kubernetes TokenReview API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-review-v1/) — JWT validation mechanism
