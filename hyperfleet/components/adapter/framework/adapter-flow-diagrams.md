@@ -315,7 +315,7 @@ flowchart LR
 
 ## Deletion Flow
 
-For full design details, see [Adapter Deletion Flow Design (Draft)](./adapter-deletion-flow-design.md).
+For full design details, see [Adapter Deletion Flow Design (Draft)](./lifecycle/adapter-lifecycle-delete-design.md).
 
 ### End-to-End Deletion Sequence
 

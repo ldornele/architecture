@@ -8,7 +8,7 @@ Last Updated: 2026-04-23
 
 ## Context
 
-HyperFleet API resources (clusters, nodepools...) are the source of truth for Sentinel and adapters. When a user deletes a resource, the API sets `deleted_time` to signal deletion intent — this is **soft deletion**. The resource stays in the database while adapters clean up the Kubernetes infrastructure they created. The [Adapter Deletion Flow Design](../components/adapter/framework/adapter-deletion-flow-design.md) covers this phase. Once adapters confirm cleanup is complete, the API resource and its associated records must be permanently removed from the database — this is **hard deletion**, and what this ADR decides.
+HyperFleet API resources (clusters, nodepools...) are the source of truth for Sentinel and adapters. When a user deletes a resource, the API sets `deleted_time` to signal deletion intent — this is **soft deletion**. The resource stays in the database while adapters clean up the Kubernetes infrastructure they created. The [Adapter Deletion Flow Design](../components/adapter/framework/lifecycle/adapter-lifecycle-delete-design.md) covers this phase. Once adapters confirm cleanup is complete, the API resource and its associated records must be permanently removed from the database — this is **hard deletion**, and what this ADR decides.
 
 **The ownership question:** A cluster can have multiple required adapters. A single adapter only knows about its own resources, not whether sibling adapters have finished. No individual adapter can own hard-delete.
 
@@ -26,7 +26,7 @@ The **service layer enforces bottom-up ordering**: a cluster cannot reach `Recon
 
 **Gains:** Small implementation scope (few lines in API status path); atomic transaction prevents partial-deletes; service-layer check prevents race condition by verifying nodepools are gone; clean database at scale; no new infrastructure; natural retry via Sentinel; consistent with Kubernetes finalizer semantics.
 
-**Trade-offs:** No `GET` after hard-delete (investigation requires log tooling); premature `Finalized=True` from adapter bug = permanent data loss (mitigated by Health guard — see [Adapter Deletion Flow Design](../components/adapter/framework/adapter-deletion-flow-design.md#deletion-error-reporting-11)). Future event streaming for audits can be added without changing this mechanism.
+**Trade-offs:** No `GET` after hard-delete (investigation requires log tooling); premature `Finalized=True` from adapter bug = permanent data loss (mitigated by Health guard — see [Adapter Deletion Flow Design](../components/adapter/framework/lifecycle/adapter-lifecycle-delete-design.md#deletion-error-reporting-11)). Future event streaming for audits can be added without changing this mechanism.
 
 ## Alternatives Considered
 
