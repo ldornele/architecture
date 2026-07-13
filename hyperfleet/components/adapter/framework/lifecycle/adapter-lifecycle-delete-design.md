@@ -33,9 +33,9 @@ Last Updated: 2026-04-12
 
 **Related Documentation:**
 
-- [Adapter Framework Design](./adapter-frame-design.md) - Current framework architecture
-- [Adapter Status Contract](./adapter-status-contract.md) - Status reporting patterns
-- [Adapter Flow Diagrams](./adapter-flow-diagrams.md) - Current event flow
+- [Adapter Framework Design](../adapter-frame-design.md) - Current framework architecture
+- [Adapter Status Contract](../adapter-status-contract.md) - Status reporting patterns
+- [Adapter Flow Diagrams](../adapter-flow-diagrams.md) - Current event flow
 
 ### Scope
 
@@ -47,8 +47,8 @@ Last Updated: 2026-04-12
 
 ### Out of Scope
 
-- **Force deletion** — covered by [Force Deletion Design](../../../docs/force-deletion-design.md)
-- **API hard-deletion mechanism** — the actor and pattern for hard-deleting DB records (inline, background job, customer-triggered, retention window) is covered by [HYPERFLEET-904](https://redhat.atlassian.net/browse/HYPERFLEET-904) — see [Hard-Delete Design](../../api-service/hard-delete-design.md)
+- **Force deletion** — covered by [Force Deletion Design](../../../../docs/force-deletion-design.md)
+- **API hard-deletion mechanism** — the actor and pattern for hard-deleting DB records (inline, background job, customer-triggered, retention window) is covered by [HYPERFLEET-904](https://redhat.atlassian.net/browse/HYPERFLEET-904) — see [Hard-Delete Design](../../../api-service/hard-delete-design.md)
 - Cleanup job support (run a job before deleting resources) — future enhancement
 - Per-resource deletion retry — Sentinel reconciliation loop re-triggers the full adapter; fine-grained per-resource retry is a future enhancement
 - Deletion cancellation — not supported in 1.0.0
@@ -65,7 +65,7 @@ Last Updated: 2026-04-12
 
 Deletion is a two-step process: **mark for deletion** (set `deleted_time`), then **hard delete** (remove DB records after cleanup). The existing Sentinel polling and adapter event flow handles everything in between — no new event types or Sentinel changes needed.
 
-See the [End-to-End Deletion Sequence diagram](./adapter-flow-diagrams.md#end-to-end-deletion-sequence) for the full 4-phase visual walkthrough:
+See the [End-to-End Deletion Sequence diagram](../adapter-flow-diagrams.md#end-to-end-deletion-sequence) for the full 4-phase visual walkthrough:
 
 1. **Mark for deletion** — User calls `DELETE /resources/{id}`, API sets `deleted_time` on resource + subresources, increments `generation`
 2. **Event propagation** — Sentinels detect the generation change and publish CloudEvents (same format as creation)
@@ -90,7 +90,7 @@ The API hard-deletes records bottom-up:
 - **Subresource records**: deleted when `deleted_time` is set and subresource `Reconciled=True`
 - **Resource record**: deleted when `deleted_time` is set, resource `Reconciled=True`, and all subresource records are already gone
 
-See the [API Delete Signal diagram](./adapter-flow-diagrams.md#api-delete-signal-hierarchical) for the full flowchart.
+See the [API Delete Signal diagram](../adapter-flow-diagrams.md#api-delete-signal-hierarchical) for the full flowchart.
 
 ### Sentinel Behavior
 
@@ -409,7 +409,7 @@ The hard-delete gate is always: `deleted_time` set + `Reconciled=True`. Optional
 
 ### API Hard-Delete Signal
 
-This section defines **when** hard deletion happens (the gate conditions). **How** the API performs hard deletion (the actor, retention window, failure handling) is a separate concern covered by [Hard-Delete Design](../../api-service/hard-delete-design.md) ([HYPERFLEET-904](https://redhat.atlassian.net/browse/HYPERFLEET-904)).
+This section defines **when** hard deletion happens (the gate conditions). **How** the API performs hard deletion (the actor, retention window, failure handling) is a separate concern covered by [Hard-Delete Design](../../../api-service/hard-delete-design.md) ([HYPERFLEET-904](https://redhat.atlassian.net/browse/HYPERFLEET-904)).
 
 The API hard-deletes records hierarchically — subresources first, then the resource.
 
@@ -608,7 +608,7 @@ post:
 
 ### Subresource Deletion
 
-Subresources are cleaned up before the resource (hierarchical hard-delete). See [Resource + Subresource Deletion Flow diagram](./adapter-flow-diagrams.md#resource--subresource-deletion-flow).
+Subresources are cleaned up before the resource (hierarchical hard-delete). See [Resource + Subresource Deletion Flow diagram](../adapter-flow-diagrams.md#resource--subresource-deletion-flow).
 
 1. API marks resource AND all subresources for deletion simultaneously (sets `deleted_time`)
 2. Resource-level and subresource-level adapters clean up **in parallel**
@@ -617,7 +617,7 @@ Subresources are cleaned up before the resource (hierarchical hard-delete). See 
 
 ### Observability
 
-Deletion introduces new observable states that should be tracked alongside existing adapter metrics (see [Adapter Metrics](./adapter-metrics.md)).
+Deletion introduces new observable states that should be tracked alongside existing adapter metrics (see [Adapter Metrics](../adapter-metrics.md)).
 
 Key areas to instrument:
 
@@ -638,7 +638,7 @@ Detailed metric naming, labels, alert thresholds, and SLO/SLI definitions will b
 | 2 | **Stale Applied=False before `deleted_time`** | **API gates on aggregate `Reconciled` (computed from adapter `Finalized`), never on individual adapter `Applied`** | **Critical** |
 | 3 | Creation in-flight when deletion starts | Discovery handles naturally on next event | Low |
 | 4 | Which adapters must confirm? | Only adapters with existing status entries | Medium |
-| 5 | Stuck in Finalizing (`deleted_time` set but can't hard-delete) | Configurable timeout + alerting (see [Force Deletion Design](../../../docs/force-deletion-design.md)) | Medium |
+| 5 | Stuck in Finalizing (`deleted_time` set but can't hard-delete) | Configurable timeout + alerting (see [Force Deletion Design](../../../../docs/force-deletion-design.md)) | Medium |
 | 6 | Concurrent deletion events | Idempotent operations, K8s handles safely | Low |
 | 7 | Independent subresource deletion | Same pattern, check subresource `deleted_time` | Low |
 | 8 | Cancel deletion | Not cancellable in 1.0.0 | Low |
@@ -718,7 +718,7 @@ No grace period is needed — deletion `Reconciled` remains `False` until all ad
 
 #### Stuck in Finalizing (#5)
 
-See [Force Deletion Design](../../../docs/force-deletion-design.md).
+See [Force Deletion Design](../../../../docs/force-deletion-design.md).
 
 #### Concurrent Events During Deletion (#6)
 
@@ -845,6 +845,8 @@ Not required. Each adapter only cleans up its own resources. Unlike creation (wh
 
 **Why Not Chosen**: While more flexible, this approach adds more DSL complexity than needed for the deletion use case. The `lifecycle.delete` approach is purpose-built for deletion, clearly communicating intent without introducing a generic action dispatch mechanism.
 
+**Update (HYPERFLEET-1295)**: A `lifecycle.create.when` block was later added for resource-level conditional creation — see [Adapter Lifecycle: Creation](./adapter-lifecycle-create-design.md). This does not reverse the rejection above: it reuses the same purpose-built, operation-scoped `lifecycle.<operation>.when` shape established here for deletion, rather than introducing the generic `when` + `action` dispatcher that was rejected.
+
 ---
 
 ## Migration & Compatibility
@@ -899,6 +901,6 @@ Existing adapters continue to work unchanged during rollout — deletion support
 - [HYPERFLEET-560](https://issues.redhat.com/browse/HYPERFLEET-560) - SPIKE: Design deletion flow between API and Adapters
 - [HYPERFLEET-543](https://issues.redhat.com/browse/HYPERFLEET-543) - Implement Cluster DELETE endpoint with cascade cleanup
 - [HYPERFLEET-544](https://issues.redhat.com/browse/HYPERFLEET-544) - Implement NodePool DELETE endpoint
-- [HYPERFLEET-904](https://redhat.atlassian.net/browse/HYPERFLEET-904) - SPIKE: Design API hard-deletion mechanism — see [Hard-Delete Design](../../api-service/hard-delete-design.md)
+- [HYPERFLEET-904](https://redhat.atlassian.net/browse/HYPERFLEET-904) - SPIKE: Design API hard-deletion mechanism — see [Hard-Delete Design](../../../api-service/hard-delete-design.md)
 - [Maestro Resource Deletion](https://github.com/openshift-online/maestro) - Two-phase deletion pattern reference
 - [Kubernetes Deletion](https://kubernetes.io/docs/concepts/architecture/garbage-collection/) - Kubernetes garbage collection and propagation policies

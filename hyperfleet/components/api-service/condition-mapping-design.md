@@ -33,7 +33,7 @@ Last Updated: 2026-05-25
 
 - **Current Status Aggregation**: [ADR-0008 — Dynamic Status Aggregation](../../adrs/0008-dynamic-status-aggregation.md) — aggregation computed on write path; [ADR-0007 — Conditions-Based Status Model](../../adrs/0007-conditions-based-status-model.md) — ResourceCondition and AdapterCondition contracts; [Status Guide](../../docs/status-guide.md) — condition reporting and validation rules
 - [API Service Design](./api-service.md) — API architecture and service layer patterns
-- [Sentinel Message Decision Config](../sentinel/sentinel.md) — Existing CEL usage in Sentinel
+- [Sentinel Decision Engine Reference](https://github.com/openshift-hyperfleet/hyperfleet-sentinel/blob/main/docs/decision-engine.md) — Existing CEL usage in Sentinel
 - [Adapter Framework Design](../adapter/framework/adapter-frame-design.md) — Existing CEL usage in adapters (Config Loader and Criteria Evaluator sections)
 
 ### Scope
@@ -238,7 +238,7 @@ When accessing optional/nested fields (like `data`), use the **safe navigation o
 
 **Why**: The optional `?` operator safely accesses maps without errors on missing keys. Combined with `hasValue()` (for existence checks) and `orValue(default)` (for safe access with defaults), this pattern handles all states: key missing, key with nil value, key with value.
 
-**Reference**: See [Adapter Framework — CEL resource presence pattern](../adapter/framework/adapter-deletion-flow-design.md#example-task-config-with-deletion) for detailed rationale on why `has()` and direct access are unsafe.
+**Reference**: See [Adapter Framework — CEL resource presence pattern](../adapter/framework/lifecycle/adapter-lifecycle-delete-design.md#example-task-config-with-deletion) for detailed rationale on why `has()` and direct access are unsafe.
 
 **Field Allowlist**: All condition fields are exposed to CEL, including the six standard fields (`type`, `status`, `reason`, `message`, `observed_generation`, `last_transition_time`), `adapter`, and `data` (adapter-specific JSONB). **Operator Responsibility**: The `data` field may contain sensitive information (API tokens, internal IPs, credentials). Operators configuring mapping rules are responsible for ensuring that sensitive data is not exposed to external consumers via mapped conditions. Use safe navigation (`c.?data.?field.hasValue()` / `orValue(default)`) when accessing optional fields. Test mapping rules thoroughly in non-production environments before deploying to production.
 
@@ -503,5 +503,5 @@ mappings:
 - [Status Guide](../../docs/status-guide.md)
 - [Error Model Standard](../../standards/error-model.md)
 - [Logging Standard](../../standards/logging-specification.md)
-- [Sentinel Message Decision Config](../sentinel/sentinel.md)
+- [Sentinel Decision Engine Reference](https://github.com/openshift-hyperfleet/hyperfleet-sentinel/blob/main/docs/decision-engine.md)
 - [Adapter Framework Design](../adapter/framework/adapter-frame-design.md)
