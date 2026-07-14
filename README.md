@@ -175,6 +175,8 @@ architecture/
 | | [Helm Chart Conventions](hyperfleet/standards/helm-chart-conventions.md) | Chart structure, values schema, and naming conventions |
 | **Process** | [Ticket Hygiene](hyperfleet/standards/ticket-hygiene.md) | JIRA ticket field requirements and sprint readiness |
 
+**See also**: [Observability Reference](hyperfleet/docs/observability.md) — consolidated metrics reference for all HyperFleet components
+
 **When to update**: When a standard changes or a new cross-cutting rule is introduced
 
 ---
