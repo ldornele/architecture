@@ -6,7 +6,7 @@ Last Updated: 2026-07-13
 
 # HyperFleet Observability Reference
 
-Consolidated reference for metrics and monitoring across all HyperFleet components.
+Consolidated reference for metrics and monitoring across HyperFleet's deployable components.
 
 ---
 
