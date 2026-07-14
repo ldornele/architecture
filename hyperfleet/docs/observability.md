@@ -60,7 +60,7 @@ Detailed metric definitions are documented in each component's repository:
 ### Sentinel
 
 - **Repository**: [hyperfleet-sentinel](https://github.com/openshift-hyperfleet/hyperfleet-sentinel)
-- **Metrics Documentation**: `docs/sentinel-operator-guide.md` in repository
+- **Metrics Documentation**: `docs/metrics.md` in repository
 - **Architecture Doc**: [sentinel.md](../components/sentinel/sentinel.md)
 - **Metrics Port**: `:9090/metrics`
 
