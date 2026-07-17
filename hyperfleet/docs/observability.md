@@ -45,6 +45,7 @@ HyperFleet's deployable components expose:
 | **Adapter Framework** | [hyperfleet-adapter](https://github.com/openshift-hyperfleet/hyperfleet-adapter) | `:9090/metrics` | `:8080/healthz`, `:8080/readyz` | [docs/metrics.md](https://github.com/openshift-hyperfleet/hyperfleet-adapter/blob/main/docs/metrics.md) | [adapter-deployment.md](../components/adapter/framework/adapter-deployment.md) |
 
 **Notes:**
+
 - Components expose separate listener ports: `:9090` for metrics, `:8080` for health checks
 - The API service also exposes REST endpoints on port `:8000`
 - **Broker**: `hyperfleet-broker` is an embedded library ([broker.md](../components/broker/broker.md)), not a standalone service — it does not expose its own endpoints. Broker metrics and health checks are surfaced through the embedding component (Adapter)
