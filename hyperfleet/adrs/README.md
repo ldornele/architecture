@@ -98,3 +98,4 @@ What did we decide? State it plainly.
 | [0020](0020-envoy-authorino-api-gateway.md) | Envoy and Authorino as the API Authentication Gateway | Active | 2026-08-11 |
 | [0021](0021-oci-external-platform.md) | External Platform for the Guest in OCI Hosted Clusters | Active | 2026-09-01 |
 | [0022](0022-api-mediated-desire-store-access.md) | API-Mediated Desire Store Access | Active | 2026-09-10 |
+| [0024](0024-oke-load-balancer-security-nsg.md) | Dedicated Network Security Group for OKE Load Balancer Traffic | Proposed | 2026-09-14 |
