@@ -1180,7 +1180,7 @@ Store `labels JSONB` and `status_conditions JSONB` on the `resources` row.
 
 **Alternative — Generated/stored columns computed from `status_conditions JSONB`**
 
-Keep the JSONB column, but add `GENERATED ALWAYS AS (...) STORED` columns for specific condition type/subfield pairs (e.g. a `reconciled_status` column extracting `status_conditions -> 'Reconciled' ->> 'status'`), with a normal B-tree index on each.
+Keep the JSONB column — an array of condition records (`[{"type": "Reconciled", "status": "False", ...}, ...]`), matching the shape `jsonb_path_query_first` already used for the expression indexes HYPERFLEET-536 removed — but add `GENERATED ALWAYS AS (...) STORED` columns for specific condition type/subfield pairs, e.g. a `reconciled_status` column defined as `jsonb_path_query_first(status_conditions, '$[*] ? (@.type == "Reconciled")') ->> 'status'`, with a normal B-tree index on each.
 
 - Pro : A plain B-tree index on the generated column sidesteps the jsonpath/Squirrel placeholder conflict entirely — no expression-index tricks needed
 - Pro : Less invasive than full normalization — additive, no new table or association preloading
