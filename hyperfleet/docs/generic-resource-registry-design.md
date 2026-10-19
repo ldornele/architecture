@@ -1187,8 +1187,9 @@ Keep the JSONB column — an array of condition records (`[{"type": "Reconciled"
 - Con : Doesn't generalize — every new condition type or subfield that needs fast lookup requires its own generated column and migration, which works against a registry meant to support arbitrary condition types across N entity kinds
 - Con : Updating conditions is still a full-JSON replace from the application; none of the plain-JSONB write-complexity cons above are solved
 - Con : DB still cannot enforce uniqueness of a condition `type` inside the JSONB blob — only the pre-chosen generated columns get structure, everything else stays an unconstrained blob
+- Con : The stale-ready query needs `last_updated_time` as `TIMESTAMPTZ`. Since that cast isn't `IMMUTABLE`, a `GENERATED` column would require a custom wrapper function, an approach we previously rejected due to migration complexity and per-write overhead.
 
-**Why chosen:** Both JSONB-based alternatives only make a handful of pre-selected condition lookups fast; neither solves the general case the registry needs — arbitrary condition types, uniqueness per `(resource_id, type)`, and simple writes — without the application re-encoding and replacing the whole blob on every update. Dedicated tables solve all of that uniformly, with ordinary indexes and ordinary SQL, at the cost of a join most callers already pay for via `Preload`.
+**Why chosen:** Both JSONB-based alternatives only make a handful of pre-selected condition lookups fast; neither solves the general case the registry needs — arbitrary condition types, uniqueness per `(resource_id, type)`, and simple writes — without the application re-encoding and replacing the whole blob on every update. Dedicated tables solve all of that uniformly, with ordinary indexes and ordinary SQL, at the cost of an `IN` query most callers already pay for via `Preload`.
 
 ---
 
