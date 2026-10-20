@@ -1150,10 +1150,10 @@ The database is initialized from scratch. There is no existing data to migrate a
 **Database migrations:**
 
 ```text
-202604080001_add_resources.go           — CREATE TABLE resources + indexes
-202604080002_add_resource_labels.go     — CREATE TABLE resource_labels
-202604080003_add_resource_conditions.go — CREATE TABLE resource_conditions
-202604080004_add_resource_references.go — CREATE TABLE resource_references + indexes
+202605202128_add_resources.go              — CREATE TABLE resources, resource_labels,
+                                              resource_conditions, resource_references + indexes
+202607140001_add_condition_status_index.go — CREATE INDEX idx_resource_conditions_type_status
+                                              ON resource_conditions (type, status) WHERE status = 'False'
 ```
 
 The `clusters` and `node_pools` tables are not dropped — the database is initialized from scratch with no pre-existing tables.
@@ -1185,7 +1185,7 @@ Store `labels JSONB` and `status_conditions JSONB` on the `resources` row.
 
 Keep the JSONB column — an array of condition records (`[{"type": "Reconciled", "status": "False", ...}, ...]`), matching the shape `jsonb_path_query_first` already used for the expression indexes HYPERFLEET-536 removed — but add `GENERATED ALWAYS AS (...) STORED` columns for specific condition type/subfield pairs, e.g. a `reconciled_status` column defined as `jsonb_path_query_first(status_conditions, '$[*] ? (@.type == "Reconciled")') ->> 'status'`, with a normal B-tree index on each.
 
-- Pro : A plain B-tree index on the generated column sidesteps the jsonpath/Squirrel placeholder conflict entirely — no expression-index tricks needed
+- Pro : A query that filters the generated column directly with a plain equality predicate (e.g. `WHERE reconciled_status = 'False'`) gets a usable B-tree index without the jsonpath/Squirrel placeholder conflict — but only for that pre-chosen column; a query still built as a dynamic jsonpath predicate against `status_conditions` (e.g. the TSL condition filter, for arbitrary condition types) hits the same conflict as before
 - Pro : Less invasive than full normalization — additive, no new table or association preloading
 - Con : Doesn't generalize — every new condition type or subfield that needs fast lookup requires its own generated column and migration, which works against a registry meant to support arbitrary condition types across N entity kinds
 - Con : Updating conditions is still a full-JSON replace from the application; none of the plain-JSONB write-complexity cons above are solved
