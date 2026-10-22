@@ -384,10 +384,9 @@ CREATE INDEX idx_resources_deleted_at ON resources (deleted_at);
 -- resource_labels: no extra index needed — the composite PK (resource_id, key) is the leading index
 -- and covers all "WHERE resource_id = ?" queries efficiently.
 
--- resource_conditions: the composite PK (resource_id, type) is the leading index and covers
--- "WHERE resource_id = ?" lookups (Get, Preload) efficiently, and enforces uniqueness per
--- (resource_id, type). It does not help a type/status scan across all resources (e.g. Sentinel-style
--- selective polling), so a separate partial index covers that:
+-- resource_conditions: PK (resource_id, type) covers "WHERE resource_id = ?" (Get, Preload). This
+-- partial index covers type/status scans; the only such query is the reconciliation metrics join.
+-- The TSL condition filter (which the Sentinel polls via) does not use it:
 CREATE INDEX idx_resource_conditions_type_status
     ON resource_conditions (type, status) WHERE status = 'False';
 
@@ -1192,7 +1191,7 @@ Keep the JSONB column — an array of condition records (`[{"type": "Reconciled"
 - Con : DB still cannot enforce uniqueness of a condition `type` inside the JSONB blob — only the pre-chosen generated columns get structure, everything else stays an unconstrained blob
 - Con : The stale-ready query needs `last_updated_time` as `TIMESTAMPTZ`. Since that cast isn't `IMMUTABLE`, a `GENERATED` column would require a custom wrapper function, an approach we previously rejected due to migration complexity and per-write overhead.
 
-**Why chosen:** Both JSONB-based alternatives only make a handful of pre-selected condition lookups fast; neither solves the general case the registry needs — arbitrary condition types, uniqueness per `(resource_id, type)`, and simple writes — without the application re-encoding and replacing the whole blob on every update. Dedicated tables solve all of that uniformly, with ordinary SQL throughout, at the cost of an `IN` query most callers already pay for via `Preload`. Type/status-filtered scans joined against `resources` (e.g. the reconciliation-pending metrics query) use an ordinary B-tree index, confirmed via `EXPLAIN ANALYZE` — see [§4.2 Indexes](#42-database-schema). The generic TSL condition filter (`status.conditions.<Type>`) is a known exception: it resolves per resource via a correlated subquery rather than a join, which is an accepted trade-off for its dynamic query flexibility.
+**Why chosen:** Both JSONB-based alternatives only make a handful of pre-selected condition lookups fast; neither solves the general case the registry needs — arbitrary condition types, uniqueness per `(resource_id, type)`, and simple writes — without the application re-encoding and replacing the whole blob on every update. Dedicated tables solve all of that uniformly, with ordinary SQL throughout, at the cost of an `IN` query most callers already pay for via `Preload`. Type/status-filtered scans joined against `resources` (e.g. the reconciliation-pending metrics query) use an ordinary B-tree index, confirmed via `EXPLAIN ANALYZE` — see [§4.2 Indexes](#42-database-schema). The generic TSL condition filter (`status.conditions.<Type>`) is a known exception: it resolves per resource via a correlated subquery rather than a join.
 
 ---
 
